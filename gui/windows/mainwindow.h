@@ -115,8 +115,5 @@ private:
 
     vtkNew<vtkWindowToImageFilter> windowToImageFilter;
     vtkNew<vtkPNGWriter> writerPNG;
-
-    void save_cam_pos(QString str);
-    void load_cam_pos(QString str);
 };
 #endif // MAINWINDOW_H

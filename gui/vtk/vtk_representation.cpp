@@ -32,10 +32,8 @@ icy::VisualRepresentation::VisualRepresentation()
     points_mapper->SetInputData(points_filter->GetOutput());
     actor_points->SetMapper(points_mapper);
     actor_points->GetProperty()->SetPointSize(2);
-//    actor_points->GetProperty()->SetVertexColor(1,0,0);
+    actor_points->GetProperty()->SetVertexColor(1,0,0);
     actor_points->GetProperty()->SetColor(0,0,0);
-
-
 }
 
 

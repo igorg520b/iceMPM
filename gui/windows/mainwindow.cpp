@@ -144,6 +144,10 @@ MainWindow::MainWindow(QWidget *parent)
 
         comboBox_visualizations->setCurrentIndex(settings.value("vis_option").toInt());
     }
+    else
+    {
+        cameraReset_triggered();
+    }
 
     windowToImageFilter->SetInput(renderWindow);
     windowToImageFilter->SetScale(1); // image quality
@@ -165,6 +169,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
     connect(&model, SIGNAL(stepCompleted()), SLOT(updateGUI()));
     //connect(&model, SIGNAL(stepAborted()), SLOT(updateGUI()));
+
+    representation.SynchronizeTopology();
 
 }
 
@@ -210,10 +216,10 @@ void MainWindow::cameraReset_triggered()
 {
     spdlog::info("MainWindow::on_action_camera_reset_triggered()");
     vtkCamera* camera = renderer->GetActiveCamera();
-//    renderer->ResetCamera();
+    renderer->ResetCamera();
     camera->ParallelProjectionOn();
     camera->SetClippingRange(1e-1,1e3);
-    camera->SetFocalPoint(1.5, 1.0, 0.0);
+    camera->SetFocalPoint(1.0, 0., 0.);
     camera->SetPosition(0.0, 0.0, 50.0);
     camera->SetViewUp(0.0, 1.0, 0.0);
     camera->SetParallelScale(2.5);
@@ -322,37 +328,6 @@ void MainWindow::limits_changed(double val)
 
 
 
-void MainWindow::save_cam_pos(QString str)
-{
-    QSettings settings(settingsFileName,QSettings::IniFormat);
-    double data[10];
-    renderer->GetActiveCamera()->GetPosition(&data[0]);
-    renderer->GetActiveCamera()->GetFocalPoint(&data[3]);
-    data[6] = renderer->GetActiveCamera()->GetParallelScale();
-    QByteArray arr((char*)&data[0], sizeof(double)*10);
-    settings.setValue(str, arr);
-}
-
-void MainWindow::load_cam_pos(QString str)
-{
-    spdlog::info("load cam pos: {}", str.toStdString());
-    QFileInfo fi(settingsFileName);
-    if(!fi.exists()) return;
-
-    QSettings settings(settingsFileName,QSettings::IniFormat);
-    QVariant var = settings.value(str);
-    if(var.isNull()) return;
-    double *vec = (double*)var.toByteArray().constData();
-    vtkCamera* camera = renderer->GetActiveCamera();
-    renderer->ResetCamera();
-    camera->ParallelProjectionOn();
-    camera->SetClippingRange(1e-1,1e4);
-    camera->SetViewUp(0.0, 1.0, 0.0);
-    camera->SetPosition(vec[0],vec[1],vec[2]);
-    camera->SetFocalPoint(vec[3],vec[4],vec[5]);
-    camera->SetParallelScale(vec[6]);
-    camera->Modified();
-}
 
 void MainWindow::screenshot_triggered()
 {

@@ -25,8 +25,8 @@ void icy::Model::Reset()
         for(int j=0;j<pts_y;j++)
         {
             Point &p = points[i+j*pts_x];
-            float x = (float)i/(float)pts_x + distribution(generator) + 1.;
-            float y = (float)j/(float)pts_y + distribution(generator) + 1.;
+            float x = (float)i/(float)pts_x + distribution(generator);// + 1.;
+            float y = (float)j/(float)pts_y + distribution(generator);// + 1.;
             p.pos = Eigen::Vector2f(x,y);
             p.velocity = Eigen::Vector2f::Zero();
             p.Fe = p.Fp = Eigen::Matrix2f::Identity();
