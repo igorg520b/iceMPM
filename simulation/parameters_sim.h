@@ -27,6 +27,9 @@ public:
     double InitialTimeStep;
     double Gravity, Density, PoissonsRatio, YoungsModulus;
 
+    int GridX, GridY;
+    double cellsize;
+
     void Reset()
     {
         InitialTimeStep = 0.01; // 0.0005;
@@ -34,6 +37,9 @@ public:
         Density = 980;
         PoissonsRatio = 0.3;
         YoungsModulus = 10e5;
+
+        GridX = GridY = 64;
+        cellsize = 3./GridX;    // 3-meter space in horizotal direction
     }
 
 

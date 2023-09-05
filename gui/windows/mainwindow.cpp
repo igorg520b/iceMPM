@@ -352,6 +352,7 @@ void MainWindow::screenshot_triggered()
 void MainWindow::updateGUI()
 {
     if(worker->running) statusLabel->setText("simulation is running");
+    else statusLabel->setText("simulation is stopped");
     labelStepCount->setText(QString::number(model.currentStep));
     spdlog::info("updateGUI");
 }

@@ -10,6 +10,7 @@
 #include <algorithm>
 #include <chrono>
 #include <unordered_set>
+#include <utility>
 
 #include "parameters_sim.h"
 #include "modelcontrollerinterface.h"
@@ -50,9 +51,23 @@ public:
     int grid_x, grid_y;
 
     std::vector<Point> points;
+    std::vector<GridNode> grid;
 
-QMutex visual_update_mutex; // to prevent modifying mesh data while updating VTK representation
+    QMutex visual_update_mutex; // to prevent modifying mesh data while updating VTK representation
     bool visual_update_requested = false;  // true when signal has been already emitted to update vtk geometry
+
+private:
+    void ResetGrid();
+    void P2GTransfer();
+    void ComputeGridVelocities();
+    void ComputeForces();
+    void VelocityUpdates();
+    void UpdateDGs();
+    void G2PTransfer();
+    void ParticleAdvection();
+
+    // helper functions
+    std::pair<int,int> PosToGrid(Eigen::Vector2f position);
 };
 
 #endif

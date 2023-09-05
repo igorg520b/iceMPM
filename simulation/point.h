@@ -4,7 +4,24 @@
 #include <Eigen/Core>
 
 
-namespace icy { struct Point; }
+namespace icy { struct Point; struct GridNode;}
+
+
+struct icy::GridNode
+{
+    Eigen::Vector2f momentum, velocity, force;
+    float mass;
+
+    void Reset()
+    {
+        momentum.setZero();
+        velocity.setZero();
+        force.setZero();
+        mass = 0;
+    }
+
+};
+
 
 struct icy::Point
 {
