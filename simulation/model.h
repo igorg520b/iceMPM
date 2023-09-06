@@ -15,8 +15,10 @@
 #include "parameters_sim.h"
 #include "modelcontrollerinterface.h"
 #include "point.h"
+#include "gridnode.h"
 
 #include <Eigen/Core>
+#include <spdlog/spdlog.h>
 
 namespace icy { class Model; }
 
@@ -34,12 +36,10 @@ public:
 
 private:
     bool abortRequested;
-    void Aborting() {abortRequested = false; Q_EMIT stepAborted();};       // called before exiting Step() if aborted
     constexpr static int colWidth = 12;    // table column width when logging
 
 Q_SIGNALS:
     void stepCompleted();
-    void stepAborted();
 
     // Model
 public:
@@ -58,16 +58,14 @@ public:
 
 private:
     void ResetGrid();
-    void P2GTransfer();
-    void ComputeGridVelocities();
-    void ComputeForces();
-    void VelocityUpdates();
-    void UpdateDGs();
-    void G2PTransfer();
+    void P2G();
+    void UpdateNodes();
+    void G2P();
     void ParticleAdvection();
 
     // helper functions
     std::pair<int,int> PosToGrid(Eigen::Vector2f position);
+    Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val) const;
 };
 
 #endif

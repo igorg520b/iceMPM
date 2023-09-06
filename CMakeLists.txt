@@ -59,6 +59,8 @@ add_executable(iceMPM
     simulation/model.h
     simulation/point.h
     simulation/point.cpp
+    simulation/gridnode.h
+    simulation/gridnode.cpp
 )
 
 target_include_directories(iceMPM PRIVATE gui geometry gui/windows gui/vtk simulation)

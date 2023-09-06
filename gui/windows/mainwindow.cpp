@@ -167,7 +167,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
 
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
-    connect(&model, SIGNAL(stepCompleted()), SLOT(updateGUI()));
+    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
     //connect(&model, SIGNAL(stepAborted()), SLOT(updateGUI()));
 
     representation.SynchronizeTopology();
@@ -355,6 +355,12 @@ void MainWindow::updateGUI()
     else statusLabel->setText("simulation is stopped");
     labelStepCount->setText(QString::number(model.currentStep));
     spdlog::info("updateGUI");
+
+    if(model.currentStep % 10 == 0)
+    {
+        representation.SynchronizeValues();
+        renderWindow->Render();
+    }
 }
 
 void MainWindow::simulation_start_pause(bool checked)

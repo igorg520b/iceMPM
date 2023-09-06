@@ -48,14 +48,17 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
+    model->visual_update_mutex.lock();
     for(int i=0;i<model->points.size();i++)
     {
         icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
     }
-//    points->Modified();
+    model->visual_update_mutex.unlock();
+    points->Modified();
     points_filter->Update();
+//    actor_points->Modified();
 }
 
 
