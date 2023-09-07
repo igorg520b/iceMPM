@@ -27,7 +27,7 @@ void BackgroundWorker::Finalize()
     kill=true;
     condition.wakeOne();
     bool result = wait();
-    qDebug() << "BackgroundWorker::Finalize() terminated; " << result;
+    qDebug() << "BackgroundWorker::Finalize() done" << result;
 }
 
 void BackgroundWorker::run()
@@ -48,7 +48,7 @@ void BackgroundWorker::run()
 
         bool result = controller->Step();
         if(!result) timeToPause = true;
-        Q_EMIT stepCompleted();
+//        Q_EMIT stepCompleted();
     }
     qDebug() << "BackgroundWorker::run() terminated";
 }

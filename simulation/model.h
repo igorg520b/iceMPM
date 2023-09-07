@@ -61,7 +61,6 @@ private:
     void P2G();
     void UpdateNodes();
     void G2P();
-    void ParticleAdvection();
 
     // helper functions
     std::pair<int,int> PosToGrid(Eigen::Vector2f position);

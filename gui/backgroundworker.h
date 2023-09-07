@@ -32,7 +32,7 @@ private:
 
 Q_SIGNALS:
     void workerPaused();
-    void stepCompleted();
+//    void stepCompleted();
 };
 
 #endif // BACKGROUNDWORKER_H

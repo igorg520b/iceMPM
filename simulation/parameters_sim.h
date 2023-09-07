@@ -31,20 +31,24 @@ public:
     int GridX, GridY;
     float cellsize;
 
+    int UpdateEveryNthStep;
+
 
 
     void Reset()
     {
-        InitialTimeStep = 1e-4;
+        InitialTimeStep = 1e-3;
         Gravity = 9.81;
         Density = 980;
         PoissonsRatio = 0.3;
-        YoungsModulus = 10e4;
+        YoungsModulus = 10e5;
 
         GridX = GridY = 64;
         cellsize = 3./GridX;    // 3-meter space in horizotal direction
 
         ComputeLame();
+
+        UpdateEveryNthStep = 10;
     }
 
     void ComputeLame()
