@@ -159,10 +159,8 @@ void icy::Model::UpdateNodes()
 void icy::Model::G2P()
 {
     visual_update_mutex.lock();
-
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; g2p", currentStep);
     const float dt = prms.InitialTimeStep;
-
 
 #pragma omp parallel for
     for(int idx_p = 0; idx_p<points.size(); idx_p++)
@@ -204,32 +202,11 @@ void icy::Model::G2P()
                 T += node.velocity * dWip.transpose();
             }
 
-        // Particle Advection
-/*
-        for (int di = -1; di < 3; di++)
-            for (int dj = -1; dj < 3; dj++)
-            {
-                int i = i0+di;
-                int j = j0+dj;
-                int idx_gridnode = i + j*prms.GridX;
-                const icy::GridNode &node = grid[idx_gridnode];
-
-                Eigen::Vector2f pos_node(i*prms.cellsize, j*prms.cellsize);
-                Eigen::Vector2f d = pointPos_copy - pos_node;
-                float Wip = Point::wc(d, prms.cellsize);   // weight
-
-            }
-*/
-
         // Update particle deformation gradient (elasticity, plasticity etc...)
         p.Fe = (Eigen::Matrix2f::Identity() + dt*T) * p.Fe;
     }
-
     visual_update_mutex.unlock();
-
 }
-
-
 
 
 void icy::Model::Reset()
