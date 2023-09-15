@@ -88,6 +88,7 @@ MainWindow::MainWindow(QWidget *parent)
     scalarBar->SetLookupTable(representation.hueLut);
 //    renderer->AddActor(representation.actor_cylinder);
     renderer->AddActor(representation.actor_points);
+    renderer->AddActor(representation.actor_grid);
     renderer->AddActor(actorText);
 
     // text
@@ -219,7 +220,7 @@ void MainWindow::cameraReset_triggered()
     renderer->ResetCamera();
     camera->ParallelProjectionOn();
     camera->SetClippingRange(1e-1,1e3);
-    camera->SetFocalPoint(1.0, 0., 0.);
+    camera->SetFocalPoint(0, 0., 0.);
     camera->SetPosition(0.0, 0.0, 50.0);
     camera->SetViewUp(0.0, 1.0, 0.0);
     camera->SetParallelScale(2.5);

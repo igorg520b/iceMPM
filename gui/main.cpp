@@ -12,6 +12,8 @@
 #include "point.h"
 #include "gridnode.h"
 
+void test_cuda();
+
 int main(int argc, char *argv[])
 {
     spdlog::info("num threads {}", omp_get_max_threads());
@@ -21,6 +23,9 @@ int main(int argc, char *argv[])
     std::cout << std::endl;
     spdlog::info("sizeof(Point) = {}", sizeof(icy::Point));
     spdlog::info("sizeof(GridNode) = {}", sizeof(icy::GridNode));
+
+    // cuda test
+    test_cuda();
 
     QApplication a(argc, argv);
     QApplication::setApplicationName("iceMPM");

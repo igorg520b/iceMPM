@@ -34,6 +34,20 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_points->GetProperty()->SetPointSize(2);
     actor_points->GetProperty()->SetVertexColor(1,0,0);
     actor_points->GetProperty()->SetColor(0,0,0);
+
+
+    grid_mapper->SetInputData(structuredGrid);
+    grid_mapper->SetLookupTable(hueLut);
+
+//    mapper_structuredGrid->SetScalarRange(0, dataSize - 1);
+//    mapper_structuredGrid->ScalarVisibilityOn();
+
+    actor_grid->SetMapper(grid_mapper);
+    actor_grid->GetProperty()->SetEdgeVisibility(true);
+    actor_grid->GetProperty()->SetEdgeColor(0.8,0.8,0.8);
+//    actor_grid->GetProperty()->SetRepresentationToWireframe();
+//    actor_grid->GetProperty()->SetVertexColor(1,0,0);
+    actor_grid->GetProperty()->SetColor(0.95,0.95,0.95);
 }
 
 
@@ -42,6 +56,27 @@ void icy::VisualRepresentation::SynchronizeTopology()
 {
     points->SetNumberOfPoints(model->points.size());
     SynchronizeValues();
+
+    // structured grid
+    int &gx = model->prms.GridX;
+    int &gy = model->prms.GridY;
+    float &h = model->prms.cellsize;
+    spdlog::info("SetDimensions {}, {}, {}",model->prms.GridX, model->prms.GridY, 1);
+    structuredGrid->SetDimensions(model->prms.GridX, model->prms.GridY, 1);
+
+    grid_points->SetNumberOfPoints(gx*gy);
+    for(int idx_y=0; idx_y<gy; idx_y++)
+        for(int idx_x=0; idx_x<gx; idx_x++)
+        {
+            float x = idx_x * h;
+            float y = idx_y * h;
+            double pt_pos[3] {x, y, -1.0};
+            grid_points->SetPoint((vtkIdType)(idx_x+idx_y*gx), pt_pos);
+        }
+
+    structuredGrid->SetPoints(grid_points);
+
+
     spdlog::info("void icy::MeshRepresentation::SynchronizeTopology() done");
 }
 

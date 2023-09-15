@@ -32,7 +32,7 @@ public:
     void Reset();
     void Prepare() override;        // invoked once, at simulation start
     bool Step() override;           // either invoked by Worker or via GUI
-    void RequestAbort() override {abortRequested = true;};   // invoked from GUI
+    void RequestAbort() override {abortRequested = true;}   // invoked from GUI
 
 private:
     bool abortRequested;
@@ -47,8 +47,8 @@ public:
 
     int currentStep;
     double simulationTime;
-    double h; // grid spacing
-    int grid_x, grid_y;
+
+    float indenter_position;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;

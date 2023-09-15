@@ -146,12 +146,12 @@ void icy::Model::UpdateNodes()
         int idx_x = idx % prms.GridX;
         int idx_y = idx / prms.GridX;
 
-        // basic non-sticky "floor" boundary
-        if(idx_y <= 2 && gn.velocity.y()<0) gn.velocity.y() = 0;
-        else if(idx_y >= prms.GridY-3 && gn.velocity.y()>0) gn.velocity.y() = 0;
+        // attached bottom layer
+        if(idx_y <= 3) gn.velocity.setZero();
+        else if(idx_y >= prms.GridY-3 && gn.velocity[1]>0) gn.velocity[1] = 0;
 
-        if(idx_x <= 2 && gn.velocity.x()<0) gn.velocity.x() *= 0;
-        else if(idx_x >= prms.GridX-3 && gn.velocity.x()>0) gn.velocity.x() = 0;
+        if(idx_x <= 2 && gn.velocity.x()<0) gn.velocity[0] = 0;
+        else if(idx_x >= prms.GridX-3 && gn.velocity[0]>0) gn.velocity[0] = 0;
     }
 }
 
@@ -211,39 +211,86 @@ void icy::Model::G2P()
 
 void icy::Model::Reset()
 {
+    constexpr float block_length = 2.5f;
+    constexpr float block_height = 1.0f;
+    constexpr bool use_grid_fill = false;//true;    // otherwise fill at random
+    const float &h = prms.cellsize;
+
+
     currentStep = 0;
     simulationTime = 0;
 
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("icy::Model::Reset() done");
 
     std::default_random_engine generator;
 
-    grid_x = prms.GridX;
-    grid_y = prms.GridY;
-    h = prms.cellsize;   // 3 meters across
-    const int pts_x = 100, pts_y=100;
-    const float vol = grid_x*h*grid_y*h/(pts_x*pts_y);
-    std::normal_distribution<double> distribution(0,1./(pts_x*100));
 
-    points.resize(pts_x*pts_y);
-    for(int i=0;i<pts_x;i++)
-        for(int j=0;j<pts_y;j++)
+
+
+    if(use_grid_fill)
+    {
+        // fill the block in a regular grid
+        float aspect = block_height/block_length;
+        const int nx = 250;
+        const int ny = (int)(nx*block_height/block_length);
+        const int total_points = nx*ny;
+        points.resize(total_points);
+        constexpr float pt_vol = block_length*block_height/total_points;
+
+        std::normal_distribution<float> distribution(0,0.1*block_length/nx);
+        for(int idx_x = 0; idx_x < nx; idx_x++)
+            for(int idx_y = 0; idx_y < ny; idx_y++)
         {
-            Point &p = points[i+j*pts_x];
-            float x = (float)i/(float)pts_x + distribution(generator) + 1.;
-            float y = (float)j/(float)pts_y + distribution(generator) + 1.;
+            float x = block_length*idx_x/(nx-1) + 5.0f*h + distribution(generator);
+            float y = block_height*idx_y/(ny-1) + 2.0f*h + distribution(generator);
 
-            p.pos = Eigen::Vector2f(x,y);
+            Point &p = points[idx_x + idx_y*nx];
+            p.pos.x() = x;
+            p.pos.y() = y;
 
-            //p.velocity.setZero();
             p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
-            p.velocity.y() = 1.f + (-p.pos.x()-1.5)/2;
+            p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
+
             p.Fe.setIdentity();
-            p.volume = vol;
-            p.mass = vol*prms.Density;
+            p.volume = pt_vol;
+            p.mass = pt_vol*prms.Density;
             p.Bp.setZero();
         }
+    }
+    else
+    {
+        // fill the block at random points
+        const int total_points = 10000;
+        points.resize(total_points);
+        std::uniform_real_distribution<float> distribution(0.,1.);
+        constexpr float pt_vol = block_length*block_height/total_points;
+        constexpr int qn = 50;
+        int count = 0;
+        for(int k=0; k<total_points/(qn*qn); k++)
+            for(int qx = 0; qx < qn; qx++)
+                for(int qy = 0; qy < qn; qy++)
+                {
+                    Point &p = points[count++];
+
+                    float x = (qx + distribution(generator))*block_length/qn;
+                    float y = (qy + distribution(generator))*block_height/qn;
+                    p.pos.x() = x+ 5.0f*h;
+                    p.pos.y() = y+ 2.0f*h;
+                    p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
+                    p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
+
+                    p.Fe.setIdentity();
+                    p.volume = pt_vol;
+                    p.mass = pt_vol*prms.Density;
+                    p.Bp.setZero();
+
+                }
+    }
+
+    const int &grid_x = prms.GridX;
+    const int &grid_y = prms.GridY;
     grid.resize(grid_x*grid_y);
+
+    spdlog::info("icy::Model::Reset() done");
 }
 
 void icy::Model::Prepare()

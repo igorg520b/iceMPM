@@ -21,6 +21,12 @@ class icy::SimParams : public QObject
     Q_PROPERTY(float p_YoungsModulus MEMBER YoungsModulus NOTIFY propertyChanged)
     Q_PROPERTY(float p_PoissonsRatio MEMBER PoissonsRatio NOTIFY propertyChanged)
 
+    // indenter
+    Q_PROPERTY(float IndDiameter MEMBER IndDiameter NOTIFY propertyChanged)
+    Q_PROPERTY(float IndVelocity MEMBER IndVelocity NOTIFY propertyChanged)
+    Q_PROPERTY(float IndDepth MEMBER IndDepth NOTIFY propertyChanged)
+
+
 public:
     SimParams() { Reset(); }
 
@@ -33,22 +39,26 @@ public:
 
     int UpdateEveryNthStep;
 
-
+    float IndDiameter, IndVelocity, IndDepth;
 
     void Reset()
     {
-        InitialTimeStep = 1e-3;
+        InitialTimeStep = 5e-4;
         Gravity = 9.81;
         Density = 980;
         PoissonsRatio = 0.3;
         YoungsModulus = 10e5;
 
-        GridX = GridY = 64;
-        cellsize = 3./GridX;    // 3-meter space in horizotal direction
-
+        GridX = 64;
+        GridY = 32;
+        cellsize = 3./GridX;
         ComputeLame();
 
         UpdateEveryNthStep = 10;
+
+        IndDiameter = 0.342;
+        IndVelocity = 0.2;
+        IndDepth = 0.101;
     }
 
     void ComputeLame()

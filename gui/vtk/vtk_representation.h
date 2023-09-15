@@ -23,9 +23,10 @@
 #include <vtkCellData.h>
 #include <vtkPoints.h>
 #include <vtkVertexGlyphFilter.h>
+#include <vtkStructuredGrid.h>
 
 #include <vtkRegularPolygonSource.h>
-#include <vtkCylinderSource.h> // testing
+#include <vtkCylinderSource.h>
 
 
 
@@ -73,6 +74,10 @@ private:
     vtkNew<vtkCellArray> points_cells;
     vtkNew<vtkVertexGlyphFilter> points_filter;
 
+    // background grid
+    vtkNew<vtkStructuredGrid> structuredGrid;
+    vtkNew<vtkDataSetMapper> grid_mapper;
+    vtkNew<vtkPoints> grid_points;
 
     static constexpr float lutArrayTemperatureAdj[51][3] =
         {{0.770938, 0.951263, 0.985716}, {0.788065, 0.959241, 0.986878},
