@@ -86,9 +86,9 @@ MainWindow::MainWindow(QWidget *parent)
     representation.model = &model;
 
     scalarBar->SetLookupTable(representation.hueLut);
-//    renderer->AddActor(representation.actor_cylinder);
     renderer->AddActor(representation.actor_points);
     renderer->AddActor(representation.actor_grid);
+    renderer->AddActor(representation.actor_indenter);
     renderer->AddActor(actorText);
 
     // text

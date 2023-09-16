@@ -48,7 +48,7 @@ public:
     int currentStep;
     double simulationTime;
 
-    float indenter_position;
+    float indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;

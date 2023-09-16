@@ -56,16 +56,16 @@ public:
     vtkNew<vtkLookupTable> hueLut;
     vtkNew<vtkActor> actor_points;
     vtkNew<vtkActor> actor_grid;
-    vtkNew<vtkActor> actor_cylinder; // testing
+    vtkNew<vtkActor> actor_indenter;
 
 private:
     VisOpt VisualizingVariable = VisOpt::none;
 
     vtkNew<vtkLookupTable> hueLut_pastel;
 
-    // testing - cylinder
-    vtkNew<vtkCylinderSource> cylinderSource;
-    vtkNew<vtkPolyDataMapper> cylinderMapper;
+    // indenter
+    vtkNew<vtkRegularPolygonSource> indenterSource;
+    vtkNew<vtkPolyDataMapper> indenterMapper;
 
     // points
     vtkNew<vtkPoints> points;

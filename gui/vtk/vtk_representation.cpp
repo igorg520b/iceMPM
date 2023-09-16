@@ -21,8 +21,23 @@ icy::VisualRepresentation::VisualRepresentation()
     hueLut_pastel->SetTableRange(0,39);
 
 
-    cylinderMapper->SetInputConnection(cylinderSource->GetOutputPort());
-    actor_cylinder->SetMapper(cylinderMapper);
+    indenterMapper->SetInputConnection(indenterSource->GetOutputPort());
+    actor_indenter->SetMapper(indenterMapper);
+
+    indenterSource->GeneratePolygonOff();
+    indenterSource->SetNumberOfSides(50);
+
+    indenterMapper->SetInputConnection(indenterSource->GetOutputPort());
+    actor_indenter->SetMapper(indenterMapper);
+    actor_indenter->GetProperty()->LightingOff();
+    actor_indenter->GetProperty()->EdgeVisibilityOn();
+    actor_indenter->GetProperty()->VertexVisibilityOff();
+    actor_indenter->GetProperty()->SetColor(0.1,0.1,0.1);
+    actor_indenter->GetProperty()->SetEdgeColor(90.0/255.0, 90.0/255.0, 97.0/255.0);
+    actor_indenter->GetProperty()->ShadingOff();
+    actor_indenter->GetProperty()->SetInterpolationToFlat();
+    actor_indenter->PickableOff();
+    actor_indenter->GetProperty()->SetLineWidth(3);
 
 
     points_polydata->SetPoints(points);
@@ -34,6 +49,10 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_points->GetProperty()->SetPointSize(2);
     actor_points->GetProperty()->SetVertexColor(1,0,0);
     actor_points->GetProperty()->SetColor(0,0,0);
+    actor_points->GetProperty()->LightingOff();
+    actor_points->GetProperty()->ShadingOff();
+    actor_points->GetProperty()->SetInterpolationToFlat();
+    actor_points->PickableOff();
 
 
     grid_mapper->SetInputData(structuredGrid);
@@ -45,6 +64,10 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_grid->SetMapper(grid_mapper);
     actor_grid->GetProperty()->SetEdgeVisibility(true);
     actor_grid->GetProperty()->SetEdgeColor(0.8,0.8,0.8);
+    actor_grid->GetProperty()->LightingOff();
+    actor_grid->GetProperty()->ShadingOff();
+    actor_grid->GetProperty()->SetInterpolationToFlat();
+    actor_grid->PickableOff();
 //    actor_grid->GetProperty()->SetRepresentationToWireframe();
 //    actor_grid->GetProperty()->SetVertexColor(1,0,0);
     actor_grid->GetProperty()->SetColor(0.95,0.95,0.95);
@@ -76,6 +99,9 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
     structuredGrid->SetPoints(grid_points);
 
+    // indenter
+    indenterSource->SetRadius(model->prms.IndDiameter/2.f);
+
 
     spdlog::info("void icy::MeshRepresentation::SynchronizeTopology() done");
 }
@@ -93,7 +119,8 @@ void icy::VisualRepresentation::SynchronizeValues()
     model->visual_update_mutex.unlock();
     points->Modified();
     points_filter->Update();
-//    actor_points->Modified();
+
+    indenterSource->SetCenter(model->indenter_x, model->indenter_y, 1);
 }
 
 

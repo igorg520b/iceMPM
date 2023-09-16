@@ -56,7 +56,7 @@ public:
 
         UpdateEveryNthStep = 10;
 
-        IndDiameter = 0.342;
+        IndDiameter = 0.324;
         IndVelocity = 0.2;
         IndDepth = 0.101;
     }

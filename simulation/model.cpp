@@ -11,6 +11,9 @@ bool icy::Model::Step()
 {
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info(" ");
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} started", currentStep);
+
+    indenter_x = indenter_x_initial + simulationTime*prms.IndVelocity;
+
     ResetGrid();
     P2G();
     if(abortRequested) return false;
@@ -21,6 +24,7 @@ bool icy::Model::Step()
 //    ParticleAdvection();
 
     currentStep++;
+    simulationTime += prms.InitialTimeStep;
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} completed\n", currentStep);
 
     if(currentStep % prms.UpdateEveryNthStep == 0) Q_EMIT stepCompleted();
@@ -289,6 +293,9 @@ void icy::Model::Reset()
     const int &grid_x = prms.GridX;
     const int &grid_y = prms.GridY;
     grid.resize(grid_x*grid_y);
+
+    indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
+    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2;
 
     spdlog::info("icy::Model::Reset() done");
 }
