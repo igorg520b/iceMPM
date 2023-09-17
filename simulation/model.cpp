@@ -1,8 +1,11 @@
+#include "model.h"
 #include <vtkPointData.h>
 #include <QtGlobal>
-#include "model.h"
+
 #include "spdlog/spdlog.h"
-#include <random>
+#include "poisson_disk_sampling.h"
+
+#include <cmath>
 
 #include <Eigen/SVD>
 #include <Eigen/LU>
@@ -21,7 +24,6 @@ bool icy::Model::Step()
     if(abortRequested) return false;
     G2P();
     if(abortRequested) return false;
-//    ParticleAdvection();
 
     currentStep++;
     simulationTime += prms.InitialTimeStep;
@@ -36,20 +38,13 @@ bool icy::Model::Step()
 void icy::Model::ResetGrid()
 {
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; reset grid", currentStep);
-
-//#pragma omp parallel for
-//    for(int i=0;i<grid.size();i++) grid[i].Reset();
-
     memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
 }
 
-
-std::pair<int,int> icy::Model::PosToGrid(Eigen::Vector2f pos)
+void icy::Model::PosToGrid(Eigen::Vector2f pos, int &idx_x, int &idx_y)
 {
-    float h = prms.cellsize;
-    int idx_x = std::clamp((int)(pos[0]/h),0,prms.GridX-1);
-    int idx_y = std::clamp((int)(pos[1]/h),0,prms.GridY-1);
-    return {idx_x, idx_y};
+    idx_x = std::clamp((int)(pos[0]/prms.cellsize),0,prms.GridX-1);
+    idx_y = std::clamp((int)(pos[1]/prms.cellsize),0,prms.GridY-1);
 }
 
 
@@ -79,18 +74,15 @@ void icy::Model::P2G()
         Point &p = points[pt_idx];
 
         // this is for elastic material only
-        Eigen::Matrix2f Re;
-
-//        Eigen::JacobiSVD<Eigen::Matrix2f, Eigen::ComputeFullU | Eigen::ComputeFullV> svd(p.Fe);
-//        Re = svd.matrixU()*svd.matrixV();
-        Re = polar_decomp_R(p.Fe);
+        Eigen::Matrix2f Re = polar_decomp_R(p.Fe);
         float Je = p.Fe.determinant();
         Eigen::Matrix2f dFe = 2.f * mu*(p.Fe - Re)* p.Fe.transpose() +
                 lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
 
-        Eigen::Matrix2f Ap = dFe * p.volume;
+        Eigen::Matrix2f Ap = dFe * particle_volume;
 
-        auto [i0, j0] = PosToGrid(p.pos);
+        int i0, j0;
+        PosToGrid(p.pos, i0, j0);
 
         for (int di = -1; di < 3; di++)
             for (int dj = -1; dj < 3; dj++)
@@ -110,7 +102,7 @@ void icy::Model::P2G()
                 Eigen::Vector2f dWip = Point::gradwc(d, prms.cellsize);    // weight gradient
 
                 // APIC increments
-                float incM = Wip * p.mass;
+                float incM = Wip * particle_mass;
                 Eigen::Vector2f incV = incM * (p.velocity + Dp_inv * p.Bp * (-d));
                 Eigen::Vector2f incFi = Ap * dWip;
 
@@ -139,6 +131,9 @@ void icy::Model::UpdateNodes()
 
     const float dt = prms.InitialTimeStep;
     const Eigen::Vector2f gravity(0,-prms.Gravity);
+    const float indRsq = prms.IndDiameter*prms.IndDiameter/4.f;
+    const Eigen::Vector2f vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
+    const Eigen::Vector2f indCenter(indenter_x, indenter_y);
 
 #pragma omp parallel for schedule (dynamic)
     for (int idx = 0; idx < grid.size(); idx++)
@@ -156,6 +151,22 @@ void icy::Model::UpdateNodes()
 
         if(idx_x <= 2 && gn.velocity.x()<0) gn.velocity[0] = 0;
         else if(idx_x >= prms.GridX-3 && gn.velocity[0]>0) gn.velocity[0] = 0;
+
+        // indenter
+        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
+        Eigen::Vector2f n = gnpos - indCenter;
+        if(n.squaredNorm() < indRsq)
+        {
+            // grid node is inside the indenter
+            Eigen::Vector2f vrel = gn.velocity - vco;
+            n.normalize();
+            float vn = vrel.dot(n);   // normal component of the velocity
+            if(vn < 0)
+            {
+                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
+            }
+        }
     }
 }
 
@@ -173,7 +184,8 @@ void icy::Model::G2P()
         p.velocity.setZero();
         p.Bp.setZero();
 
-        auto [i0, j0] = PosToGrid(p.pos);
+        int i0, j0;
+        PosToGrid(p.pos, i0, j0);
         Eigen::Vector2f pointPos_copy = p.pos;
         p.pos.setZero();
 
@@ -215,87 +227,43 @@ void icy::Model::G2P()
 
 void icy::Model::Reset()
 {
-    constexpr float block_length = 2.5f;
-    constexpr float block_height = 1.0f;
-    constexpr bool use_grid_fill = false;//true;    // otherwise fill at random
-    const float &h = prms.cellsize;
-
-
+    spdlog::info("icy::Model::Reset()");
     currentStep = 0;
     simulationTime = 0;
 
+    const float &block_length = prms.BlockLength;
+    const float &block_height = prms.BlockHeight;
+    const float &h = prms.cellsize;
 
-    std::default_random_engine generator;
+    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*M_PI)));
+    const std::array<float, 2>kXMin{5.0f*h, 2.0f*h};
+    const std::array<float, 2>kXMax{5.0f*h+block_length, 2.0f*h+block_height};
+    spdlog::info("starting thinks::PoissonDiskSampling");
+    std::vector<std::array<float, 2>> prresult = thinks::PoissonDiskSampling(kRadius, kXMin, kXMax);
+    const size_t nPoints = prresult.size();
+    points.resize(nPoints);
+    prms.PointCountActual = nPoints;
+    spdlog::info("finished thinks::PoissonDiskSampling; {} ", nPoints);
 
-
-
-
-    if(use_grid_fill)
+    particle_volume = block_length*block_height/nPoints;
+    for(int k = 0; k<nPoints; k++)
     {
-        // fill the block in a regular grid
-        float aspect = block_height/block_length;
-        const int nx = 250;
-        const int ny = (int)(nx*block_height/block_length);
-        const int total_points = nx*ny;
-        points.resize(total_points);
-        constexpr float pt_vol = block_length*block_height/total_points;
-
-        std::normal_distribution<float> distribution(0,0.1*block_length/nx);
-        for(int idx_x = 0; idx_x < nx; idx_x++)
-            for(int idx_y = 0; idx_y < ny; idx_y++)
-        {
-            float x = block_length*idx_x/(nx-1) + 5.0f*h + distribution(generator);
-            float y = block_height*idx_y/(ny-1) + 2.0f*h + distribution(generator);
-
-            Point &p = points[idx_x + idx_y*nx];
-            p.pos.x() = x;
-            p.pos.y() = y;
-
-            p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
-            p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
-
-            p.Fe.setIdentity();
-            p.volume = pt_vol;
-            p.mass = pt_vol*prms.Density;
-            p.Bp.setZero();
-        }
+        Point &p = points[k];
+        p.pos[0] = prresult[k][0];
+        p.pos[1] = prresult[k][1];
+        p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
+        p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
+        p.Fe.setIdentity();
+        p.Bp.setZero();
     }
-    else
-    {
-        // fill the block at random points
-        const int total_points = 10000;
-        points.resize(total_points);
-        std::uniform_real_distribution<float> distribution(0.,1.);
-        constexpr float pt_vol = block_length*block_height/total_points;
-        constexpr int qn = 50;
-        int count = 0;
-        for(int k=0; k<total_points/(qn*qn); k++)
-            for(int qx = 0; qx < qn; qx++)
-                for(int qy = 0; qy < qn; qy++)
-                {
-                    Point &p = points[count++];
-
-                    float x = (qx + distribution(generator))*block_length/qn;
-                    float y = (qy + distribution(generator))*block_height/qn;
-                    p.pos.x() = x+ 5.0f*h;
-                    p.pos.y() = y+ 2.0f*h;
-                    p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
-                    p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
-
-                    p.Fe.setIdentity();
-                    p.volume = pt_vol;
-                    p.mass = pt_vol*prms.Density;
-                    p.Bp.setZero();
-
-                }
-    }
+    this->particle_mass = particle_volume*prms.Density;
 
     const int &grid_x = prms.GridX;
     const int &grid_y = prms.GridY;
     grid.resize(grid_x*grid_y);
 
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2;
+    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
     spdlog::info("icy::Model::Reset() done");
 }
@@ -305,7 +273,3 @@ void icy::Model::Prepare()
     spdlog::info("icy::Model::Prepare()");
     abortRequested = false;
 }
-
-
-
-

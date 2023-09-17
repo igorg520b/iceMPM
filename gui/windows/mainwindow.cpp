@@ -39,8 +39,15 @@ MainWindow::MainWindow(QWidget *parent)
     scalarBar->GetLabelTextProperty()->ShadowOff();
     scalarBar->GetLabelTextProperty()->SetColor(0.1,0.1,0.1);
 
+    // property browser
+    pbrowser = new ObjectPropertyBrowser(this);
+
     // splitter
-    setCentralWidget(qt_vtk_widget);
+    splitter = new QSplitter(Qt::Orientation::Horizontal);
+    splitter->addWidget(pbrowser);
+    splitter->addWidget(qt_vtk_widget);
+    splitter->setSizes(QList<int>({100, 500}));
+    setCentralWidget(splitter);
 
     // toolbar - combobox
     comboBox_visualizations = new QComboBox();
@@ -162,11 +169,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionCreate_Video, &QAction::triggered, this, &MainWindow::createVideo_triggered);
     connect(qdsbLimitLow,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
     connect(qdsbLimitHigh,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
-
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
-
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
-
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
 //    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
     connect(&model, SIGNAL(stepCompleted()), SLOT(updateGUI()));
@@ -174,6 +178,16 @@ MainWindow::MainWindow(QWidget *parent)
 
     representation.SynchronizeTopology();
 }
+
+
+void MainWindow::showEvent( QShowEvent*)
+{
+    spdlog::info("MainWindow::showEvent( QShowEvent*)");
+    pbrowser->setActiveObject(&model.prms);
+    updateGUI();
+}
+
+
 
 void MainWindow::closeEvent( QCloseEvent* event )
 {

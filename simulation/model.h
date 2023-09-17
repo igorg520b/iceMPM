@@ -25,6 +25,7 @@ namespace icy { class Model; }
 class icy::Model : public QObject, public ModelControllerInterface
 {
     Q_OBJECT
+    Q_PROPERTY(int iCurrentStep MEMBER currentStep)
 
     // ModelController
 public:
@@ -43,12 +44,13 @@ Q_SIGNALS:
 
     // Model
 public:
-    SimParams prms;
+    icy::SimParams prms;
 
     int currentStep;
     double simulationTime;
 
     float indenter_x, indenter_x_initial, indenter_y;
+    float particle_volume, particle_mass;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;
@@ -63,7 +65,7 @@ private:
     void G2P();
 
     // helper functions
-    std::pair<int,int> PosToGrid(Eigen::Vector2f position);
+    void PosToGrid(Eigen::Vector2f position, int &idx_x, int &idx_y);
     Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val) const;
 };
 

@@ -61,7 +61,7 @@ add_executable(iceMPM
     simulation/gridnode.cpp
 )
 
-target_include_directories(iceMPM PRIVATE gui geometry gui/windows gui/vtk simulation)
+target_include_directories(iceMPM PRIVATE gui geometry gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
 
 target_link_libraries(iceMPM PRIVATE Qt5::Widgets Qt5::Core)
 

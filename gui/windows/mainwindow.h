@@ -36,16 +36,17 @@
 #include <vtkScalarBarActor.h>
 #include <vtkTextProperty.h>
 #include <vtkTextActor.h>
-
 #include <vtkWindowToImageFilter.h>
 #include <vtkPNGWriter.h>
-
 #include <vtkInteractorStyleRubberBand2D.h>
 
+#include "objectpropertybrowser.h"
 #include "preferences_gui.h"
 #include "vtk_representation.h"
 #include "model.h"
 #include "backgroundworker.h"
+#include "parameters_sim.h"
+
 #include <spdlog/spdlog.h>
 
 #include <fstream>
@@ -66,6 +67,7 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void closeEvent( QCloseEvent* event ) override;
+    void showEvent( QShowEvent* event ) override;
 
 private Q_SLOTS:
     void quit_triggered();
@@ -97,6 +99,9 @@ private:
     QComboBox *comboBox_visualizations;
     QSlider *slider1;
     QDoubleSpinBox *qdsbLimitLow, *qdsbLimitHigh;   // high and low limits for value scale
+
+    ObjectPropertyBrowser *pbrowser;    // to show simulation settings/properties
+    QSplitter *splitter;
 
     // VTK
     vtkNew<vtkGenericOpenGLRenderWindow> renderWindow;

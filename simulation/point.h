@@ -9,7 +9,6 @@ namespace icy { struct Point; }
 
 struct icy::Point
 {
-    float mass, volume;
     Eigen::Vector2f pos, velocity;
     Eigen::Matrix2f Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
 
