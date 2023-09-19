@@ -25,7 +25,7 @@ class icy::SimParams : public QObject
     Q_PROPERTY(double p_FrictionCoeff MEMBER IceFrictionCoefficient NOTIFY propertyChanged)
     Q_PROPERTY(double p_ParticleVolume READ getParticleVolume)
     Q_PROPERTY(double p_ParticleMass READ getParticleMass)
-
+    Q_PROPERTY(double p_ParticleViewSize MEMBER ParticleViewSize NOTIFY propertyChanged)
 
     //Q_PROPERTY(double in_HHTalpha READ getHHTalpha WRITE setHHTalpha)
 
@@ -58,7 +58,7 @@ public:
     int PointsWanted, PointCountActual;
     float BlockHeight, BlockLength;
 
-    float ParticleVolume, ParticleMass;
+    float ParticleVolume, ParticleMass, ParticleViewSize;
 
 
     void Reset()
@@ -73,7 +73,8 @@ public:
 
         GridX = 128;
         GridY = 64;
-        PointsWanted = 150000;
+        PointsWanted = 200'000;
+        ParticleViewSize = 2.3f;
         cellsize = 3./GridX;
         ComputeLame();
 

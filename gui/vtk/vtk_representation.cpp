@@ -60,7 +60,7 @@ icy::VisualRepresentation::VisualRepresentation()
     visualized_values->SetName("visualized_values");
 
     actor_points->SetMapper(points_mapper);
-    actor_points->GetProperty()->SetPointSize(3);
+    actor_points->GetProperty()->SetPointSize(2);
     actor_points->GetProperty()->SetVertexColor(1,0,0);
     actor_points->GetProperty()->SetColor(0,0,0);
     actor_points->GetProperty()->LightingOff();
@@ -128,6 +128,8 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
+    actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
+
     model->visual_update_mutex.lock();
     for(int i=0;i<model->points.size();i++)
     {

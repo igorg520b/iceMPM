@@ -115,6 +115,7 @@ private:
     void OpenFile(QString fileName);
     void GoToStep(int step);
     QString qLastFileName, qBaseFileName, qLastDirectory;
+    const std::string screenshot_directory = "/screenshots";
     bool replayMode = false;
     int replayFrame;
 

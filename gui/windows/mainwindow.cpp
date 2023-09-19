@@ -151,11 +151,19 @@ MainWindow::MainWindow(QWidget *parent)
         }
 
         comboBox_visualizations->setCurrentIndex(settings.value("vis_option").toInt());
+
+        var = settings.value("take_screenshots");
+        if(!var.isNull())
+        {
+            ui->actionTake_Screenshots->setChecked(var.toBool());
+        }
     }
     else
     {
         cameraReset_triggered();
     }
+    QDir pngDir(QDir::currentPath()+ screenshot_directory.c_str());
+    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ screenshot_directory.c_str());
 
     windowToImageFilter->SetInput(renderWindow);
     windowToImageFilter->SetScale(1); // image quality
@@ -215,6 +223,8 @@ void MainWindow::quit_triggered()
     spdlog::info("camData saved");
 
     if(!qLastFileName.isEmpty()) settings.setValue("lastFile", qLastFileName);
+
+    settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
     QApplication::quit();
 }
 
@@ -346,12 +356,15 @@ void MainWindow::limits_changed(double val)
 
 void MainWindow::screenshot_triggered()
 {
+    int screenshot_number = model.currentStep / model.prms.UpdateEveryNthStep;
+    QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
+            QString::number(screenshot_number).rightJustified(5, '0') + ".png";
+
     renderWindow->DoubleBufferOff();
     renderWindow->Render();
     windowToImageFilter->SetInputBufferTypeToRGBA(); //also record the alpha (transparency) channel
     renderWindow->WaitForCompletion();
 
-    QString outputPath = qBaseFileName + ".png";
 
     windowToImageFilter->Update();
     windowToImageFilter->Modified();
@@ -373,6 +386,8 @@ void MainWindow::updateGUI()
 
     representation.SynchronizeValues();
     renderWindow->Render();
+
+    if( ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
 }
 
 void MainWindow::simulation_start_pause(bool checked)

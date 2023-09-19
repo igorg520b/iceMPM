@@ -40,6 +40,7 @@
     <addaction name="action_camera_reset"/>
     <addaction name="actionCreate_Video"/>
     <addaction name="actionScreenshot"/>
+    <addaction name="actionTake_Screenshots"/>
    </widget>
    <widget class="QMenu" name="menuSimulation">
     <property name="title">
@@ -146,6 +147,14 @@
   <action name="actionReset">
    <property name="text">
     <string>Reset</string>
+   </property>
+  </action>
+  <action name="actionTake_Screenshots">
+   <property name="checkable">
+    <bool>true</bool>
+   </property>
+   <property name="text">
+    <string>Take Screenshots</string>
    </property>
   </action>
  </widget>
