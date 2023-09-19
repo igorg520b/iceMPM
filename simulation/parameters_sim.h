@@ -45,6 +45,8 @@ public:
     float lambda, mu; // Lame
     float IceFrictionCoefficient;
 
+    float XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
+
     int GridX, GridY;
     float cellsize;
 
@@ -56,15 +58,16 @@ public:
 
     void Reset()
     {
-        InitialTimeStep = 3e-4;
+        InitialTimeStep = 5e-4;
         Gravity = 9.81;
         Density = 980;
         PoissonsRatio = 0.3;
-        YoungsModulus = 10e5;
+        YoungsModulus = 1.e6;
         IceFrictionCoefficient = 0.03;
 
-        GridX = 128; //64;
-        GridY = 64;// 32;
+        GridX = 128;//64;
+        GridY = 64;//32;
+        PointsWanted = 15000;
         cellsize = 3./GridX;
         ComputeLame();
 
@@ -74,9 +77,12 @@ public:
         IndVelocity = 0.2;
         IndDepth = 0.101;
 
-        PointsWanted = 15000;
         BlockHeight = 1.0f;
         BlockLength = 2.5f;
+
+        XiSnow = 10.f;
+        THT_C_snow = 2.0e-2;				// Critical compression
+        THT_S_snow = 6.0e-3;				// Critical stretch
     }
 
     void ComputeLame()
