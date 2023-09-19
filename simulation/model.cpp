@@ -6,6 +6,7 @@
 #include "poisson_disk_sampling.h"
 
 #include <cmath>
+#include <random>
 
 #include <Eigen/SVD>
 #include <Eigen/LU>
@@ -30,6 +31,8 @@ bool icy::Model::Step()
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} completed\n", currentStep);
 
     if(currentStep % prms.UpdateEveryNthStep == 0) Q_EMIT stepCompleted();
+
+    if(simulationTime >= prms.SimulationEndTime) return false;
     return true;
 }
 
@@ -49,15 +52,6 @@ void icy::Model::PosToGrid(Eigen::Vector2f pos, int &idx_x, int &idx_y)
 
 
 
-// polar decomposition
-// http://www.cs.cornell.edu/courses/cs4620/2014fa/lectures/polarnotes.pdf
-Eigen::Matrix2f icy::Model::polar_decomp_R(const Eigen::Matrix2f &val) const
-{
-    float th = atan2(val(1,0) - val(0,1), val(0,0) + val(1,1));
-    Eigen::Matrix2f result;
-    result << cos(th), -sin(th), sin(th), cos(th);
-    return result;
-}
 
 
 void icy::Model::P2G()
@@ -70,27 +64,10 @@ void icy::Model::P2G()
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
     {
         Point &p = points[pt_idx];
-/*
-        // elastic material (same for snow)
-        const float mu = prms.mu;
-        const float lambda = prms.lambda;
-        Eigen::Matrix2f Re = polar_decomp_R(p.Fe);
-        float Je = p.Fe.determinant();
-        Eigen::Matrix2f dFe = 2.f * mu*(p.Fe - Re)* p.Fe.transpose() +
-                lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
-        Eigen::Matrix2f Ap = dFe * particle_volume;
-*/
 
-        //snow
-        float exp = std::exp(prms.XiSnow*(1.f - p.Fp.determinant()));
-        const float mu = prms.mu * exp;
-        const float lambda = prms.lambda * exp;
-        Eigen::Matrix2f Re = polar_decomp_R(p.Fe);
-        float Je = p.Fe.determinant();
-        Eigen::Matrix2f dFe = 2.f * mu*(p.Fe - Re)* p.Fe.transpose() +
-                lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
-        Eigen::Matrix2f Ap = dFe * particle_volume;
-
+        Eigen::Matrix2f Ap;
+        Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
+        //Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
 
         int i0, j0;
         PosToGrid(p.pos, i0, j0);
@@ -113,7 +90,7 @@ void icy::Model::P2G()
                 Eigen::Vector2f dWip = Point::gradwc(d, prms.cellsize);    // weight gradient
 
                 // APIC increments
-                float incM = Wip * particle_mass;
+                float incM = Wip * prms.ParticleMass;
                 Eigen::Vector2f incV = incM * (p.velocity + Dp_inv * p.Bp * (-d));
                 Eigen::Vector2f incFi = Ap * dWip;
 
@@ -136,14 +113,11 @@ void icy::Model::P2G()
 }
 
 
-
-
-
 void icy::Model::G2P()
 {
     visual_update_mutex.lock();
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; g2p", currentStep);
-    const float dt = prms.InitialTimeStep;
+    const float &dt = prms.InitialTimeStep;
 
 #pragma omp parallel for
     for(int idx_p = 0; idx_p<points.size(); idx_p++)
@@ -187,21 +161,10 @@ void icy::Model::G2P()
             }
 
         // Update particle deformation gradient (elasticity, plasticity etc...)
-//        p.Fe = (Eigen::Matrix2f::Identity() + dt*T) * p.Fe;
 
-        Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * T) * p.Fe;
-        Eigen::Matrix2f FpTr = p.Fp;
+        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
+//        p.ElasticUpdateDeformationGradient(dt,T);
 
-        Eigen::JacobiSVD<Eigen::Matrix2f,Eigen::NoQRPreconditioner> svd(FeTr,Eigen::ComputeFullU | Eigen::ComputeFullV);
-        Eigen::Matrix2f U = svd.matrixU();
-        Eigen::Matrix2f V = svd.matrixV();
-        Eigen::Vector2f Sigma = svd.singularValues();
-
-        Eigen::Vector2f SigmaClamped;
-        for(int k=0;k<2;k++) SigmaClamped[k] = std::clamp(Sigma[k], 1.f - prms.THT_C_snow,1.f + prms.THT_S_snow);
-
-        p.Fe = U*SigmaClamped.asDiagonal()*V.transpose();
-        p.Fp = V*SigmaClamped.asDiagonal().inverse()*Sigma.asDiagonal()*V.transpose()*FpTr;
     }
     visual_update_mutex.unlock();
 }
@@ -272,7 +235,11 @@ void icy::Model::Reset()
     prms.PointCountActual = nPoints;
     spdlog::info("finished thinks::PoissonDiskSampling; {} ", nPoints);
 
-    particle_volume = block_length*block_height/nPoints;
+    std::random_device rd;
+    std::mt19937 gen{rd()};
+    std::normal_distribution<float> d{0.5, 0.2};
+
+    prms.ParticleVolume = block_length*block_height/nPoints;
     for(int k = 0; k<nPoints; k++)
     {
         Point &p = points[k];
@@ -284,8 +251,9 @@ void icy::Model::Reset()
         p.Fe.setIdentity();
         p.Fp.setIdentity();
         p.Bp.setZero();
+        p.visualized_value = d(gen);
     }
-    this->particle_mass = particle_volume*prms.Density;
+    prms.ParticleMass = prms.ParticleVolume*prms.Density;
 
     const int &grid_x = prms.GridX;
     const int &grid_y = prms.GridY;

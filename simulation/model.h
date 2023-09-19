@@ -50,7 +50,6 @@ public:
     double simulationTime;
 
     float indenter_x, indenter_x_initial, indenter_y;
-    float particle_volume, particle_mass;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;
@@ -66,7 +65,6 @@ private:
 
     // helper functions
     void PosToGrid(Eigen::Vector2f position, int &idx_x, int &idx_y);
-    Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val) const;
 };
 
 #endif

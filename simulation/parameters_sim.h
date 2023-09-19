@@ -23,6 +23,8 @@ class icy::SimParams : public QObject
     Q_PROPERTY(double p_LameLambda READ getLambda)
     Q_PROPERTY(double p_LameMu READ getMu)
     Q_PROPERTY(double p_FrictionCoeff MEMBER IceFrictionCoefficient NOTIFY propertyChanged)
+    Q_PROPERTY(double p_ParticleVolume READ getParticleVolume)
+    Q_PROPERTY(double p_ParticleMass READ getParticleMass)
 
 
     //Q_PROPERTY(double in_HHTalpha READ getHHTalpha WRITE setHHTalpha)
@@ -40,7 +42,7 @@ class icy::SimParams : public QObject
 public:
     SimParams() { Reset(); }
 
-    float InitialTimeStep;
+    float InitialTimeStep, SimulationEndTime;
     float Gravity, Density, PoissonsRatio, YoungsModulus;
     float lambda, mu; // Lame
     float IceFrictionCoefficient;
@@ -56,18 +58,22 @@ public:
     int PointsWanted, PointCountActual;
     float BlockHeight, BlockLength;
 
+    float ParticleVolume, ParticleMass;
+
+
     void Reset()
     {
         InitialTimeStep = 5e-4;
+        SimulationEndTime = 10;
         Gravity = 9.81;
         Density = 980;
         PoissonsRatio = 0.3;
         YoungsModulus = 1.e6;
         IceFrictionCoefficient = 0.03;
 
-        GridX = 128;//64;
-        GridY = 64;//32;
-        PointsWanted = 15000;
+        GridX = 128;
+        GridY = 64;
+        PointsWanted = 150000;
         cellsize = 3./GridX;
         ComputeLame();
 
@@ -108,6 +114,8 @@ public:
         Q_EMIT propertyChanged();
     }
     int getPointCountActual() {return PointCountActual;}
+    double getParticleVolume() {return ParticleVolume;}
+    double getParticleMass() {return ParticleMass;}
 
 
 Q_SIGNALS:
