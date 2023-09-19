@@ -2,6 +2,7 @@
 #include "model.h"
 
 #include "spdlog/spdlog.h"
+#include <omp.h>
 
 icy::VisualRepresentation::VisualRepresentation()
 {
@@ -131,12 +132,12 @@ void icy::VisualRepresentation::SynchronizeValues()
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->visual_update_mutex.lock();
+#pragma omp parallel
     for(int i=0;i<model->points.size();i++)
     {
         icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
-
         visualized_values->SetValue((vtkIdType)i, p.visualized_value);
     }
 

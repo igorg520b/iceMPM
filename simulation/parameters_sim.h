@@ -63,7 +63,9 @@ public:
 
     void Reset()
     {
-        InitialTimeStep = 5e-4;
+        InitialTimeStep = 1e-4;
+        UpdateEveryNthStep = 20;
+
         SimulationEndTime = 10;
         Gravity = 9.81;
         Density = 980;
@@ -71,14 +73,13 @@ public:
         YoungsModulus = 1.e6;
         IceFrictionCoefficient = 0.03;
 
-        GridX = 128;
-        GridY = 64;
-        PointsWanted = 200'000;
-        ParticleViewSize = 2.3f;
+        GridX = 512;
+        GridY = 256;
+        PointsWanted = 1'100'000;
+        ParticleViewSize = 1.f;
         cellsize = 3./GridX;
         ComputeLame();
 
-        UpdateEveryNthStep = 10;
 
         IndDiameter = 0.324;
         IndVelocity = 0.2;

@@ -27,7 +27,7 @@ MainWindow::MainWindow(QWidget *parent)
     renderWindow->GetInteractor()->SetInteractorStyle(rubberBand);
 
     // VTK - scalar bar
-    renderer->AddActor(scalarBar);
+//    renderer->AddActor(scalarBar);
     scalarBar->SetMaximumWidthInPixels(130);
     scalarBar->SetBarRatio(0.07);
     scalarBar->SetMaximumHeightInPixels(300);

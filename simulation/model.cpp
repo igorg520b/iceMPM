@@ -225,7 +225,8 @@ void icy::Model::Reset()
     const float &block_height = prms.BlockHeight;
     const float &h = prms.cellsize;
 
-    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*M_PI)));
+    constexpr double pi = 3.14159265358979323846;
+    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*pi)));
     const std::array<float, 2>kXMin{5.0f*h, 2.0f*h};
     const std::array<float, 2>kXMax{5.0f*h+block_length, 2.0f*h+block_height};
     spdlog::info("starting thinks::PoissonDiskSampling");

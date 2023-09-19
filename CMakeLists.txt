@@ -1,6 +1,7 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(iceMPM LANGUAGES CXX C CUDA)
+project(iceMPM LANGUAGES CXX C)
+#project(iceMPM LANGUAGES CXX C CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -35,7 +36,7 @@ add_compile_definitions(QT_NO_KEYWORDS)
 
 add_executable(iceMPM
     gui/main.cpp
-    gui/cuda_test.cu
+#    gui/cuda_test.cu
 
 
     gui/windows/mainwindow.cpp
@@ -108,10 +109,10 @@ target_link_libraries(iceMPM PRIVATE PBrowser)
 # HDF5
 if(WIN32)
     add_compile_definitions(H5_BUILT_AS_DYNAMIC_LIB)
-    target_include_directories(iceMPM PRIVATE "C:\\Users\\s\\Projects\\libraries\\hdf5-build\\src")
-    target_include_directories(iceMPM PRIVATE "C:\\Users\\s\\Projects\\libraries\\hdf5-develop\\src")
-    target_include_directories(iceMPM PRIVATE "C:\\Users\\s\\Projects\\libraries\\hdf5-develop\\c++\\src")
-    target_link_directories(iceMPM PRIVATE "C:\\Users\\s\\Projects\\libraries\\hdf5-build\\bin\\Release")
+    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-build\\src")
+    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-develop\\src")
+    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-develop\\c++\\src")
+    target_link_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-build\\bin\\Release")
     target_link_libraries(iceMPM PRIVATE hdf5_cpp hdf5 )
 else()
     find_package(HDF5 REQUIRED COMPONENTS CXX)
@@ -120,9 +121,8 @@ else()
 endif()
 
 #CUDA
-#set(CMAKE_CUDA_ARCHITECTURES native)
-set_target_properties(iceMPM PROPERTIES CUDA_ARCHITECTURES "61")
-set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.2")
-find_package(CUDA REQUIRED)
-include_directories(${CUDA_INCLUDE_DIRS})
-target_link_libraries(iceMPM PRIVATE cudart)
+#set_target_properties(iceMPM PROPERTIES CUDA_ARCHITECTURES "61")
+#set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.2")
+#find_package(CUDA REQUIRED)
+#include_directories(${CUDA_INCLUDE_DIRS})
+#target_link_libraries(iceMPM PRIVATE cudart)
