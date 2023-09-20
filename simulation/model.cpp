@@ -190,12 +190,6 @@ void icy::Model::UpdateNodes()
         int idx_x = idx % prms.GridX;
         int idx_y = idx / prms.GridX;
 
-        // attached bottom layer
-        if(idx_y <= 3) gn.velocity.setZero();
-        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity.setZero();//gn.velocity[1] = 0;
-
-        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity.setZero();//gn.velocity[0] = 0;
-        else if(idx_x >= prms.GridX-4 && gn.velocity[0]>0) gn.velocity.setZero();//gn.velocity[0] = 0;
 
         // indenter
         Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
@@ -212,6 +206,14 @@ void icy::Model::UpdateNodes()
                 gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
             }
         }
+
+        // attached bottom layer
+        if(idx_y <= 3) gn.velocity.setZero();
+        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity.setZero();//gn.velocity[1] = 0;
+
+        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity.setZero();//gn.velocity[0] = 0;
+        else if(idx_x >= prms.GridX-5 && gn.velocity[0]>0) gn.velocity.setZero();//gn.velocity[0] = 0;
+
     }
 }
 

@@ -73,11 +73,11 @@ public:
         YoungsModulus = 1.e6;
         IceFrictionCoefficient = 0.03;
 
-        GridX = 256;
-        GridY = 128;
-        PointsWanted = 100'000;
-        ParticleViewSize = 2.1f;
-        cellsize = 3./GridX;
+        GridX = 512;
+        GridY = 200;
+        PointsWanted = 1100'000;
+        ParticleViewSize = 1.1f;
+        cellsize = 4./GridX;
         ComputeLame();
 
 
