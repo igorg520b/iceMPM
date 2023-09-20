@@ -63,8 +63,8 @@ public:
 
     void Reset()
     {
-        InitialTimeStep = 1e-4;
-        UpdateEveryNthStep = 20;
+        InitialTimeStep = 5e-5;
+        UpdateEveryNthStep = 40;
 
         SimulationEndTime = 10;
         Gravity = 9.81;
