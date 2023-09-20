@@ -135,7 +135,7 @@ void icy::VisualRepresentation::SynchronizeValues()
 #pragma omp parallel
     for(int i=0;i<model->points.size();i++)
     {
-        icy::Point &p = model->points[i];
+        const icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
         visualized_values->SetValue((vtkIdType)i, p.visualized_value);

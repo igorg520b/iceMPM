@@ -5,12 +5,15 @@
 #include <QObject>
 #include <QMutex>
 #include <QThread>
+#include <QtGlobal>
 
 #include <vector>
 #include <algorithm>
 #include <chrono>
 #include <unordered_set>
 #include <utility>
+#include <cmath>
+#include <random>
 
 #include "parameters_sim.h"
 #include "modelcontrollerinterface.h"
@@ -18,7 +21,12 @@
 #include "gridnode.h"
 
 #include <Eigen/Core>
+#include <Eigen/SVD>
+#include <Eigen/LU>
+
 #include <spdlog/spdlog.h>
+#include "poisson_disk_sampling.h"
+
 
 namespace icy { class Model; }
 

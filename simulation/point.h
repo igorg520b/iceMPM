@@ -15,6 +15,8 @@ struct icy::Point
 
     static float wc(Eigen::Vector2f dx, double h);
     static Eigen::Vector2f gradwc(Eigen::Vector2f dx, double h);
+    static float wq(Eigen::Vector2f dx, double h);
+    static Eigen::Vector2f gradwq(Eigen::Vector2f dx, double h);
 
     Eigen::Matrix2f SnowConstitutiveModel(const float &XiSnow,
                                           const float &prmsMu,
@@ -34,6 +36,8 @@ struct icy::Point
 private:
     static float wcs(float x);   // cubic spline
     static float dwcs(float x);  // cubic spline derivative
+    static float wqs(float x);   // cubic spline
+    static float dwqs(float x);  // cubic spline derivative
     static Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val);
 
 };

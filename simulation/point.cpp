@@ -103,3 +103,33 @@ Eigen::Matrix2f icy::Point::polar_decomp_R(const Eigen::Matrix2f &val)
     result << cos(th), -sin(th), sin(th), cos(th);
     return result;
 }
+
+
+float icy::Point::wqs(float x)
+{
+    x = std::abs(x);
+    if (x < 0.5f) return -x * x + 3 / 4.0f;
+    else if (x < 1.5f) return x * x / 2.0f - 3 * x / 2.0f + 9 / 8.0f;
+    return 0;
+}
+
+float icy::Point::dwqs(float x)
+{
+    float x_abs = std::abs(x);
+    if (x_abs < 0.5f) return -2.0f * x;
+    else if (x_abs < 1.5f) return x - 3 / 2.0f * x / x_abs;
+    return 0;
+}
+
+float icy::Point::wq(Eigen::Vector2f dx, double h)
+{
+    return wqs(dx[0]/h)*wqs(dx[1]/h);
+}
+
+Eigen::Vector2f icy::Point::gradwq(Eigen::Vector2f dx, double h)
+{
+    Eigen::Vector2f result;
+    result[0] = dwqs(dx[0]/h)*wqs(dx[1]/h)/h;
+    result[1] = wqs(dx[0]/h)*dwqs(dx[1]/h)/h;
+    return result;
+}

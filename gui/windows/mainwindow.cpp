@@ -157,6 +157,14 @@ MainWindow::MainWindow(QWidget *parent)
         {
             ui->actionTake_Screenshots->setChecked(var.toBool());
         }
+
+        var = settings.value("splitter_size_0");
+        if(!var.isNull())
+        {
+            int sz1 = var.toInt();
+            int sz2 = settings.value("splitter_size_1").toInt();
+            splitter->setSizes(QList<int>({sz1, sz2}));
+        }
     }
     else
     {
@@ -225,6 +233,14 @@ void MainWindow::quit_triggered()
     if(!qLastFileName.isEmpty()) settings.setValue("lastFile", qLastFileName);
 
     settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
+
+//    splitter->setSizes(QList<int>({100, 500}));
+    QList<int> szs = splitter->sizes();
+    settings.setValue("splitter_size_0", szs[0]);
+    settings.setValue("splitter_size_1", szs[1]);
+
+
+
     QApplication::quit();
 }
 

@@ -63,23 +63,22 @@ public:
 
     void Reset()
     {
-        InitialTimeStep = 5e-5;
-        UpdateEveryNthStep = 40;
-
+        InitialTimeStep = 5e-4;
+        UpdateEveryNthStep = 100;
         SimulationEndTime = 10;
+
+        PointsWanted = 20'000;
+        GridX = 128;
+        GridY = 50;
+        ParticleViewSize = 2.4f;
+        cellsize = 4./(GridX);  // this better have a form of 2^n, where n is an integer
+
+        YoungsModulus = 1.e6;
+        PoissonsRatio = 0.3;
+        ComputeLame();
         Gravity = 9.81;
         Density = 980;
-        PoissonsRatio = 0.3;
-        YoungsModulus = 1.e6;
         IceFrictionCoefficient = 0.03;
-
-        GridX = 512;
-        GridY = 200;
-        PointsWanted = 1100'000;
-        ParticleViewSize = 1.1f;
-        cellsize = 4./GridX;
-        ComputeLame();
-
 
         IndDiameter = 0.324;
         IndVelocity = 0.2;
