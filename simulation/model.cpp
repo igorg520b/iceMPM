@@ -16,7 +16,8 @@ void icy::Model::P2G()
         Point &p = points[pt_idx];
 
         Eigen::Matrix2f Ap;
-        Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
+        Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
+        //Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
         //Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
 
         constexpr float offset = 0.5f;  // 0 for cubic; 0.5 for quadratic
@@ -102,7 +103,8 @@ void icy::Model::G2P()
                 p.pos += Wip * (pos_node + dt * node.velocity);
                 T += node.velocity * dWip.transpose();
             }
-        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
+        p.NACCUpdateDeformationGradient(dt,T,prms);
+//        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
 //        p.ElasticUpdateDeformationGradient(dt,T);
 
     }
@@ -165,8 +167,7 @@ void icy::Model::Reset()
     const float &block_height = prms.BlockHeight;
     const float &h = prms.cellsize;
 
-    constexpr double pi = 3.14159265358979323846;
-    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*pi)));
+    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)));
     const std::array<float, 2>kXMin{5.0f*h, 2.0f*h};
     const std::array<float, 2>kXMax{5.0f*h+block_length, 2.0f*h+block_height};
     spdlog::info("starting thinks::PoissonDiskSampling");
@@ -190,6 +191,7 @@ void icy::Model::Reset()
         p.Fp.setIdentity();
         p.Bp.setZero();
         p.visualized_value = 0;
+        p.NACC_alpha_p = prms.NACC_alpha;
     }
     grid.resize(prms.GridX*prms.GridY);
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;

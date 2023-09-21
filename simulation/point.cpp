@@ -10,8 +10,12 @@ Eigen::Matrix2f icy::Point::NACCConstitutiveModel(const float &prmsMu,
                                       const float &prmsLambda,
                                       const float &particle_volume) const
 {
-    Eigen::Matrix2f Ap;
-
+    // elastic material (same for snow)
+    Eigen::Matrix2f Re = polar_decomp_R(Fe);
+    float Je = Fe.determinant();
+    Eigen::Matrix2f dFe = 2.f * prmsMu*(Fe - Re)* Fe.transpose() +
+            prmsLambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
+    Eigen::Matrix2f Ap = dFe * particle_volume;
     return Ap;
 }
 
@@ -20,8 +24,18 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
                                    const Eigen::Matrix2f &FModifier,
                                                const icy::SimParams &prms)
 {
-    float dAlpha; //change in logJp, or the change in volumetric plastic strain
-    float dOmega; //change in logJp from q hardening (only for q hardening)
+    constexpr float magic_epsilon = 1e-5f;
+    const float &mu = prms.mu;
+    const float kappa = prms.mu*2.f/3 + prms.lambda; // bulk modulus
+    const float &xi = prms.NACC_xi;
+    const float &beta = prms.NACC_beta;
+    const float &M = prms.NACC_M;
+    const float M_sq = M*M;
+    const int &d = prms.dim;
+    float &alpha = NACC_alpha_p;
+
+//    float dAlpha; //change in logJp, or the change in volumetric plastic strain
+//    float dOmega; //change in logJp from q hardening (only for q hardening)
 
     Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * FModifier) * this->Fe;
 
@@ -30,135 +44,83 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
     Eigen::Matrix2f V = svd.matrixV();
     Eigen::Vector2f Sigma = svd.singularValues();
 
-    constexpr float magic_epsilon = 1e-5f;
-    const float kappa = prms.mu*2.f/3 + prms.lambda; // bulk modulus
-    const float &xi = prms.NACC_xi;
-    float p0 = kappa * (magic_epsilon + std::sinh(xi * std::max(-logJp, 0)));
 
+    // line 4
+    float p0 = kappa * (magic_epsilon + std::sinh(xi * std::max(-alpha, 0.f)));
 
-/*
-    float p0	= data.bm * (static_cast<float>(0.00001) + sinh(data.xi * (-data.log_jp > 0 ? -data.log_jp : 0)));
-    float p_min = -data.beta * p0;
+    // line 5
+    float Je_tr = Sigma[0]*Sigma[1];    // this is for 2D
 
-    float Je_trial = S[0] * S[1] * S[2];
+    // line 6
+    Eigen::Matrix2f SigmaMatrix = Sigma.asDiagonal();
+    Eigen::Matrix2f SigmaSquared = SigmaMatrix*SigmaMatrix;
+    Eigen::Matrix2f SigmaSquaredDev = SigmaSquared - SigmaSquared.trace()/2.f*Eigen::Matrix2f::Identity();
+    float J_power_neg_2_d_mulmu = mu * std::pow(Je_tr, -2.f / (float)d);///< J^(-2/dim) * mu
+    Eigen::Matrix2f s_hat_tr = J_power_neg_2_d_mulmu * SigmaSquaredDev;
 
-*/
+    // line 7
+    float psi_kappa_partial_J = (kappa/2.f) * (Je_tr - 1.f / Je_tr);
 
-    /*
+    // line 8
+    float p_trial = -psi_kappa_partial_J * Je_tr;
 
-
-    T J = 1.;
-    for (int i = 0; i < dim; ++i) J *= sigma(i);
-
-    //Step 1, compute pTrial and see if case 1, 2, or 3
-    TV B_hat_trial;
-    for (int i = 0; i < dim; ++i)
-        B_hat_trial(i) = sigma(i) * sigma(i);
-    TV s_hat_trial = c.mu * std::pow(J, -(T)2 / (T)dim) * deviatoric(B_hat_trial);
-
-    T prime = c.kappa / (T)2 * (J - 1 / J);
-    T p_trial = -prime * J;
-
-    //Cases 1 and 2 (Ellipsoid Tips)
-    //Project to the tips
-    T pMin = beta * p0;
-    T pMax = p0;
-    if (p_trial > pMax) {
-        T Je_new = std::sqrt(-2 * pMax / c.kappa + 1);
-        sigma = TV::Ones() * std::pow(Je_new, (T)1 / dim);
-        Eigen::DiagonalMatrix<T, dim, dim> sigma_m(sigma);
-        TM Fe = U * sigma_m * V.transpose();
-        strain = Fe;
-        if (hardeningOn) {
-            logJp += log(J / Je_new);
-        }
-        return false;
-    }
-    else if (p_trial < -pMin) {
-        T Je_new = std::sqrt(2 * pMin / c.kappa + 1);
-        sigma = TV::Ones() * std::pow(Je_new, (T)1 / dim);
-        Eigen::DiagonalMatrix<T, dim, dim> sigma_m(sigma);
-        TM Fe = U * sigma_m * V.transpose();
-        strain = Fe;
-        if (hardeningOn) {
-            logJp += log(J / Je_new);
-        }
-        return false;
+    // line 9 (case 1)
+    float y = (1.f + 2.f*beta)*(3.f-(float)d/2.f)*s_hat_tr.norm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    Eigen::Matrix2f Fe_new; // result of all this
+    if(p_trial > p0)
+    {
+        float Je_new = std::sqrt(-2.f*p0 / kappa + 1.f);
+        Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
+        Fe_new = U*Sigma_new*V.transpose();
+        if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
     }
 
-    //Case 3 --> check if inside or outside YS
-    T y_s_half_coeff = ((T)6 - dim) / (T)2 * ((T)1 + (T)2 * beta);
-    T y_p_half = M * M * (p_trial + pMin) * (p_trial - pMax);
-    T y = y_s_half_coeff * s_hat_trial.squaredNorm() + y_p_half;
-
-    //Case 3a (Inside Yield Surface)
-    //Do nothing
-    if (y < 1e-4) return false;
-
-    //Case 3b (Outside YS)
-    // project to yield surface
-    TV B_hat_new = std::pow(J, (T)2 / (T)dim) / c.mu * std::sqrt(-y_p_half / y_s_half_coeff) * s_hat_trial / s_hat_trial.norm();
-    B_hat_new += (T)1 / dim * B_hat_trial.sum() * TV::Ones();
-
-    for (int i = 0; i < dim; ++i)
-        sigma(i) = std::sqrt(B_hat_new(i));
-    Eigen::DiagonalMatrix<T, dim, dim> sigma_m(sigma);
-    TM Fe = U * sigma_m * V.transpose();
-    strain = Fe;
-
-    //Step 2: Hardening
-    //Three approaches to hardening:
-    //0 -> hack the hardening by computing a fake delta_p
-    //1 -> q based
-    if (p0 > 1e-4 && p_trial < pMax - 1e-4 && p_trial > 1e-4 - pMin) {
-        T p_center = p0 * ((1 - beta) / (T)2);
-        T q_trial = std::sqrt(((T)6 - (T)dim) / (T)2) * s_hat_trial.norm();
-        Vector<T, 2> direction;
-        direction(0) = p_center - p_trial;
-        direction(1) = 0 - q_trial;
-        direction = direction / direction.norm();
-
-        T C = M * M * (p_center + beta * p0) * (p_center - p0);
-        T B = M * M * direction(0) * (2 * p_center - p0 + beta * p0);
-        T A = M * M * direction(0) * direction(0) + (1 + 2 * beta) * direction(1) * direction(1);
-
-        T l1 = (-B + std::sqrt(B * B - 4 * A * C)) / (2 * A);
-        T l2 = (-B - std::sqrt(B * B - 4 * A * C)) / (2 * A);
-
-        T p1 = p_center + l1 * direction(0);
-        T p2 = p_center + l2 * direction(0);
-        T p_fake = (p_trial - p_center) * (p1 - p_center) > 0 ? p1 : p2;
-
-        //Only for pFake Hardening
-        T Je_new_fake = sqrt(std::abs(-2 * p_fake / c.kappa + 1));
-        dAlpha = log(J / Je_new_fake);
-
-        //Only for q Hardening
-        T qNPlus = sqrt(M * M * (p_trial + pMin) * (pMax - p_trial) / ((T)1 + (T)2 * beta));
-        T Jtrial = J;
-        T zTrial = sqrt(((q_trial * pow(Jtrial, ((T)2 / (T)dim))) / (c.mu * sqrt(((T)6 - (T)dim) / (T)2))) + 1);
-        T zNPlus = sqrt(((qNPlus * pow(Jtrial, ((T)2 / (T)dim))) / (c.mu * sqrt(((T)6 - (T)dim) / (T)2))) + 1);
-        if (p_trial > p_fake) {
-            dOmega = -1 * log(zTrial / zNPlus);
-        }
-        else {
-            dOmega = log(zTrial / zNPlus);
-        }
-
-        if (hardeningOn) {
-            if (!qHard) {
-                if (Je_new_fake > 1e-4) {
-                    logJp += dAlpha;
-                }
-            }
-            else if (qHard) {
-                if (zNPlus > 1e-4) {
-                    logJp += dOmega;
-                }
-            }
-        }
+    // line 14 (case 2)
+    else if(p_trial < -beta*p0)
+    {
+        float Je_new = std::sqrt(2.f*beta*p0/kappa + 1.f);
+        Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
+        Fe_new = U*Sigma_new*V.transpose();
+        if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
     }
-*/
+
+    // line 19 (case 3)
+    else if(y >= magic_epsilon*10)
+    {
+        if(prms.NACC_hardening && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+        {
+            float p_c = (1.f-beta)*p0/2.f;  // line 23
+            float q_tr = sqrt(3.f-d/2.f)*s_hat_tr.norm();   // line 24
+            Eigen::Vector2f direction(p_c-p_trial, -q_tr);  // line 25
+            direction.normalize();
+            float C = M_sq*(p_c-beta*p0)*(p_c-p0);
+            float B = M_sq*direction[0]*(2.f*p_c-p0+beta*p0);
+            float A = M_sq*direction[0]*direction[0]+(1.f+2.f*beta)*direction[1]*direction[1];  // line 30
+            float l1 = (-B+sqrt(B*B-4.f*A*C))/(2.f*A);
+            float l2 = (-B-sqrt(B*B-4.f*A*C))/(2.f*A);
+            float p1 = p_c + l1*direction[0];
+            float p2 = p_c + l2*direction[0];
+
+            float p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
+            float Je_x = sqrt(abs(-2.f*p_x/kappa + 1.f));
+            if(Je_x > magic_epsilon*10) alpha += std::log(Je_tr / Je_x);
+
+        }
+
+        float expr_under_root = (-M*M*(p_trial+beta*p0)*(p_trial-p0))/((1+2.f*beta)*(3.f-d/2.));
+        Eigen::Matrix2f B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2.f/d)/mu)*s_hat_tr.normalized() +
+                Eigen::Matrix2f::Identity()*SigmaSquared.trace()/(float)d;
+        Eigen::Matrix2f Sigma_new;
+        Sigma_new.setZero();
+        Sigma_new(0,0) = sqrt(B_hat_E_new(0,0));
+        Sigma_new(1,1) = sqrt(B_hat_E_new(1,1));
+        Fe_new = U*Sigma_new*V.transpose();
+    }
+    else
+    {
+        Fe_new = FeTr;
+    }
+    Fe = Fe_new;
 }
 
 
