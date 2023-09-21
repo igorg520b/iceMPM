@@ -48,6 +48,7 @@ public:
     float IceFrictionCoefficient;
 
     float XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
+    float NACC_xi, NACC_alpha, NACC_beta;
 
     int GridX, GridY;
     float cellsize;
@@ -64,7 +65,7 @@ public:
     void Reset()
     {
         InitialTimeStep = 5e-4;
-        UpdateEveryNthStep = 100;
+        UpdateEveryNthStep = 10;
         SimulationEndTime = 10;
 
         PointsWanted = 20'000;
@@ -90,6 +91,9 @@ public:
         XiSnow = 10.f;
         THT_C_snow = 2.0e-2;				// Critical compression
         THT_S_snow = 6.0e-3;				// Critical stretch
+
+        NACC_beta = 2;
+        NACC_alpha = 0.96;
     }
 
     void ComputeLame()
