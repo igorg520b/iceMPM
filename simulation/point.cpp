@@ -121,6 +121,7 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
         Fe_new = FeTr;
     }
     Fe = Fe_new;
+    this->visualized_value = this->NACC_alpha_p;
 }
 
 

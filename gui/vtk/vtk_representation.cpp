@@ -142,6 +142,15 @@ void icy::VisualRepresentation::SynchronizeValues()
     }
 
     model->visual_update_mutex.unlock();
+
+    float minmax[2];
+    visualized_values->GetValueRange(minmax);
+    float epsilon = std::max(abs(minmax[0]-model->prms.NACC_alpha),abs(minmax[1]-model->prms.NACC_alpha));
+    if(epsilon == 0) epsilon = 1e-6;
+    minmax[0]=model->prms.NACC_alpha-epsilon;
+    minmax[1]=model->prms.NACC_alpha+epsilon;
+    spdlog::info("visualized range [{}, {}]",minmax[0],minmax[1]);
+    lutMPM->SetTableRange(minmax[0], minmax[1]);
     points->Modified();
     visualized_values->Modified();
     points_filter->Update();

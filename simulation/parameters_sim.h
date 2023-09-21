@@ -18,6 +18,8 @@ class icy::SimParams : public QObject
 
     Q_PROPERTY(double in_InitialTimeStep MEMBER InitialTimeStep NOTIFY propertyChanged)
     Q_PROPERTY(double in_SimulationTime MEMBER SimulationEndTime NOTIFY propertyChanged)
+    Q_PROPERTY(int in_UpdateEvery READ getUpdateEveryNthStep NOTIFY propertyChanged)
+
     Q_PROPERTY(double p_Gravity MEMBER Gravity NOTIFY propertyChanged)
     Q_PROPERTY(double p_Density MEMBER Density NOTIFY propertyChanged)
     Q_PROPERTY(double p_YoungsModulus READ getYoungsModulus WRITE setYoungsModulus NOTIFY propertyChanged)
@@ -68,20 +70,30 @@ public:
     constexpr static double pi = 3.14159265358979323846;
     constexpr static int dim = 2;
 
-
+#define PARAMS2
     void Reset()
     {
-        InitialTimeStep = 5e-4;
-        UpdateEveryNthStep = 10;
-        SimulationEndTime = 10;
-
+#ifdef PARAMS2
+        InitialTimeStep = 1e-5;
+        YoungsModulus = 1.e8;
+        PointsWanted = 2'200'000;
+        GridX = 512;
+        GridY = 200;
+        ParticleViewSize = 1.1f;
+#elif
+        InitialTimeStep = 2e-4;
+        YoungsModulus = 1.e7;
         PointsWanted = 20'000;
         GridX = 128;
         GridY = 50;
-        ParticleViewSize = 2.4f;
+        ParticleViewSize = 3.4f;
+#endif
+
+        SimulationEndTime = 15;
+        UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+
         cellsize = 4./(GridX);  // this better have a form of 2^n, where n is an integer
 
-        YoungsModulus = 1.e6;
         PoissonsRatio = 0.3;
         ComputeLame();
         Gravity = 9.81;
@@ -99,10 +111,10 @@ public:
         THT_C_snow = 2.0e-2;				// Critical compression
         THT_S_snow = 6.0e-3;				// Critical stretch
 
-        NACC_beta = 2;
+        NACC_beta = .8;
         NACC_xi = 3;
-        NACC_alpha = std::log(0.96);
-        NACC_hardening = false;
+        NACC_alpha = std::log(0.999);
+        NACC_hardening = true;
 
         NACC_friction_angle = 45;
         ComputeCamClayParams();
@@ -130,6 +142,7 @@ public:
     int getPointCountActual() {return PointCountActual;}
     double getParticleVolume() {return ParticleVolume;}
     double getParticleMass() {return ParticleMass;}
+    int getUpdateEveryNthStep() {return UpdateEveryNthStep;}
 
 Q_SIGNALS:
     void propertyChanged();
