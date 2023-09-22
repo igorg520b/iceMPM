@@ -74,12 +74,12 @@ public:
     void Reset()
     {
 #ifdef PARAMS2
-        InitialTimeStep = 1e-5;
-        YoungsModulus = 1.e8;
-        PointsWanted = 2'200'000;
-        GridX = 512;
-        GridY = 200;
-        ParticleViewSize = 1.1f;
+        InitialTimeStep = 5e-5;
+        YoungsModulus = 5.e7;
+        PointsWanted = 400'000;
+        GridX = 256;
+        GridY = 100;
+        ParticleViewSize = 1.5f;
 #elif
         InitialTimeStep = 2e-4;
         YoungsModulus = 1.e7;
@@ -90,7 +90,7 @@ public:
 #endif
 
         SimulationEndTime = 15;
-        UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+        UpdateEveryNthStep = (int)(1.f/(300*InitialTimeStep));
 
         cellsize = 4./(GridX);  // this better have a form of 2^n, where n is an integer
 
