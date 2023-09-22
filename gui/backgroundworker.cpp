@@ -1,6 +1,6 @@
 #include "backgroundworker.h"
 
-BackgroundWorker::BackgroundWorker(ModelControllerInterface *controller_) : controller(controller_)
+BackgroundWorker::BackgroundWorker(icy::Model *controller_) : controller(controller_)
 {
     this->start();
 }
@@ -32,6 +32,7 @@ void BackgroundWorker::Finalize()
 
 void BackgroundWorker::run()
 {
+    controller->Prepare();
     while(!kill)
     {
         if (timeToPause)
@@ -48,7 +49,7 @@ void BackgroundWorker::run()
 
         bool result = controller->Step();
         if(!result) timeToPause = true;
-//        Q_EMIT stepCompleted();
+        if(controller->currentStep % controller->prms.UpdateEveryNthStep == 0) Q_EMIT stepCompleted();
     }
     qDebug() << "BackgroundWorker::run() terminated";
 }

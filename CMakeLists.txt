@@ -1,7 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
 
-project(iceMPM LANGUAGES CXX C)
-#project(iceMPM LANGUAGES CXX C CUDA)
+project(RHITA_MPM LANGUAGES CXX C CUDA)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
@@ -34,10 +33,60 @@ find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
 add_compile_definitions(QT_NO_KEYWORDS)
 
+
+# Functions that implement the model, but not IO
+
+add_library(NACC_cpu SHARED
+    simulation/parameters_sim.h
+    simulation/model.cpp
+    simulation/model.h
+    simulation/point.h
+    simulation/point.cpp
+    simulation/gridnode.h
+    simulation/gridnode.cpp
+
+    simulation/nacc_on_gpu.cu
+)
+set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
+
+target_include_directories(NACC_cpu PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
+
+# OpenMP
+if(WIN32)
+    target_compile_options(NACC_cpu PRIVATE /openmp)
+else()
+    target_compile_options(NACC_cpu PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
+    target_link_libraries(NACC_cpu PRIVATE gomp)
+endif()
+
+# spdlog
+if (WIN32)
+    target_link_libraries(NACC_cpu PRIVATE spdlog)
+    target_include_directories(NACC_cpu PRIVATE "C:\\libraries\\spdlog\\include")
+    target_link_directories(NACC_cpu PRIVATE "C:\\libraries\\spdlog-build\\Release")
+else()
+    find_package(spdlog REQUIRED)
+    target_link_libraries(NACC_cpu PRIVATE spdlog::spdlog)
+endif()
+
+# Eigen
+find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
+target_link_libraries(NACC_cpu PRIVATE Eigen3::Eigen)
+
+#CUDA
+set_target_properties(NACC_cpu PROPERTIES CUDA_ARCHITECTURES "61")
+set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.2")
+find_package(CUDA REQUIRED)
+include_directories(${CUDA_INCLUDE_DIRS})
+target_link_libraries(NACC_cpu PRIVATE cudart)
+
+
+
+
+# Qt GUI executable
+
 add_executable(iceMPM
     gui/main.cpp
-#    gui/cuda_test.cu
-
 
     gui/windows/mainwindow.cpp
     gui/windows/mainwindow.h
@@ -49,48 +98,22 @@ add_executable(iceMPM
 
     gui/backgroundworker.cpp
     gui/backgroundworker.h
-
-    gui/preferences_gui.h
-    gui/modelcontrollerinterface.h
-
-    simulation/parameters_sim.h
-    simulation/model.cpp
-    simulation/model.h
-    simulation/point.h
-    simulation/point.cpp
-    simulation/gridnode.h
-    simulation/gridnode.cpp
+    gui/parameters_wrapper.h
 )
+
 
 target_include_directories(iceMPM PRIVATE gui geometry gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
 
 target_link_libraries(iceMPM PRIVATE Qt5::Widgets Qt5::Core)
-
-# OpenMP
-if(WIN32)
-    target_compile_options(iceMPM PRIVATE /openmp)
-else()
-    target_compile_options(iceMPM PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
-    target_link_libraries(iceMPM PRIVATE gomp)
-endif()
-
-# spdlog
-if (WIN32)
-    target_link_libraries(iceMPM PRIVATE spdlog)
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\spdlog\\include")
-    target_link_directories(iceMPM PRIVATE "C:\\libraries\\spdlog-build\\Release")
-else()
-    find_package(spdlog REQUIRED)
-    target_link_libraries(iceMPM PRIVATE spdlog::spdlog)
-endif()
-
-# VTK
-target_link_libraries(iceMPM PRIVATE ${VTK_LIBRARIES})
-
+target_link_libraries(iceMPM PRIVATE NACC_cpu)
 
 # Eigen
 find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
 target_link_libraries(iceMPM PRIVATE Eigen3::Eigen)
+
+
+# VTK
+target_link_libraries(iceMPM PRIVATE ${VTK_LIBRARIES})
 
 #PBrowser
 if(WIN32)
@@ -120,9 +143,4 @@ else()
     target_include_directories(iceMPM PRIVATE ${HDF5_INCLUDE_DIRS})
 endif()
 
-#CUDA
-#set_target_properties(iceMPM PROPERTIES CUDA_ARCHITECTURES "61")
-#set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.2")
-#find_package(CUDA REQUIRED)
-#include_directories(${CUDA_INCLUDE_DIRS})
-#target_link_libraries(iceMPM PRIVATE cudart)
+

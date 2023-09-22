@@ -1,4 +1,5 @@
 #include "model.h"
+#include <spdlog/spdlog.h>
 
 
 
@@ -159,6 +160,7 @@ void icy::Model::UpdateNodes()
 
 void icy::Model::Reset()
 {
+    // this should be called after prms are set as desired (either via GUI or CLI)
     spdlog::info("icy::Model::Reset()");
     currentStep = 0;
     simulationTime = 0;
@@ -167,7 +169,7 @@ void icy::Model::Reset()
     const float &block_height = prms.BlockHeight;
     const float &h = prms.cellsize;
 
-    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)));
+    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)*100./97.));
     const std::array<float, 2>kXMin{5.0f*h, 2.0f*h};
     const std::array<float, 2>kXMax{5.0f*h+block_length, 2.0f*h+block_height};
     spdlog::info("starting thinks::PoissonDiskSampling");
@@ -225,12 +227,9 @@ bool icy::Model::Step()
     simulationTime += prms.InitialTimeStep;
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} completed\n", currentStep);
 
-    if(currentStep % prms.UpdateEveryNthStep == 0) Q_EMIT stepCompleted();
-
     if(simulationTime >= prms.SimulationEndTime) return false;
     return true;
 }
-
 
 
 void icy::Model::ResetGrid()
@@ -240,3 +239,15 @@ void icy::Model::ResetGrid()
     // for(int i =0;i<grid.size();i++) grid[i].Reset();
 }
 
+icy::Model::Model()
+{
+    spdlog::info("num threads {}", omp_get_max_threads());
+    int nthreads, tid;
+#pragma omp parallel
+    { spdlog::info("thread {}", omp_get_thread_num()); }
+    std::cout << std::endl;
+    spdlog::info("sizeof(Point) = {}", sizeof(icy::Point));
+    spdlog::info("sizeof(GridNode) = {}", sizeof(icy::GridNode));
+
+    test_cuda();
+}

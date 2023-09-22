@@ -1,7 +1,6 @@
 #include "vtk_representation.h"
 #include "model.h"
 
-#include "spdlog/spdlog.h"
 #include <omp.h>
 
 icy::VisualRepresentation::VisualRepresentation()
@@ -104,7 +103,6 @@ void icy::VisualRepresentation::SynchronizeTopology()
     int &gx = model->prms.GridX;
     int &gy = model->prms.GridY;
     float &h = model->prms.cellsize;
-    spdlog::info("SetDimensions {}, {}, {}",model->prms.GridX, model->prms.GridY, 1);
     structuredGrid->SetDimensions(model->prms.GridX, model->prms.GridY, 1);
 
     grid_points->SetNumberOfPoints(gx*gy);
@@ -121,9 +119,6 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
     // indenter
     indenterSource->SetRadius(model->prms.IndDiameter/2.f);
-
-
-    spdlog::info("void icy::MeshRepresentation::SynchronizeTopology() done");
 }
 
 
@@ -149,7 +144,6 @@ void icy::VisualRepresentation::SynchronizeValues()
     if(epsilon == 0) epsilon = 1e-6;
     minmax[0]=model->prms.NACC_alpha-epsilon;
     minmax[1]=model->prms.NACC_alpha+epsilon;
-    spdlog::info("visualized range [{}, {}]",minmax[0],minmax[1]);
     lutMPM->SetTableRange(minmax[0], minmax[1]);
     points->Modified();
     visualized_values->Modified();
@@ -161,9 +155,6 @@ void icy::VisualRepresentation::SynchronizeValues()
 
 void icy::VisualRepresentation::ChangeVisualizationOption(int option)
 {
-
-    spdlog::info("icy::Model::ChangeVisualizationOption {}", option);
     VisualizingVariable = (VisOpt)option;
-
     SynchronizeTopology();
 }

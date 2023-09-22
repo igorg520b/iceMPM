@@ -7,7 +7,6 @@
 #include <cmath>
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
-#include <spdlog/spdlog.h>
 
 MainWindow::~MainWindow() {delete ui;}
 
@@ -17,7 +16,10 @@ MainWindow::MainWindow(QWidget *parent)
 {
     ui->setupUi(this);
 
+    params = new ParamsWrapper(&model.prms);
+    model.Reset();
     worker = new BackgroundWorker(&model);
+
     // VTK
     qt_vtk_widget = new QVTKOpenGLNativeWidget();
     qt_vtk_widget->setRenderWindow(renderWindow);
@@ -130,7 +132,6 @@ MainWindow::MainWindow(QWidget *parent)
         var = settings.value("camData");
         if(!var.isNull())
         {
-            spdlog::info("camData available - setting camera position");
             double *vec = (double*)var.toByteArray().constData();
             camera->SetClippingRange(1e-1,1e4);
             camera->SetViewUp(0.0, 1.0, 0.0);
@@ -187,20 +188,17 @@ MainWindow::MainWindow(QWidget *parent)
     connect(qdsbLimitHigh,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
-    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
-//    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
-    connect(&model, SIGNAL(stepCompleted()), SLOT(updateGUI()));
-    //connect(&model, SIGNAL(stepAborted()), SLOT(updateGUI()));
 
     representation.SynchronizeTopology();
+    pbrowser->setActiveObject(params);
+    updateGUI();
 }
 
 
 void MainWindow::showEvent( QShowEvent*)
 {
-    spdlog::info("MainWindow::showEvent( QShowEvent*)");
-    pbrowser->setActiveObject(&model.prms);
-    updateGUI();
+    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
+    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
 }
 
 
@@ -214,7 +212,7 @@ void MainWindow::closeEvent( QCloseEvent* event )
 
 void MainWindow::quit_triggered()
 {
-    spdlog::info("MainWindow::quit_triggered() ");
+    qDebug() << "MainWindow::quit_triggered() ";
     worker->Finalize();
     // save settings and stop simulation
     QSettings settings(settingsFileName,QSettings::IniFormat);
@@ -228,19 +226,13 @@ void MainWindow::quit_triggered()
     QByteArray arr((char*)&data[0], sizeof(double)*10);
     settings.setValue("camData", arr);
     settings.setValue("vis_option", comboBox_visualizations->currentIndex());
-    spdlog::info("camData saved");
 
     if(!qLastFileName.isEmpty()) settings.setValue("lastFile", qLastFileName);
-
     settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
 
-//    splitter->setSizes(QList<int>({100, 500}));
     QList<int> szs = splitter->sizes();
     settings.setValue("splitter_size_0", szs[0]);
     settings.setValue("splitter_size_1", szs[1]);
-
-
-
     QApplication::quit();
 }
 
@@ -255,7 +247,7 @@ void MainWindow::comboboxIndexChanged_visualizations(int index)
 
 void MainWindow::cameraReset_triggered()
 {
-    spdlog::info("MainWindow::on_action_camera_reset_triggered()");
+    qDebug() << "MainWindow::on_action_camera_reset_triggered()";
     vtkCamera* camera = renderer->GetActiveCamera();
     renderer->ResetCamera();
     camera->ParallelProjectionOn();
@@ -278,7 +270,7 @@ void MainWindow::sliderValueChanged(int val)
 
 void MainWindow::open_triggered()
 {
-    spdlog::info("void MainWindow::open_triggered()");
+    qDebug() << "void MainWindow::open_triggered()";
 /*    qLastFileName = QFileDialog::getOpenFileName(this, "Open Binary Export", qLastDirectory, "Bin Files (*.bin)");
     QFileInfo fi(qLastFileName);
     qLastDirectory = fi.path();
@@ -305,13 +297,11 @@ void MainWindow::OpenFile(QString fileName)
 
 */
     renderWindow->Render();
-    spdlog::info("void MainWindow::OpenFile(QString fileName) done");
 }
 
 void MainWindow::createVideo_triggered()
 {
 /*
-    spdlog::info("createVideo_triggered()");
     QDir pngDir(QDir::currentPath()+ "/png");
     if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ "/png");
     QString tentativeDir = QDir::currentPath()+ "/png" + "/" + qBaseFileName;
@@ -325,7 +315,6 @@ void MainWindow::createVideo_triggered()
     {
         GoToStep(i);
         renderWindow->WaitForCompletion();
-        spdlog::info("{}", i);
 
         QString outputPath = tentativeDir + "/" + QString::number(i) + ".png";
 
@@ -343,7 +332,6 @@ void MainWindow::createVideo_triggered()
         qBaseFileName.toStdString() + ".mp4\n";
     std::system(ffmpegCommand.c_str());
 */
-    spdlog::info("createVideo_triggered() done");
 }
 
 void MainWindow::GoToStep(int step)
@@ -398,25 +386,24 @@ void MainWindow::updateGUI()
     if(worker->running) statusLabel->setText("simulation is running");
     else statusLabel->setText("simulation is stopped");
     labelStepCount->setText(QString::number(model.currentStep));
-    // spdlog::info("updateGUI");
 
     representation.SynchronizeValues();
     renderWindow->Render();
 
-    if( ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
+    if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
 }
 
 void MainWindow::simulation_start_pause(bool checked)
 {
     if(!worker->running && checked)
     {
-        spdlog::info("MainWindow::simulation_start_pause() - starting");
+        qDebug() << "starting simulation via GUI";
         statusLabel->setText("starting simulation");
         worker->Resume();
     }
     else if(worker->running && !checked)
     {
-        spdlog::info("MainWindow::simulation_start_pause() - pausing");
+        qDebug() << "pausing simulation via GUI";
         statusLabel->setText("pausing simulation");
         worker->Pause();
         ui->actionStart_Pause->setEnabled(false);

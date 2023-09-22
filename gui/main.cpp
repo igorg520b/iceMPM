@@ -1,11 +1,7 @@
-#include <omp.h>
-
 #include "mainwindow.h"
 #include <QApplication>
 #include <QSurfaceFormat>
 #include <QCommandLineParser>
-#include "spdlog/spdlog.h"
-#include "spdlog/sinks/stdout_sinks.h"
 #include <iostream>
 
 #include "point.h"
@@ -16,13 +12,6 @@
 int main(int argc, char *argv[])
 {
 //    test_cuda();
-    spdlog::info("num threads {}", omp_get_max_threads());
-    int nthreads, tid;
-#pragma omp parallel
-    { spdlog::info("thread {}", omp_get_thread_num()); }
-    std::cout << std::endl;
-    spdlog::info("sizeof(Point) = {}", sizeof(icy::Point));
-    spdlog::info("sizeof(GridNode) = {}", sizeof(icy::GridNode));
 
 
     QApplication a(argc, argv);

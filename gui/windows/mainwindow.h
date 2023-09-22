@@ -41,13 +41,10 @@
 #include <vtkInteractorStyleRubberBand2D.h>
 
 #include "objectpropertybrowser.h"
-#include "preferences_gui.h"
 #include "vtk_representation.h"
 #include "model.h"
+#include "parameters_wrapper.h"
 #include "backgroundworker.h"
-#include "parameters_sim.h"
-
-#include <spdlog/spdlog.h>
 
 #include <fstream>
 #include <iomanip>
@@ -91,6 +88,7 @@ private:
     BackgroundWorker *worker;
     icy::Model model;
     icy::VisualRepresentation representation;
+    ParamsWrapper *params;
 
     QString settingsFileName;       // includes current dir
     QLabel *statusLabel;                    // statusbar

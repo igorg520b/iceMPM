@@ -26,16 +26,12 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
 {
     constexpr float magic_epsilon = 1e-5f;
     const float &mu = prms.mu;
-    const float kappa = prms.mu*2.f/3 + prms.lambda; // bulk modulus
+    const float &kappa = prms.kappa; // bulk modulus
     const float &xi = prms.NACC_xi;
     const float &beta = prms.NACC_beta;
-    const float &M = prms.NACC_M;
-    const float M_sq = M*M;
+    const float &M_sq = prms.NACC_M_sq;
     const int &d = prms.dim;
     float &alpha = NACC_alpha_p;
-
-//    float dAlpha; //change in logJp, or the change in volumetric plastic strain
-//    float dOmega; //change in logJp from q hardening (only for q hardening)
 
     Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * FModifier) * this->Fe;
 
@@ -43,7 +39,6 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
     Eigen::Matrix2f U = svd.matrixU();
     Eigen::Matrix2f V = svd.matrixV();
     Eigen::Vector2f Sigma = svd.singularValues();
-
 
     // line 4
     float p0 = kappa * (magic_epsilon + std::sinh(xi * std::max(-alpha, 0.f)));
@@ -66,12 +61,11 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
 
     // line 9 (case 1)
     float y = (1.f + 2.f*beta)*(3.f-(float)d/2.f)*s_hat_tr.norm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    Eigen::Matrix2f Fe_new; // result of all this
     if(p_trial > p0)
     {
         float Je_new = std::sqrt(-2.f*p0 / kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
-        Fe_new = U*Sigma_new*V.transpose();
+        Fe = U*Sigma_new*V.transpose();
         if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
     }
 
@@ -80,7 +74,7 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
     {
         float Je_new = std::sqrt(2.f*beta*p0/kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
-        Fe_new = U*Sigma_new*V.transpose();
+        Fe = U*Sigma_new*V.transpose();
         if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
     }
 
@@ -100,28 +94,24 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
             float l2 = (-B-sqrt(B*B-4.f*A*C))/(2.f*A);
             float p1 = p_c + l1*direction[0];
             float p2 = p_c + l2*direction[0];
-
             float p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
             float Je_x = sqrt(abs(-2.f*p_x/kappa + 1.f));
             if(Je_x > magic_epsilon*10) alpha += std::log(Je_tr / Je_x);
-
         }
 
-        float expr_under_root = (-M*M*(p_trial+beta*p0)*(p_trial-p0))/((1+2.f*beta)*(3.f-d/2.));
+        float expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.f*beta)*(3.f-d/2.));
         Eigen::Matrix2f B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2.f/d)/mu)*s_hat_tr.normalized() +
                 Eigen::Matrix2f::Identity()*SigmaSquared.trace()/(float)d;
         Eigen::Matrix2f Sigma_new;
-        Sigma_new.setZero();
-        Sigma_new(0,0) = sqrt(B_hat_E_new(0,0));
-        Sigma_new(1,1) = sqrt(B_hat_E_new(1,1));
-        Fe_new = U*Sigma_new*V.transpose();
+        Sigma_new << sqrt(B_hat_E_new(0,0)), 0,
+                0, sqrt(B_hat_E_new(1,1));
+        Fe = U*Sigma_new*V.transpose();
     }
     else
     {
-        Fe_new = FeTr;
+        Fe = FeTr;
     }
-    Fe = Fe_new;
-    this->visualized_value = this->NACC_alpha_p;
+    visualized_value = NACC_alpha_p;
 }
 
 

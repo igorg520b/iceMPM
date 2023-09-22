@@ -7,20 +7,20 @@
 #include <QMutex>
 #include <QWaitCondition>
 #include <QString>
-#include "modelcontrollerinterface.h"
+#include "model.h"
 
 class BackgroundWorker : public QThread
 {
     Q_OBJECT
 public:
-    BackgroundWorker(ModelControllerInterface *controller_);
+    BackgroundWorker(icy::Model *controller_);
     void Pause();       // cancel current step and pause the worker thread
     void Resume();      // resume the worker thread
     void Finalize();    // exit the worker thread
 
     bool timeToPause = true;
     bool running = false;
-    ModelControllerInterface *controller;
+    icy::Model *controller;
 
 protected:
     void run() override;
@@ -32,7 +32,7 @@ private:
 
 Q_SIGNALS:
     void workerPaused();
-//    void stepCompleted();
+    void stepCompleted();
 };
 
 #endif // BACKGROUNDWORKER_H
