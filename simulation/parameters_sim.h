@@ -12,7 +12,8 @@ public:
     SimParams() { Reset(); }
 
     constexpr static double pi = 3.14159265358979323846;
-    constexpr static int dim = 2;
+
+    bool useGPU;
 
     float InitialTimeStep, SimulationEndTime;
     float Gravity, Density, PoissonsRatio, YoungsModulus;
@@ -47,7 +48,7 @@ public:
         GridY = 100;
         ParticleViewSize = 1.5f;
 #else
-        InitialTimeStep = 2.5e-4;
+        InitialTimeStep = 1.5e-4;
         YoungsModulus = 1.e7;
         PointsWanted = 10'000;
         GridX = 128;
@@ -62,6 +63,8 @@ public:
 
         NACC_friction_angle = 45;
         ComputeCamClayParams();
+
+        useGPU = true;
 
         SimulationEndTime = 15;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
@@ -96,6 +99,7 @@ public:
 
     void ComputeCamClayParams()
     {
+        constexpr int dim = 2;
         float sin_phi = std::sin(NACC_friction_angle / 180.f * pi);
         float mohr_columb_friction = std::sqrt(2.f / 3.f) * 2.f * sin_phi / (3.f - sin_phi);
         float NACC_M = mohr_columb_friction * (float)dim / std::sqrt(2.f / (6.f - dim));

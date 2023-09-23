@@ -11,6 +11,12 @@ void icy::Model::P2G()
 //    const float Dp_inv = 3.f/(h*h); // cubic
     const float Dp_inv = 4.f/(h*h); // quadratic
 
+    if(prms.useGPU)
+    {
+        cuda_p2g(points.size());
+        return;
+    }
+
 #pragma omp parallel for
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
     {
@@ -66,12 +72,25 @@ void icy::Model::P2G()
 
 void icy::Model::G2P()
 {
-    visual_update_mutex.lock();
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; g2p", currentStep);
+
+    if(prms.useGPU)
+    {
+        cuda_g2p(points.size());
+        if(currentStep % prms.UpdateEveryNthStep == 0)
+        {
+            visual_update_mutex.lock();
+            cuda_transfer_from_device(points.size(), points.data());
+            visual_update_mutex.unlock();
+        }
+        return;
+    }
+
     const float &dt = prms.InitialTimeStep;
     const float &h = prms.cellsize;
     constexpr float offset = 0.5f;  // 0 for cubic
 
+    visual_update_mutex.lock();
 #pragma omp parallel for
     for(int idx_p = 0; idx_p<points.size(); idx_p++)
     {
@@ -198,12 +217,19 @@ void icy::Model::Reset()
     grid.resize(prms.GridX*prms.GridY);
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
+    spdlog::info("icy::Model::Reset(); grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
+                 (float)sizeof(GridNode)*grid.size()/(1024*1024), (float)sizeof(Point)*points.size()/(1024*1024),
+                 ((float)sizeof(GridNode)*grid.size()+sizeof(Point)*points.size())/(1024*1024));
+
+    cuda_allocate_arrays(grid.size(), points.size());
+    transfer_ponts_to_device(points.size(), (void*)points.data());
     spdlog::info("icy::Model::Reset() done");
 }
 
 void icy::Model::Prepare()
 {
     spdlog::info("icy::Model::Prepare()");
+    cuda_update_constants(prms);
     abortRequested = false;
 }
 
@@ -235,8 +261,8 @@ bool icy::Model::Step()
 void icy::Model::ResetGrid()
 {
     if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; reset grid", currentStep);
-    memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
-    // for(int i =0;i<grid.size();i++) grid[i].Reset();
+    if(prms.useGPU) cuda_reset_grid(grid.size());
+    else memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
 }
 
 icy::Model::Model()

@@ -79,33 +79,9 @@ public:
         Reset();
     }
 
-//#define PARAMS2
     void Reset()
     {
-#ifdef PARAMS2
-        prms->InitialTimeStep = 5e-5;
-        prms->YoungsModulus = 5.e7;
-        prms->PointsWanted = 400'000;
-        prms->GridX = 256;
-        prms->GridY = 100;
-        prms->ParticleViewSize = 1.5f;
-#else
-        prms->InitialTimeStep = 1.5e-4;
-        prms->YoungsModulus = 1.e7;
-        prms->PointsWanted = 5'000;
-        prms->GridX = 128;
-        prms->GridY = 50;
-        prms->ParticleViewSize = 4.4f;
-#endif
-
-        prms->NACC_beta = .8;
-        prms->NACC_xi = 3;
-        prms->NACC_alpha = std::log(0.999);
-        prms->NACC_hardening = true;
-        prms->NACC_friction_angle = 45;
-
-        prms->ComputeCamClayParams();
-        prms->ComputeLame();
+        // it is possible to change parameters here
     }
 
 

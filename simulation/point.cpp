@@ -25,12 +25,12 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
                                                const icy::SimParams &prms)
 {
     constexpr float magic_epsilon = 1e-5f;
+    constexpr int d = 2; // dimensions
     const float &mu = prms.mu;
     const float &kappa = prms.kappa; // bulk modulus
     const float &xi = prms.NACC_xi;
     const float &beta = prms.NACC_beta;
     const float &M_sq = prms.NACC_M_sq;
-    const int &d = prms.dim;
     float &alpha = NACC_alpha_p;
 
     Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * FModifier) * this->Fe;
