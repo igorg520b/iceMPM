@@ -24,7 +24,7 @@
 
 void test_cuda();
 void cuda_update_constants(const icy::SimParams &prms);
-void cuda_allocate_arrays(size_t nPoints, size_t nGridNodes);
+void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
 void transfer_ponts_to_device(size_t nPoints, void* hostSource);
 void cuda_reset_grid(size_t nGridNodes);
 void cuda_transfer_from_device(size_t nPoints, void *hostArray);

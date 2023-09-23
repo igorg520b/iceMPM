@@ -5,12 +5,13 @@
 
 #include <spdlog/spdlog.h>
 #include <Eigen/Core>
-#include <Eigen/SVD>
 #include <Eigen/LU>
+
 
 #include "parameters_sim.h"
 #include "point.h"
 #include "gridnode.h"
+#include "helper_math.cuh"
 
 __constant__ float mu, lambda, kappa, xi, beta, M_sq, particle_volume, cellsize, Dp_inv, particle_mass, dt;
 __constant__ int gridX, gridY;
@@ -18,6 +19,8 @@ __constant__ bool hardening;
 
 __device__ icy::Point *gpu_points;
 __device__ icy::GridNode *gpu_nodes;
+icy::Point *gpu_points_;
+icy::GridNode *gpu_nodes_;
 __device__ int gpu_error_indicator;
 
 void cuda_update_constants(const icy::SimParams &prms)
@@ -45,9 +48,8 @@ void cuda_update_constants(const icy::SimParams &prms)
     spdlog::info("CUDA constants copied to device");
 }
 
-void cuda_allocate_arrays(size_t nPoints, size_t nGridNodes)
+void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
 {
-    void* ptr;
 //    cudaFree((void)gpu_error_indicator);
 
     // TODO: free when needed
@@ -58,27 +60,27 @@ void cuda_allocate_arrays(size_t nPoints, size_t nGridNodes)
 
 //    cudaMallocManaged((void**)&gpu_error_indicator,sizeof(int));
 
-    err = cudaMalloc(&ptr, sizeof(icy::Point)*nPoints);
+    err = cudaMalloc(&gpu_points_, sizeof(icy::Point)*nPoints);
     if(err != cudaSuccess)
     {
         spdlog::critical("cuda_allocate_arrays can't allocate");
         throw std::runtime_error("cuda_allocate_arrays");
     }
-    err = cudaMemcpyToSymbol(gpu_points, &ptr, sizeof(ptr));
+
+    err = cudaMemcpyToSymbol(gpu_points, &gpu_points_, sizeof(gpu_points_));
     if(err != cudaSuccess)
     {
         spdlog::critical("cuda_allocate_arrays cudaMemcpyToSymbol error");
         throw std::runtime_error("cuda_allocate_arrays");
     }
 
-
-    err = cudaMalloc(&ptr, sizeof(icy::GridNode)*nGridNodes);
+    err = cudaMalloc(&gpu_nodes_, sizeof(icy::GridNode)*nGridNodes);
     if(err != cudaSuccess)
     {
         spdlog::critical("cuda_allocate_arrays can't allocate");
         throw std::runtime_error("cuda_allocate_arrays");
     }
-    err = cudaMemcpyToSymbol(gpu_nodes, &ptr, sizeof(ptr));
+    err = cudaMemcpyToSymbol(gpu_nodes, &gpu_nodes_, sizeof(gpu_nodes_));
     if(err != cudaSuccess)
     {
         spdlog::critical("cuda_allocate_arrays cudaMemcpyToSymbol error");
@@ -91,10 +93,13 @@ void cuda_allocate_arrays(size_t nPoints, size_t nGridNodes)
 void transfer_ponts_to_device(size_t nPoints, void* hostSource)
 {
     cudaError_t err;
-    err = cudaMemcpy(gpu_points, hostSource, nPoints*sizeof(icy::Point), cudaMemcpyHostToDevice);
+    err = cudaMemcpy(gpu_points_, hostSource, nPoints*sizeof(icy::Point), cudaMemcpyHostToDevice);
     if(err != cudaSuccess)
     {
-        spdlog::critical("transfer_ponts_to_device failed");
+        spdlog::critical("transfer_ponts_to_device failed with code {}",err);
+        spdlog::critical("gpu_points_ {}",(void*)gpu_points_);
+        spdlog::critical("hostsource {}", (void*)hostSource);
+        spdlog::critical("size {}",nPoints*sizeof(icy::Point));
         throw std::runtime_error("transfer_ponts_to_device");
     }
     spdlog::info("transfer_ponts_to_device done");
@@ -103,7 +108,7 @@ void transfer_ponts_to_device(size_t nPoints, void* hostSource)
 void cuda_transfer_from_device(size_t nPoints, void *hostArray)
 {
     cudaError_t err;
-    err = cudaMemcpy(hostArray, gpu_points, nPoints*sizeof(icy::Point), cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(hostArray, gpu_points_, nPoints*sizeof(icy::Point), cudaMemcpyDeviceToHost);
     if(err != cudaSuccess)
     {
         spdlog::critical("cuda_transfer_from_device failed");
@@ -243,18 +248,20 @@ void cuda_p2g(const int nPoints)
 }
 
 
+
+
 __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FModifier)
 {
+    /*
     constexpr float magic_epsilon = 1e-5f;
     constexpr int d = 2; // dimensions
     float &alpha = p.NACC_alpha_p;
 
     Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * FModifier) * p.Fe;
 
-    Eigen::JacobiSVD<Eigen::Matrix2f,Eigen::NoQRPreconditioner> svd(FeTr,Eigen::ComputeFullU | Eigen::ComputeFullV);
-    Eigen::Matrix2f U = svd.matrixU();
-    Eigen::Matrix2f V = svd.matrixV();
-    Eigen::Vector2f Sigma = svd.singularValues();
+    Eigen::Matrix2f U, V, Sigma;
+
+    svd2x2(FeTr, U, Sigma, V);
 
     // line 4
     float p0 = kappa * (magic_epsilon + sinhf(xi * fmaxf(-alpha, 0.f)));
@@ -328,6 +335,7 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
         p.Fe = FeTr;
     }
     p.visualized_value = alpha;
+    */
 }
 
 
@@ -389,7 +397,14 @@ void cuda_g2p(const int nPoints)
 
 
 
-__global__ void cuda_hello(){
+__global__ void cuda_hello(Eigen::Matrix2f A, Eigen::Matrix2f *result){
+
+    Eigen::Matrix2f &U = result[0];
+    Eigen::Matrix2f &Sigma = result[1];
+    Eigen::Matrix2f &V = result[2];
+
+    svd2x2(A, U, Sigma, V);
+
     printf("Hello World from GPU!\n\n");
 }
 
@@ -406,5 +421,22 @@ void test_cuda()
     printf("Device \"%s\"\n", deviceProp.name);
     printf("Major/Minor version number:    %d.%d\n", deviceProp.major, deviceProp.minor);
 
-    cuda_hello<<<1,1>>>();
+
+    Eigen::Matrix2f *results;
+    cudaMallocManaged(&results, sizeof(Eigen::Matrix2f)*3);
+    Eigen::Matrix2f A;
+    A << 1,7,-3,4;
+    cuda_hello<<<1,1>>>(A, results);
+    cudaDeviceSynchronize();
+    Eigen::Matrix2f U = results[0];
+    Eigen::Matrix2f S = results[1];
+    Eigen::Matrix2f V = results[2];
+
+    std::cout << "A=\n" << A << '\n';
+    std::cout << "U=\n" << U << '\n';
+    std::cout << "S=\n" << S << '\n';
+    std::cout << "V=\n" << V << '\n';
+    std::cout << "USV^T=\n" << U*S*V.transpose() << '\n';
+    cudaFree(results);
+
 }

@@ -46,6 +46,8 @@ add_library(NACC_cpu SHARED
     simulation/gridnode.cpp
 
     simulation/nacc_on_gpu.cu
+    simulation/givens.cuh
+    simulation/helper_math.cuh
 )
 set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
 
