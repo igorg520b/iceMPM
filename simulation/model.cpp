@@ -5,7 +5,7 @@
 
 void icy::Model::P2G()
 {
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; p2g", currentStep);
+    if(isTimeToUpdate()) spdlog::info("s {}; p2g", prms.SimulationStep);
 
     const float &h = prms.cellsize;
 //    const float Dp_inv = 3.f/(h*h); // cubic
@@ -72,12 +72,12 @@ void icy::Model::P2G()
 
 void icy::Model::G2P()
 {
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; g2p", currentStep);
+    if(isTimeToUpdate()) spdlog::info("s {}; g2p", prms.SimulationStep);
 
     if(prms.useGPU)
     {
         cuda_g2p(points.size());
-        if(currentStep % prms.UpdateEveryNthStep == 0)
+        if(isTimeToUpdate())
         {
             visual_update_mutex.lock();
             cuda_transfer_from_device(points.size(), points.data());
@@ -134,7 +134,13 @@ void icy::Model::G2P()
 
 void icy::Model::UpdateNodes()
 {
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; update nodes", currentStep);
+    if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
+
+    if(prms.useGPU)
+    {
+        cuda_update_nodes(grid.size(),indenter_x, indenter_y);
+        return;
+    }
 
     const float dt = prms.InitialTimeStep;
     const Eigen::Vector2f gravity(0,-prms.Gravity);
@@ -181,8 +187,9 @@ void icy::Model::Reset()
 {
     // this should be called after prms are set as desired (either via GUI or CLI)
     spdlog::info("icy::Model::Reset()");
-    currentStep = 0;
-    simulationTime = 0;
+
+    prms.SimulationStep = 0;
+    prms.SimulationTime = 0;
 
     const float &block_length = prms.BlockLength;
     const float &block_height = prms.BlockHeight;
@@ -217,9 +224,12 @@ void icy::Model::Reset()
     grid.resize(prms.GridX*prms.GridY);
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
+
+    prms.MemAllocGrid = (float)sizeof(GridNode)*grid.size()/(1024*1024);
+    prms.MemAllocPoints = (float)sizeof(Point)*points.size()/(1024*1024);
+    prms.MemAllocTotal = prms.MemAllocGrid + prms.MemAllocPoints;
     spdlog::info("icy::Model::Reset(); grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
-                 (float)sizeof(GridNode)*grid.size()/(1024*1024), (float)sizeof(Point)*points.size()/(1024*1024),
-                 ((float)sizeof(GridNode)*grid.size()+sizeof(Point)*points.size())/(1024*1024));
+                 prms.MemAllocGrid, prms.MemAllocPoints, prms.MemAllocTotal);
 
     cuda_allocate_arrays(grid.size(), points.size());
     transfer_ponts_to_device(points.size(), (void*)points.data());
@@ -236,10 +246,9 @@ void icy::Model::Prepare()
 
 bool icy::Model::Step()
 {
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info(" ");
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} started", currentStep);
+    if(isTimeToUpdate()) spdlog::info("step {} started", prms.SimulationStep);
 
-    indenter_x = indenter_x_initial + simulationTime*prms.IndVelocity;
+    indenter_x = indenter_x_initial + prms.SimulationTime*prms.IndVelocity;
 
     ResetGrid();
     P2G();
@@ -249,18 +258,18 @@ bool icy::Model::Step()
     G2P();
     if(abortRequested) return false;
 
-    currentStep++;
-    simulationTime += prms.InitialTimeStep;
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("step {} completed\n", currentStep);
+    prms.SimulationStep++;
+    prms.SimulationTime += prms.InitialTimeStep;
+    if(isTimeToUpdate()) spdlog::info("step {} completed\n", prms.SimulationStep);
 
-    if(simulationTime >= prms.SimulationEndTime) return false;
+    if(prms.SimulationTime >= prms.SimulationEndTime) return false;
     return true;
 }
 
 
 void icy::Model::ResetGrid()
 {
-    if(currentStep % prms.UpdateEveryNthStep == 0) spdlog::info("s {}; reset grid", currentStep);
+    if(isTimeToUpdate()) spdlog::info("s {}; reset grid", prms.SimulationStep);
     if(prms.useGPU) cuda_reset_grid(grid.size());
     else memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
 }

@@ -49,7 +49,7 @@ void BackgroundWorker::run()
 
         bool result = controller->Step();
         if(!result) timeToPause = true;
-        if(controller->currentStep % controller->prms.UpdateEveryNthStep == 0) Q_EMIT stepCompleted();
+        if(controller->isTimeToUpdate()) Q_EMIT stepCompleted();
     }
     qDebug() << "BackgroundWorker::run() terminated";
 }

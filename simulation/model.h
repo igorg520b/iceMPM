@@ -30,6 +30,7 @@ void cuda_reset_grid(size_t nGridNodes);
 void cuda_transfer_from_device(size_t nPoints, void *hostArray);
 void cuda_p2g(const int nPoints);
 void cuda_g2p(const int nPoints);
+void cuda_update_nodes(const int nGridNodes,float indenter_x, float indenter_y);
 
 namespace icy { class Model; }
 
@@ -49,9 +50,6 @@ private:
 public:
     icy::SimParams prms;
 
-    int currentStep;
-    double simulationTime;
-
     float indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
@@ -60,11 +58,13 @@ public:
     std::mutex visual_update_mutex; // to prevent modifying mesh data while updating VTK representation
     bool visual_update_requested = false;  // true when signal has been already emitted to update vtk geometry
 
+    bool isTimeToUpdate() { return prms.SimulationStep % prms.UpdateEveryNthStep == 0;}
 private:
     void ResetGrid();
     void P2G();
     void UpdateNodes();
     void G2P();
+
 
     bool abortRequested;
 };

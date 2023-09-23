@@ -14,51 +14,86 @@
 #include "helper_math.cuh"
 
 __constant__ float mu, lambda, kappa, xi, beta, M_sq, particle_volume, cellsize, Dp_inv, particle_mass, dt;
+__constant__ float ind_velocity, ind_diameter, gravity, ice_friction_coeff;
 __constant__ int gridX, gridY;
 __constant__ bool hardening;
 
 __device__ icy::Point *gpu_points;
 __device__ icy::GridNode *gpu_nodes;
-icy::Point *gpu_points_;
-icy::GridNode *gpu_nodes_;
+icy::Point *gpu_points_ = nullptr;
+icy::GridNode *gpu_nodes_ = nullptr;
 __device__ int gpu_error_indicator;
 
 void cuda_update_constants(const icy::SimParams &prms)
 {
-    cudaMemcpyToSymbol(&mu, &prms.mu, sizeof(float));
-    cudaMemcpyToSymbol(&lambda, &prms.lambda, sizeof(float));
-    cudaMemcpyToSymbol(&kappa, &prms.kappa, sizeof(float));
-    cudaMemcpyToSymbol(&xi, &prms.NACC_xi, sizeof(float));
-    cudaMemcpyToSymbol(&beta, &prms.NACC_beta, sizeof(float));
-    cudaMemcpyToSymbol(&M_sq, &prms.NACC_M_sq, sizeof(float));
-    cudaMemcpyToSymbol(&particle_volume, &prms.ParticleVolume, sizeof(float));
-    cudaMemcpyToSymbol(&cellsize, &prms.cellsize, sizeof(float));
-    cudaMemcpyToSymbol(&particle_mass, &prms.ParticleMass, sizeof(float));
-    cudaMemcpyToSymbol(&dt, &prms.InitialTimeStep, sizeof(float));
+    cudaError_t err;
+    err = cudaMemcpyToSymbol(mu, &prms.mu, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: mu");
 
-    cudaMemcpyToSymbol(&gridX, &prms.GridX, sizeof(int));
-    cudaMemcpyToSymbol(&gridY, &prms.GridY, sizeof(int));
+    err = cudaMemcpyToSymbol(lambda, &prms.lambda, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: lambda");
+
+    err = cudaMemcpyToSymbol(kappa, &prms.kappa, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(xi, &prms.NACC_xi, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(beta, &prms.NACC_beta, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(M_sq, &prms.NACC_M_sq, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(particle_volume, &prms.ParticleVolume, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(cellsize, &prms.cellsize, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(particle_mass, &prms.ParticleMass, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(dt, &prms.InitialTimeStep, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+
+    err = cudaMemcpyToSymbol(ind_velocity, &prms.IndVelocity, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(ind_diameter, &prms.IndDiameter, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants");
+
+    err = cudaMemcpyToSymbol(gravity, &prms.Gravity, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: gravity");
+
+    err = cudaMemcpyToSymbol(ice_friction_coeff, &prms.IceFrictionCoefficient, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: ice_friction_coeff");
+
+
+    err = cudaMemcpyToSymbol(gridX, &prms.GridX, sizeof(int));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: gridX");
+
+    err = cudaMemcpyToSymbol(gridY, &prms.GridY, sizeof(int));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: gridY");
+
 
     const float host_Dp_inv = 4.f/(prms.cellsize*prms.cellsize); // quadratic
-    cudaMemcpyToSymbol(&Dp_inv, &host_Dp_inv, sizeof(float));
-    cudaMemcpyToSymbol(&hardening, &prms.NACC_hardening, sizeof(bool));
+    err = cudaMemcpyToSymbol(Dp_inv, &host_Dp_inv, sizeof(float));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: Dp_inv");
 
-
+    err = cudaMemcpyToSymbol(hardening, &prms.NACC_hardening, sizeof(bool));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: hardening");
 
     spdlog::info("CUDA constants copied to device");
 }
 
 void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
 {
-//    cudaFree((void)gpu_error_indicator);
-
-    // TODO: free when needed
-    //cudaFree((void*)gpu_points);
-    //cudaFree((void*)gpu_nodes);
+    cudaFree((void*)gpu_points_);
+    cudaFree((void*)gpu_nodes_);
 
     cudaError_t err;
-
-//    cudaMallocManaged((void**)&gpu_error_indicator,sizeof(int));
 
     err = cudaMalloc(&gpu_points_, sizeof(icy::Point)*nPoints);
     if(err != cudaSuccess)
@@ -119,9 +154,8 @@ void cuda_transfer_from_device(size_t nPoints, void *hostArray)
 
 void cuda_reset_grid(size_t nGridNodes)
 {
-    cudaError_t err = cudaMemset(gpu_nodes, 0, sizeof(icy::GridNode)*nGridNodes);
+    cudaError_t err = cudaMemset(gpu_nodes_, 0, sizeof(icy::GridNode)*nGridNodes);
     if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid memset error");
-    spdlog::info("cuda_reset_grid done");
 }
 
 
@@ -173,7 +207,6 @@ __global__ void kernel_p2g(const int nPoints)
     if(pt_idx >= nPoints) return;
 
     icy::Point &p = gpu_points[pt_idx];
-//    const float &h = cellsize;
 
     // NACC constitutive model
     Eigen::Matrix2f Re = polar_decomp_R(p.Fe);
@@ -230,7 +263,8 @@ void cuda_p2g(const int nPoints)
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
-        spdlog::critical("cuda_p2g error executing kernel_p2g");
+        spdlog::critical("cuda_p2g error executing kernel_p2g, code {}; error string: {}; nPoints {}; blocks {}",
+                         err,cudaGetErrorString(err), nPoints,blocksPerGrid);
         throw std::runtime_error("cuda_p2g");
     }
 
@@ -252,7 +286,6 @@ void cuda_p2g(const int nPoints)
 
 __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FModifier)
 {
-    /*
     constexpr float magic_epsilon = 1e-5f;
     constexpr int d = 2; // dimensions
     float &alpha = p.NACC_alpha_p;
@@ -267,10 +300,10 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
     float p0 = kappa * (magic_epsilon + sinhf(xi * fmaxf(-alpha, 0.f)));
 
     // line 5
-    float Je_tr = Sigma[0]*Sigma[1];    // this is for 2D
+    float Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
 
     // line 6
-    Eigen::Matrix2f SigmaMatrix = Sigma.asDiagonal();
+    Eigen::Matrix2f &SigmaMatrix = Sigma;
     Eigen::Matrix2f SigmaSquared = SigmaMatrix*SigmaMatrix;
     Eigen::Matrix2f SigmaSquaredDev = SigmaSquared - SigmaSquared.trace()/2.f*Eigen::Matrix2f::Identity();
     float J_power_neg_2_d_mulmu = mu * powf(Je_tr, -2.f / (float)d);///< J^(-2/dim) * mu
@@ -335,7 +368,6 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
         p.Fe = FeTr;
     }
     p.visualized_value = alpha;
-    */
 }
 
 
@@ -379,7 +411,6 @@ __global__ void kernel_g2p(const int nPoints)
     NACCUpdateDeformationGradient(p, T);
 }
 
-
 void cuda_g2p(const int nPoints)
 {
     cudaError_t err;
@@ -395,16 +426,70 @@ void cuda_g2p(const int nPoints)
 }
 
 
+__global__ void kernel_update_nodes(const int nGridNodes, float indenter_x, float indenter_y)
+{
+    int idx = blockIdx.x * blockDim.x + threadIdx.x;
+    if(idx >= nGridNodes) return;
+    icy::GridNode &gn = gpu_nodes[idx];
+    if(gn.mass == 0) return;
+
+    const Eigen::Vector2f gravity_(0,-gravity);
+    const float indRsq = ind_diameter*ind_diameter/4.f;
+    const Eigen::Vector2f vco(ind_velocity,0);  // velocity of the collision object (indenter)
+    const Eigen::Vector2f indCenter(indenter_x, indenter_y);
+
+    gn.velocity = gn.velocity/gn.mass + dt*(-gn.force/gn.mass + gravity_);
+
+    int idx_x = idx % gridX;
+    int idx_y = idx / gridX;
+
+    // indenter
+    Eigen::Vector2f gnpos(idx_x*cellsize, idx_y*cellsize);
+    Eigen::Vector2f n = gnpos - indCenter;
+    if(n.squaredNorm() < indRsq)
+    {
+        // grid node is inside the indenter
+        Eigen::Vector2f vrel = gn.velocity - vco;
+        n.normalize();
+        float vn = vrel.dot(n);   // normal component of the velocity
+        if(vn < 0)
+        {
+            Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+            gn.velocity = vco + vt + ice_friction_coeff*vn*vt.normalized();
+        }
+    }
+
+    // attached bottom layer
+    if(idx_y <= 3) gn.velocity.setZero();
+    else if(idx_y >= gridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
+    if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
+    else if(idx_x >= gridX-5) gn.velocity[0] = 0;
+}
 
 
-__global__ void cuda_hello(Eigen::Matrix2f A, Eigen::Matrix2f *result){
+void cuda_update_nodes(const int nGridNodes,float indenter_x, float indenter_y)
+{
+    cudaError_t err;
+    int threadsPerBlock = 256;
+    int blocksPerGrid = (nGridNodes + threadsPerBlock - 1) / threadsPerBlock;
+    kernel_update_nodes<<<blocksPerGrid, threadsPerBlock>>>(nGridNodes, indenter_x, indenter_y);
+    err = cudaGetLastError();
+    if(err != cudaSuccess)
+    {
+        spdlog::critical("cuda_update_nodes");
+        throw std::runtime_error("cuda_update_nodes");
+    }
+}
 
+
+
+// ====================================================
+__global__ void cuda_hello(Eigen::Matrix2f A, Eigen::Matrix2f *result)
+{
     Eigen::Matrix2f &U = result[0];
     Eigen::Matrix2f &Sigma = result[1];
     Eigen::Matrix2f &V = result[2];
-
     svd2x2(A, U, Sigma, V);
-
     printf("Hello World from GPU!\n\n");
 }
 
@@ -421,7 +506,6 @@ void test_cuda()
     printf("Device \"%s\"\n", deviceProp.name);
     printf("Major/Minor version number:    %d.%d\n", deviceProp.major, deviceProp.minor);
 
-
     Eigen::Matrix2f *results;
     cudaMallocManaged(&results, sizeof(Eigen::Matrix2f)*3);
     Eigen::Matrix2f A;
@@ -432,11 +516,11 @@ void test_cuda()
     Eigen::Matrix2f S = results[1];
     Eigen::Matrix2f V = results[2];
 
-    std::cout << "A=\n" << A << '\n';
-    std::cout << "U=\n" << U << '\n';
-    std::cout << "S=\n" << S << '\n';
-    std::cout << "V=\n" << V << '\n';
-    std::cout << "USV^T=\n" << U*S*V.transpose() << '\n';
+//    std::cout << "A=\n" << A << '\n';
+//    std::cout << "U=\n" << U << '\n';
+//    std::cout << "S=\n" << S << '\n';
+//    std::cout << "V=\n" << V << '\n';
+//    std::cout << "USV^T=\n" << U*S*V.transpose() << '\n';
     cudaFree(results);
 
 }

@@ -17,6 +17,9 @@ class ParamsWrapper : public QObject
     double getTimeStep() {return prms->InitialTimeStep;}
     void setTimeStep(double val) { prms->InitialTimeStep = val; }
 
+    Q_PROPERTY(QString in_TimeStep_ READ getTimeStep_ NOTIFY propertyChanged)
+    QString getTimeStep_() {return QString("%1 s").arg(prms->InitialTimeStep,0,'e',3);}
+
     Q_PROPERTY(double in_SimulationTime READ getSimulationTime WRITE setSimulationTime NOTIFY propertyChanged)
     double getSimulationTime() {return prms->SimulationEndTime;}
     void setSimulationTime(double val) { prms->SimulationEndTime = val; }
@@ -24,7 +27,9 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(int in_UpdateEvery READ getUpdateEveryNthStep NOTIFY propertyChanged)
     int getUpdateEveryNthStep() {return prms->UpdateEveryNthStep;}
 
-
+    Q_PROPERTY(bool in_useGPU READ getUseGpu WRITE setUseGpu NOTIFY propertyChanged)
+    bool getUseGpu() {return prms->useGPU;}
+    void setUseGpu(bool val) {prms->useGPU = val;}
 
     Q_PROPERTY(double p_Gravity READ getGravity NOTIFY propertyChanged)
     double getGravity() {return prms->Gravity;}
@@ -37,7 +42,7 @@ class ParamsWrapper : public QObject
     void setYoungsModulus(double val) { prms->YoungsModulus = (float)val; prms->ComputeLame(); }
 
     Q_PROPERTY(QString p_YM READ getYM NOTIFY propertyChanged)
-    QString getYM() {return QString("%1").arg(prms->YoungsModulus, 0, 'e', 2);}
+    QString getYM() {return QString("%1 Pa").arg(prms->YoungsModulus, 0, 'e', 2);}
 
     Q_PROPERTY(double p_PoissonsRatio READ getPoissonsRatio WRITE setPoissonsRatio NOTIFY propertyChanged)
     double getPoissonsRatio() {return prms->PoissonsRatio;}
@@ -71,6 +76,15 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(int b_PtActual READ getPointCountActual NOTIFY propertyChanged)
     int getPointCountActual() {return prms->PointCountActual;}
 
+
+    Q_PROPERTY(QString mem_Pts READ getMemPts NOTIFY propertyChanged)
+    QString getMemPts() {return QString("%1 MB").arg(prms->MemAllocPoints,0,'f',3);}
+
+    Q_PROPERTY(QString mem_Grid READ getMemGrid NOTIFY propertyChanged)
+    QString getMemGrid() {return QString("%1 MB").arg(prms->MemAllocGrid,0,'f',3);}
+
+    Q_PROPERTY(QString mem_Total READ getMemTotal NOTIFY propertyChanged)
+    QString getMemTotal() {return QString("%1 MB").arg(prms->MemAllocTotal,0,'f',3);}
 
 public:
     ParamsWrapper(icy::SimParams *p)

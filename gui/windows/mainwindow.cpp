@@ -360,7 +360,7 @@ void MainWindow::limits_changed(double val)
 
 void MainWindow::screenshot_triggered()
 {
-    int screenshot_number = model.currentStep / model.prms.UpdateEveryNthStep;
+    int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
     QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
             QString::number(screenshot_number).rightJustified(5, '0') + ".png";
 
@@ -385,7 +385,8 @@ void MainWindow::updateGUI()
 {
     if(worker->running) statusLabel->setText("simulation is running");
     else statusLabel->setText("simulation is stopped");
-    labelStepCount->setText(QString::number(model.currentStep));
+    labelStepCount->setText(QString::number(model.prms.SimulationStep));
+    labelElapsedTime->setText(QString("%1 s").arg(model.prms.SimulationTime,0,'f',3));
 
     representation.SynchronizeValues();
     renderWindow->Render();

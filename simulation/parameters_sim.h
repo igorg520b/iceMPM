@@ -37,6 +37,10 @@ public:
 
     float ParticleVolume, ParticleMass, ParticleViewSize;
 
+    int SimulationStep;
+    float SimulationTime;
+    float MemAllocGrid, MemAllocPoints, MemAllocTotal;
+
 //#define PARAMS2
     void Reset()
     {
@@ -48,12 +52,12 @@ public:
         GridY = 100;
         ParticleViewSize = 1.5f;
 #else
-        InitialTimeStep = 1.5e-4;
-        YoungsModulus = 1.e7;
-        PointsWanted = 10'000;
+        InitialTimeStep = 7e-5;
+        YoungsModulus = 5.e7;
+        PointsWanted = 50'000;
         GridX = 128;
         GridY = 50;
-        ParticleViewSize = 4.4f;
+        ParticleViewSize = 3.4f;
 #endif
 
         NACC_beta = .8;
@@ -87,6 +91,10 @@ public:
         XiSnow = 10.f;
         THT_C_snow = 2.0e-2;				// Critical compression
         THT_S_snow = 6.0e-3;				// Critical stretch
+
+        SimulationStep = 0;
+        SimulationTime = 0;
+        MemAllocGrid = MemAllocPoints = MemAllocTotal = 0;
     }
 
     void ComputeLame()

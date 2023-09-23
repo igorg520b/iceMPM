@@ -50,6 +50,7 @@ add_library(NACC_cpu SHARED
     simulation/helper_math.cuh
 )
 set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored")
 
 target_include_directories(NACC_cpu PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
 
