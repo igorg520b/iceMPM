@@ -387,7 +387,7 @@ void MainWindow::updateGUI()
  //   else statusLabel->setText("simulation is stopped");
     labelStepCount->setText(QString::number(model.prms.SimulationStep));
     labelElapsedTime->setText(QString("%1 s").arg(model.prms.SimulationTime,0,'f',3));
-    statusLabel->setText(QString("per cycle: %1 ms").arg(model.compute_time_per_cycle,0,'e',3));
+    statusLabel->setText(QString("per cycle: %1 ms").arg(model.compute_time_per_cycle,0,'f',3));
 
 
     representation.SynchronizeValues();

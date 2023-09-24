@@ -49,10 +49,15 @@ add_library(NACC_cpu SHARED
     simulation/helper_math.cuh
     simulation/gpu_implementation0.h
     simulation/gpu_implementation0.cu
+    simulation/gpu_implementation1.h
+    simulation/gpu_implementation1.cu
 )
 set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_math")
+set_target_properties(NACC_cpu PROPERTIES CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
+#SET(CUDA_SEPARABLE_COMPILATION ON)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_math")
+# --device-c
 target_include_directories(NACC_cpu PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
 
 # OpenMP

@@ -15,7 +15,8 @@
 #include "point.h"
 #include "gridnode.h"
 #include "poisson_disk_sampling.h"
-#include "gpu_implementation0.h"
+//#include "gpu_implementation0.h"
+#include "gpu_implementation1.h"
 
 #include <Eigen/Core>
 #include <Eigen/SVD>
@@ -35,7 +36,7 @@ public:
     void RequestAbort() {abortRequested = true;}   // asynchronous stop
 
 private:
-    GPU_Implementation0 gpu;
+    GPU_Implementation1 gpu;
 
 public:
     icy::SimParams prms;

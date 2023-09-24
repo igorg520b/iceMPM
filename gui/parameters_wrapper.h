@@ -89,6 +89,16 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(QString mem_Total READ getMemTotal NOTIFY propertyChanged)
     QString getMemTotal() {return QString("%1 MB").arg(prms->MemAllocTotal,0,'f',3);}
 
+    Q_PROPERTY(double nacc_beta READ getNaccBeta WRITE setNaccBeta NOTIFY propertyChanged)
+    double getNaccBeta() {return prms->NACC_beta;}
+    void setNaccBeta(double val) {prms->NACC_beta = val;}
+
+    Q_PROPERTY(double nacc_xi READ getNaccXi WRITE setNaccXi NOTIFY propertyChanged)
+    double getNaccXi() {return prms->NACC_xi;}
+    void setNaccXi(double val) {prms->NACC_xi = val;}
+
+
+
 public:
     ParamsWrapper(icy::SimParams *p)
     {

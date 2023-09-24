@@ -44,8 +44,8 @@ public:
     void Reset()
     {
 #ifdef PARAMS2
-        InitialTimeStep = 2e-5;
-        YoungsModulus = 3.e9;
+        InitialTimeStep = 1e-5;
+        YoungsModulus = 1.e9;
         PointsWanted = 50'000;
         GridX = 256;
         GridY = 100;
@@ -59,8 +59,8 @@ public:
         ParticleViewSize = 3.1f;
 #endif
 
-        NACC_beta = 0.5;
-        NACC_xi = 0.9;
+        NACC_beta = 2.;
+        NACC_xi = .5;
         NACC_alpha = std::log(0.99);
         NACC_hardening = true;
 

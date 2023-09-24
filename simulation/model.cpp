@@ -211,7 +211,7 @@ void icy::Model::Reset()
                  prms.MemAllocGrid, prms.MemAllocPoints, prms.MemAllocTotal);
 
     gpu.cuda_allocate_arrays(grid.size(), points.size());
-    gpu.transfer_ponts_to_device(points.size(), (void*)points.data());
+    gpu.transfer_ponts_to_device(points);
     spdlog::info("icy::Model::Reset() done");
 }
 
@@ -251,13 +251,13 @@ bool icy::Model::Step()
     prms.SimulationTime += prms.InitialTimeStep;
     if(isTimeToUpdate())
     {
-        spdlog::info("step {} completed\n", prms.SimulationStep);
+        spdlog::info("step {} completed\n", prms.SimulationStep-1);
         if(prms.useGPU)
         {
             compute_time_per_cycle = gpu.end_timing()/prms.UpdateEveryNthStep;
             gpu.cuda_device_synchronize();
             visual_update_mutex.lock();
-            gpu.cuda_transfer_from_device(points.size(), points.data());
+            gpu.cuda_transfer_from_device(points);
             visual_update_mutex.unlock();
         }
     }
