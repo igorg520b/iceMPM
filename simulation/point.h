@@ -11,15 +11,16 @@ namespace icy { struct Point; }
 struct icy::Point
 {
     Eigen::Vector2f pos, velocity;
-    Eigen::Matrix2f Bp, Fe, Fp; // refer to "The Material Point Method for Simulating Continuum Materials"
-    float visualized_value;
+    Eigen::Matrix2f Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
+//    Eigen::Matrix2f Fp; // for snow
+//    float visualized_value;
     float NACC_alpha_p;
 
     static float wc(Eigen::Vector2f dx, double h);
     static Eigen::Vector2f gradwc(Eigen::Vector2f dx, double h);
     static float wq(Eigen::Vector2f dx, double h);
     static Eigen::Vector2f gradwq(Eigen::Vector2f dx, double h);
-
+/*
     Eigen::Matrix2f SnowConstitutiveModel(const float &XiSnow,
                                           const float &prmsMu,
                                           const float &prmsLambda,
@@ -28,7 +29,7 @@ struct icy::Point
                                        const float &THT_C_snow,
                                        const float &THT_S_snow,
                                        const Eigen::Matrix2f &FModifier);
-
+*/
 
     Eigen::Matrix2f NACCConstitutiveModel(const float &prmsMu,
                                           const float &prmsLambda,

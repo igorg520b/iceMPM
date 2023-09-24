@@ -3,6 +3,8 @@
 
 
 
+
+
 void icy::Model::P2G()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; p2g", prms.SimulationStep);
@@ -10,12 +12,6 @@ void icy::Model::P2G()
     const float &h = prms.cellsize;
 //    const float Dp_inv = 3.f/(h*h); // cubic
     const float Dp_inv = 4.f/(h*h); // quadratic
-
-    if(prms.useGPU)
-    {
-        cuda_p2g(points.size());
-        return;
-    }
 
 #pragma omp parallel for
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
@@ -74,18 +70,6 @@ void icy::Model::G2P()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; g2p", prms.SimulationStep);
 
-    if(prms.useGPU)
-    {
-        cuda_g2p(points.size());
-        if(isTimeToUpdate())
-        {
-            visual_update_mutex.lock();
-            cuda_transfer_from_device(points.size(), points.data());
-            visual_update_mutex.unlock();
-        }
-        return;
-    }
-
     const float &dt = prms.InitialTimeStep;
     const float &h = prms.cellsize;
     constexpr float offset = 0.5f;  // 0 for cubic
@@ -136,12 +120,6 @@ void icy::Model::UpdateNodes()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
 
-    if(prms.useGPU)
-    {
-        cuda_update_nodes(grid.size(),indenter_x, indenter_y);
-        return;
-    }
-
     const float dt = prms.InitialTimeStep;
     const Eigen::Vector2f gravity(0,-prms.Gravity);
     const float indRsq = prms.IndDiameter*prms.IndDiameter/4.f;
@@ -190,6 +168,7 @@ void icy::Model::Reset()
 
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
+    compute_time_per_cycle = 0;
 
     const float &block_length = prms.BlockLength;
     const float &block_height = prms.BlockHeight;
@@ -216,9 +195,9 @@ void icy::Model::Reset()
 //        p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
         p.velocity.setZero();
         p.Fe.setIdentity();
-        p.Fp.setIdentity();
+        //p.Fp.setIdentity();
         p.Bp.setZero();
-        p.visualized_value = 0;
+        //p.visualized_value = 0;
         p.NACC_alpha_p = prms.NACC_alpha;
     }
     grid.resize(prms.GridX*prms.GridY);
@@ -231,15 +210,15 @@ void icy::Model::Reset()
     spdlog::info("icy::Model::Reset(); grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  prms.MemAllocGrid, prms.MemAllocPoints, prms.MemAllocTotal);
 
-    cuda_allocate_arrays(grid.size(), points.size());
-    transfer_ponts_to_device(points.size(), (void*)points.data());
+    gpu.cuda_allocate_arrays(grid.size(), points.size());
+    gpu.transfer_ponts_to_device(points.size(), (void*)points.data());
     spdlog::info("icy::Model::Reset() done");
 }
 
 void icy::Model::Prepare()
 {
     spdlog::info("icy::Model::Prepare()");
-    cuda_update_constants(prms);
+    gpu.cuda_update_constants(prms);
     abortRequested = false;
 }
 
@@ -249,18 +228,39 @@ bool icy::Model::Step()
     if(isTimeToUpdate()) spdlog::info("step {} started", prms.SimulationStep);
 
     indenter_x = indenter_x_initial + prms.SimulationTime*prms.IndVelocity;
-
-    ResetGrid();
-    P2G();
-    if(abortRequested) return false;
-    UpdateNodes();
-    if(abortRequested) return false;
-    G2P();
-    if(abortRequested) return false;
+    if(isTimeToUpdate()) gpu.start_timing();
+    if(prms.useGPU)
+    {
+        gpu.cuda_reset_grid(grid.size());
+        gpu.cuda_p2g(points.size());
+        gpu.cuda_update_nodes(grid.size(),indenter_x, indenter_y);
+        gpu.cuda_g2p(points.size());
+    }
+    else
+    {
+        ResetGrid();
+        P2G();
+        if(abortRequested) return false;
+        UpdateNodes();
+        if(abortRequested) return false;
+        G2P();
+        if(abortRequested) return false;
+    }
 
     prms.SimulationStep++;
     prms.SimulationTime += prms.InitialTimeStep;
-    if(isTimeToUpdate()) spdlog::info("step {} completed\n", prms.SimulationStep);
+    if(isTimeToUpdate())
+    {
+        spdlog::info("step {} completed\n", prms.SimulationStep);
+        if(prms.useGPU)
+        {
+            compute_time_per_cycle = gpu.end_timing()/prms.UpdateEveryNthStep;
+            gpu.cuda_device_synchronize();
+            visual_update_mutex.lock();
+            gpu.cuda_transfer_from_device(points.size(), points.data());
+            visual_update_mutex.unlock();
+        }
+    }
 
     if(prms.SimulationTime >= prms.SimulationEndTime) return false;
     return true;
@@ -270,12 +270,12 @@ bool icy::Model::Step()
 void icy::Model::ResetGrid()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; reset grid", prms.SimulationStep);
-    if(prms.useGPU) cuda_reset_grid(grid.size());
-    else memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
+    memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
 }
 
 icy::Model::Model()
 {
+    prms.Reset();
     spdlog::info("num threads {}", omp_get_max_threads());
     int nthreads, tid;
 #pragma omp parallel
@@ -284,5 +284,4 @@ icy::Model::Model()
     spdlog::info("sizeof(Point) = {}", sizeof(icy::Point));
     spdlog::info("sizeof(GridNode) = {}", sizeof(icy::GridNode));
 
-    test_cuda();
 }

@@ -14,29 +14,19 @@
 #include "parameters_sim.h"
 #include "point.h"
 #include "gridnode.h"
+#include "poisson_disk_sampling.h"
+#include "gpu_implementation0.h"
 
 #include <Eigen/Core>
 #include <Eigen/SVD>
 #include <Eigen/LU>
 
-#include "poisson_disk_sampling.h"
 
-
-void test_cuda();
-void cuda_update_constants(const icy::SimParams &prms);
-void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
-void transfer_ponts_to_device(size_t nPoints, void* hostSource);
-void cuda_reset_grid(size_t nGridNodes);
-void cuda_transfer_from_device(size_t nPoints, void *hostArray);
-void cuda_p2g(const int nPoints);
-void cuda_g2p(const int nPoints);
-void cuda_update_nodes(const int nGridNodes,float indenter_x, float indenter_y);
 
 namespace icy { class Model; }
 
 class icy::Model
 {
-    // ModelController
 public:
     Model();
     void Reset();
@@ -45,10 +35,11 @@ public:
     void RequestAbort() {abortRequested = true;}   // asynchronous stop
 
 private:
+    GPU_Implementation0 gpu;
 
-    // Model
 public:
     icy::SimParams prms;
+    float compute_time_per_cycle;
 
     float indenter_x, indenter_x_initial, indenter_y;
 
@@ -64,7 +55,6 @@ private:
     void P2G();
     void UpdateNodes();
     void G2P();
-
 
     bool abortRequested;
 };

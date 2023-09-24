@@ -1,10 +1,9 @@
-/**
-Givens rotation
-*/
 #ifndef GIVENS_CUH
 #define GIVENS_CUH
 #include <type_traits>
 #include <cmath>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 #define ENABLE_COLUMN_ROTATION 0
 #define ENABLE_ADDITIONAL_GIVENS_FUNCTION 0

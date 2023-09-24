@@ -111,7 +111,7 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
     {
         Fe = FeTr;
     }
-    visualized_value = NACC_alpha_p;
+    //visualized_value = NACC_alpha_p;
 }
 
 
@@ -137,7 +137,7 @@ void icy::Point::ElasticUpdateDeformationGradient(const float &dt,
 }
 
 
-
+/*
 Eigen::Matrix2f icy::Point::SnowConstitutiveModel(const float &XiSnow,
                                   const float &prmsMu,
                                   const float &prmsLambda,
@@ -152,7 +152,6 @@ Eigen::Matrix2f icy::Point::SnowConstitutiveModel(const float &XiSnow,
     Eigen::Matrix2f dFe = 2.f * mu*(Fe - Re)* Fe.transpose() +
             lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
     Eigen::Matrix2f Ap = dFe * particle_volume;
-    return Ap;
 }
 
 void icy::Point::SnowUpdateDeformationGradient(const float &dt,
@@ -174,7 +173,7 @@ void icy::Point::SnowUpdateDeformationGradient(const float &dt,
     Fp = V*SigmaClamped.asDiagonal().inverse()*Sigma.asDiagonal()*V.transpose()*Fp;
 }
 
-
+*/
 
 
 float icy::Point::wcs(float x)

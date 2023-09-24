@@ -76,6 +76,9 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(int b_PtActual READ getPointCountActual NOTIFY propertyChanged)
     int getPointCountActual() {return prms->PointCountActual;}
 
+    Q_PROPERTY(QString b_Grid READ getGridDimensions NOTIFY propertyChanged)
+    QString getGridDimensions() {return QString("%1 x %2").arg(prms->GridX).arg(prms->GridY);}
+
 
     Q_PROPERTY(QString mem_Pts READ getMemPts NOTIFY propertyChanged)
     QString getMemPts() {return QString("%1 MB").arg(prms->MemAllocPoints,0,'f',3);}

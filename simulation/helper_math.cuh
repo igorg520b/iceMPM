@@ -3,6 +3,8 @@
 
 #include "givens.cuh"
 #include <Eigen/Core>
+#include <cuda.h>
+#include <cuda_runtime.h>
 
 /**
  \brief 2x2 polar decomposition.
@@ -56,7 +58,7 @@ __device__ void polar_decomposition(const T a[4], T r[4], T s[4]) {
 }
 
 
-template <typename T> __device__ void inline swap(T& a, T& b)
+template <typename T> __device__ void inline my_swap(T& a, T& b)
 {
     T c(a); a=b; b=c;
 }
@@ -121,7 +123,7 @@ __device__ void singular_value_decomposition(
     // Polar already guarantees negative sign is on the small magnitude singular value.
     if(sigma[0] < sigma[1])
     {
-        swap(sigma[0], sigma[1]);
+        my_swap(sigma[0], sigma[1]);
         v.c = -sine;
         v.s = cosine;
     } else {
@@ -131,36 +133,6 @@ __device__ void singular_value_decomposition(
     u *= v;
 }
 
-/**
-\brief 2x2 SVD (singular value decomposition) a=USV'
-\param[in] a Input matrix.
-\param[out] u Robustly a rotation matrix.
-\param[out] sigma Vector of singular values sorted with decreasing magnitude. The second one can be negative.
-\param[out] v Robustly a rotation matrix.
-*/
-__device__ void svd(const float a[4], float u[4], float sigma[2], float v[4])
-{
-    GivensRotation<double> gv(0, 1);
-    GivensRotation<double> gu(0, 1);
-    singular_value_decomposition(a, gu, sigma, gv);
-    gu.template fill<2, float>(u);
-    gv.template fill<2, float>(v);
-}
-
-
-__device__ void svd2x2(const Eigen::Matrix2f &mA,
-                       Eigen::Matrix2f &mU,
-                       Eigen::Matrix2f &mS,
-                       Eigen::Matrix2f &mV)
-{
-    float U[4], V[4], S[2];
-    float a[4] = {mA(0,0), mA(0,1), mA(1,0), mA(1,1)};
-    svd(a, U, S, V);
-
-    mU << U[0],U[1],U[2],U[3];
-    mS << S[0],0,0,S[1];
-    mV << V[0],V[1],V[2],V[3];
-}
 
 
 #endif // HELPER_MATH_CUH

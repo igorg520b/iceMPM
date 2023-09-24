@@ -383,10 +383,12 @@ void MainWindow::screenshot_triggered()
 
 void MainWindow::updateGUI()
 {
-    if(worker->running) statusLabel->setText("simulation is running");
-    else statusLabel->setText("simulation is stopped");
+ //   if(worker->running) statusLabel->setText("simulation is running");
+ //   else statusLabel->setText("simulation is stopped");
     labelStepCount->setText(QString::number(model.prms.SimulationStep));
     labelElapsedTime->setText(QString("%1 s").arg(model.prms.SimulationTime,0,'f',3));
+    statusLabel->setText(QString("per cycle: %1 ms").arg(model.compute_time_per_cycle,0,'e',3));
+
 
     representation.SynchronizeValues();
     renderWindow->Render();
@@ -417,4 +419,5 @@ void MainWindow::background_worker_paused()
     ui->actionStart_Pause->setEnabled(true);
     ui->actionStart_Pause->setChecked(false);
     ui->actionStart_Pause->blockSignals(false);
+    statusLabel->setText("simulation stopped");
 }
