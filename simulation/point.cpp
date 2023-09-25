@@ -11,7 +11,7 @@ Eigen::Matrix2f icy::Point::NACCConstitutiveModel(const float &prmsMu,
                                       const float &particle_volume) const
 {
     // elastic material (same for snow)
-    Eigen::Matrix2f Re = polar_decomp_R(Fe);
+    Eigen::Matrix2f Re = icy::Point::polar_decomp_R(Fe);
     float Je = Fe.determinant();
     Eigen::Matrix2f dFe = 2.f * prmsMu*(Fe - Re)* Fe.transpose() +
             prmsLambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
@@ -122,7 +122,7 @@ Eigen::Matrix2f icy::Point::ElasticConstitutiveModel(const float &prmsMu,
                                       const float &particle_volume) const
 {
     // elastic material (same for snow)
-    Eigen::Matrix2f Re = polar_decomp_R(Fe);
+    Eigen::Matrix2f Re = icy::Point::polar_decomp_R(Fe);
     float Je = Fe.determinant();
     Eigen::Matrix2f dFe = 2.f * prmsMu*(Fe - Re)* Fe.transpose() +
             prmsLambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
@@ -147,7 +147,7 @@ Eigen::Matrix2f icy::Point::SnowConstitutiveModel(const float &XiSnow,
     visualized_value = Fp.determinant();
     const float mu = prmsMu * exp;
     const float lambda = prmsLambda * exp;
-    Eigen::Matrix2f Re = polar_decomp_R(Fe);
+    Eigen::Matrix2f Re = icy::Point::polar_decomp_R(Fe);
     float Je = Fe.determinant();
     Eigen::Matrix2f dFe = 2.f * mu*(Fe - Re)* Fe.transpose() +
             lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();

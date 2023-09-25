@@ -59,12 +59,12 @@ public:
         ParticleViewSize = 3.1f;
 #endif
 
-        NACC_beta = 2.;
-        NACC_xi = .5;
+        NACC_beta = 3;//2.;
+        NACC_xi = 2; //0.5
         NACC_alpha = std::log(0.99);
         NACC_hardening = true;
 
-        NACC_friction_angle = 60;
+        NACC_friction_angle = 30;//60;
         ComputeCamClayParams();
 
         useGPU = true;
