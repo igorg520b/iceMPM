@@ -38,33 +38,33 @@ public:
     float SimulationTime;
     float MemAllocGrid, MemAllocPoints, MemAllocTotal;
 
-    bool NACC_hardening;
     bool useGPU;
-//#define PARAMS2
     void Reset()
     {
+//#define PARAMS2
 #ifdef PARAMS2
-        InitialTimeStep = 1e-5;
-        YoungsModulus = 1.e9;
-        PointsWanted = 50'000;
-        GridX = 256;
-        GridY = 100;
-        ParticleViewSize = 2.3f;
+        InitialTimeStep = 5.e-6;
+        YoungsModulus = 5.e8;
+        NACC_beta = 0.4;
+        NACC_xi = 0.9;
+        NACC_alpha = std::log(1.-1.e-6);
+        PointsWanted = 1'000'000;
+        GridX = 512;
+        GridY = 256;
+        ParticleViewSize = 1.1f;
 #else
-        InitialTimeStep = 3e-5;
+        InitialTimeStep = 1.e-5;
         YoungsModulus = 1.e9;
-        PointsWanted = 30'000;
+        NACC_beta = 0.3;
+        NACC_xi = 0.9;
+        NACC_alpha = std::log(1.-1.e-8);
+        PointsWanted = 25'000;
         GridX = 128;
-        GridY = 50;
-        ParticleViewSize = 3.1f;
+        GridY = 64;
+        ParticleViewSize = 5.5f;
 #endif
 
-        NACC_beta = 3;//2.;
-        NACC_xi = 2; //0.5
-        NACC_alpha = std::log(0.99);
-        NACC_hardening = true;
-
-        NACC_friction_angle = 30;//60;
+        NACC_friction_angle = 45;//60;
         ComputeCamClayParams();
 
         useGPU = true;
@@ -72,14 +72,14 @@ public:
         SimulationEndTime = 15;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
 
-        cellsize = 4./(GridX);  // this better have a form of 2^n, where n is an integer
+        cellsize = 3.33/(GridX);  // this better have a form of 2^n, where n is an integer
         Dp_inv = 4.f/(cellsize*cellsize);
 
         PoissonsRatio = 0.3;
         ComputeLame();
         Gravity = 9.81;
         Density = 980;
-        IceFrictionCoefficient = 0.03;
+        IceFrictionCoefficient = 0;//0.03;
 
         IndDiameter = 0.324;
         IndRSq = IndDiameter*IndDiameter/4.f;

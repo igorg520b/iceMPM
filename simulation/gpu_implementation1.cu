@@ -15,15 +15,11 @@
 __device__ Eigen::Vector2f *gpu_pts_pos, *gpu_pts_velocity;
 __device__ float *gpu_pts_Bp[4], *gpu_pts_Fe[4];
 __device__ float *gpu_pts_NACC_alpha_p;
-
 __device__ Eigen::Vector2f *gpu_grid_momentum, *gpu_grid_velocity, *gpu_grid_force;
 __device__ float *gpu_grid_mass;
 
-
 __constant__ icy::SimParams gprms;
 __device__ int gpu_error_indicator;
-__device__ icy::Point *gpu_points;
-__device__ icy::GridNode *gpu_nodes;
 
 
 GPU_Implementation1::GPU_Implementation1()
@@ -208,7 +204,7 @@ void GPU_Implementation1::cuda_p2g(const int nPoints)
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
-        std::cout << "cuda_p2g error executing kernel_p2g\n";
+        std::cout << "cuda_p2g error executing kernel_p2g " << err << std::endl;
         throw std::runtime_error("cuda_p2g");
     }
 }
@@ -222,7 +218,7 @@ void GPU_Implementation1::cuda_g2p(const int nPoints)
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
-        std::cout << "cuda_g2p error\n";
+        std::cout << "cuda_g2p error " << err << '\n';
         throw std::runtime_error("cuda_g2p");
     }
 }
@@ -289,21 +285,21 @@ __global__ void v1_kernel_p2g(const int nPoints)
     const int j0 = (int)(p.pos[1]/cellsize - offset);
 
     for (int i = i0; i < i0+3; i++)
-        for (int j = 0; j < j0+3; j++)
+        for (int j = j0; j < j0+3; j++)
         {
             int idx_gridnode = i + j*gridX;
             if(i < 0 || j < 0 || i >=gridX || j>=gridY || idx_gridnode < 0)
                 gpu_error_indicator = 1;
 
-            Eigen::Vector2f pos_node(i*cellsize, j*cellsize);
-            Eigen::Vector2f d = p.pos - pos_node;
-            float Wip = wq(d, cellsize);   // weight
-            Eigen::Vector2f dWip = gradwq(d, cellsize);    // weight gradient
+            Eigen::Vector2f pos_node(i, j);
+            Eigen::Vector2f d = p.pos/cellsize - pos_node;
+            float Wip = wq(d);   // weight
+            Eigen::Vector2f dWip = gradwq(d);    // weight gradient
 
             // APIC increments
             float incM = Wip * particle_mass;
-            Eigen::Vector2f incV = incM * (p.velocity + Dp_inv * p.Bp * (-d));
-            Eigen::Vector2f incFi = Ap * dWip;
+            Eigen::Vector2f incV = incM * (p.velocity - p.Bp * (d*4.f/cellsize)); // this is for 2D only (Dp_inv)
+            Eigen::Vector2f incFi = Ap * dWip/cellsize;
 
             // Udpate mass, velocity and force
             atomicAdd(&gpu_grid_mass[idx_gridnode], incM);
@@ -341,6 +337,7 @@ __global__ void v1_kernel_update_nodes(const int nGridNodes, float indenter_x, f
     const Eigen::Vector2f indCenter(indenter_x, indenter_y);
 
     gn.velocity = gn.velocity/gn.mass + dt*(-gn.force/gn.mass + gravity_);
+    if(gn.velocity.norm() > cellsize/dt) gn.velocity = gn.velocity.normalized()*cellsize/dt;
 
     int idx_x = idx % gridX;
     int idx_y = idx / gridX;
@@ -376,30 +373,23 @@ __global__ void v1_kernel_g2p(const int nPoints)
     if(pt_idx >= nPoints) return;
 
     icy::Point p;
-    p.pos = gpu_pts_pos[pt_idx];
-//    p.velocity = gpu_pts_velocity[pt_idx];
-//    p.Bp(0,0) = gpu_pts_Bp[0][pt_idx];
-//    p.Bp(0,1) = gpu_pts_Bp[1][pt_idx];
-//    p.Bp(1,0) = gpu_pts_Bp[2][pt_idx];
-//    p.Bp(1,1) = gpu_pts_Bp[3][pt_idx];
     p.Fe(0,0) = gpu_pts_Fe[0][pt_idx];
     p.Fe(0,1) = gpu_pts_Fe[1][pt_idx];
     p.Fe(1,0) = gpu_pts_Fe[2][pt_idx];
     p.Fe(1,1) = gpu_pts_Fe[3][pt_idx];
     p.NACC_alpha_p = gpu_pts_NACC_alpha_p[pt_idx];
+    p.velocity.setZero();
+    p.Bp.setZero();
+    p.pos.setZero();
+    const Eigen::Vector2f pointPos_copy = gpu_pts_pos[pt_idx];
 
     const float &cellsize = gprms.cellsize;
     const float &dt = gprms.InitialTimeStep;
     const int &gridX = gprms.GridX;
 
-    p.velocity.setZero();
-    p.Bp.setZero();
-
     constexpr float offset = 0.5f;  // 0 for cubic; 0.5 for quadratic
-    const int i0 = (int)((p.pos[0])/cellsize - offset);
-    const int j0 = (int)((p.pos[1])/cellsize - offset);
-    const Eigen::Vector2f pointPos_copy = p.pos;
-    p.pos.setZero();
+    const int i0 = (int)((pointPos_copy[0])/cellsize - offset);
+    const int j0 = (int)((pointPos_copy[1])/cellsize - offset);
 
     Eigen::Matrix2f T;
     T.setZero();
@@ -414,16 +404,16 @@ __global__ void v1_kernel_g2p(const int nPoints)
             node.force = gpu_grid_force[idx_gridnode];
             node.mass = gpu_grid_mass[idx_gridnode];
 
-            Eigen::Vector2f pos_node(i*cellsize, j*cellsize);
-            Eigen::Vector2f d = pointPos_copy - pos_node;   // dist
-            float Wip = wq(d, cellsize);   // weight
-            Eigen::Vector2f dWip = gradwq(d, cellsize);    // weight gradient
+            Eigen::Vector2f pos_node(i, j);
+            Eigen::Vector2f d = pointPos_copy/cellsize - pos_node;   // dist
+            float Wip = wq(d);   // weight
+            Eigen::Vector2f dWip = gradwq(d);    // weight gradient
 
             p.velocity += Wip * node.velocity;
-            p.Bp += Wip *(node.velocity*(-d).transpose());
+            p.Bp += Wip *(node.velocity*(-d*cellsize).transpose());
             // Update position and nodal deformation
-            p.pos += Wip * (pos_node + dt * node.velocity);
-            T += node.velocity * dWip.transpose();
+            p.pos += Wip * (pos_node*cellsize + dt * node.velocity);
+            T += node.velocity * dWip.transpose()/(cellsize);
         }
     NACCUpdateDeformationGradient(p, T);
 
@@ -489,7 +479,6 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
     const float &beta = gprms.NACC_beta;
     const float &M_sq = gprms.NACC_M_sq;
     const float &xi = gprms.NACC_xi;
-    const bool &hardening = gprms.NACC_hardening;
     const float &dt = gprms.InitialTimeStep;
 
     Eigen::Matrix2f FeTr = (Eigen::Matrix2f::Identity() + dt * FModifier) * p.Fe;
@@ -523,7 +512,7 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
         float Je_new = sqrtf(-2.f*p0 / kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * powf(Je_new, 1.f/(float)d);
         p.Fe = U*Sigma_new*V.transpose();
-        if(hardening) alpha += logf(Je_tr / Je_new);
+        if(true) alpha += logf(Je_tr / Je_new);
     }
 
     // line 14 (case 2)
@@ -532,13 +521,13 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FM
         float Je_new = sqrtf(2.f*beta*p0/kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
         p.Fe = U*Sigma_new*V.transpose();
-        if(hardening) alpha += logf(Je_tr / Je_new);
+        if(true) alpha += logf(Je_tr / Je_new);
     }
 
     // line 19 (case 3)
     else if(y >= magic_epsilon*10)
     {
-        if(hardening && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+        if(true && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
         {
             float p_c = (1.f-beta)*p0/2.f;  // line 23
             float q_tr = sqrtf(3.f-d/2.f)*s_hat_tr.norm();   // line 24
@@ -602,15 +591,15 @@ __device__ float dwqs(float x)
     return 0;
 }
 
-__device__ float wq(Eigen::Vector2f dx, double h)
+__device__ float wq(Eigen::Vector2f dx)
 {
-    return wqs(dx[0]/h)*wqs(dx[1]/h);
+    return wqs(dx[0])*wqs(dx[1]);
 }
 
-__device__ Eigen::Vector2f gradwq(Eigen::Vector2f dx, double h)
+__device__ Eigen::Vector2f gradwq(Eigen::Vector2f dx)
 {
     Eigen::Vector2f result;
-    result[0] = dwqs(dx[0]/h)*wqs(dx[1]/h)/h;
-    result[1] = wqs(dx[0]/h)*dwqs(dx[1]/h)/h;
+    result[0] = dwqs(dx[0])*wqs(dx[1]);
+    result[1] = wqs(dx[0])*dwqs(dx[1]);
     return result;
 }

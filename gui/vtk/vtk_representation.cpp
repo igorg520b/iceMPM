@@ -133,19 +133,19 @@ void icy::VisualRepresentation::SynchronizeValues()
         const icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
-        visualized_values->SetValue((vtkIdType)i, std::exp(p.NACC_alpha_p));
+        visualized_values->SetValue((vtkIdType)i, p.NACC_alpha_p);
     }
 
     model->visual_update_mutex.unlock();
 
     float minmax[2];
     visualized_values->GetValueRange(minmax);
-    float exp_alpha = std::exp(model->prms.NACC_alpha);
-    float epsilon = std::max(abs(minmax[0]-exp_alpha),abs(minmax[1]-exp_alpha));
-    if(epsilon == 0) epsilon = 1e-6;
-    minmax[0]=exp_alpha-epsilon;
-    minmax[1]=exp_alpha+epsilon;
-    lutMPM->SetTableRange(minmax[0], minmax[1]);
+    const float &alpha0 = model->prms.NACC_alpha;
+//    float epsilon = std::max(abs(minmax[0]-alpha0),abs(minmax[1]-alpha0));
+//    if(epsilon == 0) epsilon = 1e-6;
+    float epsilon = 0.02;
+    lutMPM->SetTableRange(alpha0-epsilon/2, alpha0+epsilon/2);
+//    std::cout << "vis epsilon " << std::scientific << epsilon << '\n';
     points->Modified();
     visualized_values->Modified();
     points_filter->Update();

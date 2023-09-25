@@ -85,10 +85,10 @@ find_package(CUDA REQUIRED)
 #target_link_libraries(NACC_cpu PRIVATE cudart)
 
 set_target_properties(NACC_cpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored")
 include_directories(${CUDA_INCLUDE_DIRS})
 # --device-c
-
+# -use_fast_maths
 
 
 # Qt GUI executable

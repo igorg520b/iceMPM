@@ -18,8 +18,8 @@ struct icy::Point
 
     static float wc(Eigen::Vector2f dx, double h);
     static Eigen::Vector2f gradwc(Eigen::Vector2f dx, double h);
-    static float wq(Eigen::Vector2f dx, double h);
-    static Eigen::Vector2f gradwq(Eigen::Vector2f dx, double h);
+    static float wq(Eigen::Vector2f dx);
+    static Eigen::Vector2f gradwq(Eigen::Vector2f dx);
 /*
     Eigen::Matrix2f SnowConstitutiveModel(const float &XiSnow,
                                           const float &prmsMu,

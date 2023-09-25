@@ -11,7 +11,6 @@ void icy::Model::P2G()
 
     const float &h = prms.cellsize;
 //    const float Dp_inv = 3.f/(h*h); // cubic
-    const float Dp_inv = 4.f/(h*h); // quadratic
 
 #pragma omp parallel for
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
@@ -19,16 +18,18 @@ void icy::Model::P2G()
         Point &p = points[pt_idx];
 
         Eigen::Matrix2f Ap;
-        Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
+        //Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
         //Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
-        //Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
+        Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
 
+
+        // TODO: this is unfinished
         constexpr float offset = 0.5f;  // 0 for cubic; 0.5 for quadratic
-        const int i0 = (int)(p.pos[0]/h - offset);
-        const int j0 = (int)(p.pos[1]/h - offset);
+        const int i0 = (int)((p.pos[0])/h - offset);
+        const int j0 = (int)((p.pos[1])/h - offset);
 
         for (int i = i0; i < i0+3; i++)
-            for (int j = 0; j < j0+3; j++)
+            for (int j = j0; j < j0+3; j++)
             {
                 int idx_gridnode = i + j*prms.GridX;
                 if(i < 0 || j < 0 || i >=prms.GridX || j>=prms.GridY || idx_gridnode < 0 || idx_gridnode >= grid.size())
@@ -37,15 +38,15 @@ void icy::Model::P2G()
                     throw std::runtime_error("particle is out of grid bounds");
                 }
 
-                Eigen::Vector2f pos_node(i*h, j*h);
-                Eigen::Vector2f d = p.pos - pos_node;
-                float Wip = Point::wq(d, h);   // weight
-                Eigen::Vector2f dWip = Point::gradwq(d, h);    // weight gradient
+                Eigen::Vector2f pos_node(i, j);
+                Eigen::Vector2f d = p.pos/h - pos_node;
+                float Wip = Point::wq(d);   // weight
+                Eigen::Vector2f dWip = Point::gradwq(d);    // weight gradient
 
                 // APIC increments
                 float incM = Wip * prms.ParticleMass;
-                Eigen::Vector2f incV = incM * (p.velocity + Dp_inv * p.Bp * (-d));
-                Eigen::Vector2f incFi = Ap * dWip;
+                Eigen::Vector2f incV = incM * (p.velocity - p.Bp * (d*4.f/h));
+                Eigen::Vector2f incFi = Ap * dWip/h;
 
                 // Udpate mass, velocity and force
                 GridNode &gn = grid[idx_gridnode];
@@ -96,20 +97,20 @@ void icy::Model::G2P()
                 int idx_gridnode = i + j*prms.GridX;
                 const icy::GridNode &node = grid[idx_gridnode];
 
-                Eigen::Vector2f pos_node(i*prms.cellsize, j*prms.cellsize);
-                Eigen::Vector2f d = pointPos_copy - pos_node;   // dist
-                float Wip = Point::wq(d, prms.cellsize);   // weight
-                Eigen::Vector2f dWip = Point::gradwq(d, prms.cellsize);    // weight gradient
+                Eigen::Vector2f pos_node(i, j);
+                Eigen::Vector2f d = pointPos_copy/h - pos_node;   // dist
+                float Wip = Point::wq(d);   // weight
+                Eigen::Vector2f dWip = Point::gradwq(d);    // weight gradient
 
                 p.velocity += Wip * node.velocity;
-                p.Bp += Wip *(node.velocity*(-d).transpose());
+                p.Bp += Wip *(node.velocity*(-d*h).transpose());
                 // Update position and nodal deformation
-                p.pos += Wip * (pos_node + dt * node.velocity);
-                T += node.velocity * dWip.transpose();
+                p.pos += Wip * (pos_node*h + dt * node.velocity);
+                T += node.velocity * dWip.transpose()/h;
             }
-        p.NACCUpdateDeformationGradient(dt,T,prms);
+//        p.NACCUpdateDeformationGradient(dt,T,prms);
 //        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
-//        p.ElasticUpdateDeformationGradient(dt,T);
+        p.ElasticUpdateDeformationGradient(dt,T);
 
     }
     visual_update_mutex.unlock();

@@ -23,8 +23,8 @@ __device__ void svd2x2(const Eigen::Matrix2f &mA, Eigen::Matrix2f &mU, Eigen::Ma
 
 __device__ float wqs(float x);
 __device__ float dwqs(float x);
-__device__ float wq(Eigen::Vector2f dx, double h);
-__device__ Eigen::Vector2f gradwq(Eigen::Vector2f dx, double h);
+__device__ float wq(Eigen::Vector2f dx);
+__device__ Eigen::Vector2f gradwq(Eigen::Vector2f dx);
 __device__ void NACCUpdateDeformationGradient(icy::Point &p, Eigen::Matrix2f &FModifier);
 
 // Naive GPU Implementation with memory coalescing
@@ -48,7 +48,7 @@ public:
     float end_timing();
 
 private:
-    constexpr static int threadsPerBlock = 256;
+    constexpr static int threadsPerBlock = 128;
 
     Eigen::Vector2f *_gpu_pts_pos, *_gpu_pts_velocity;
     float *_gpu_pts_Bp[4], *_gpu_pts_Fe[4];

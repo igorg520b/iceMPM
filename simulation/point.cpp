@@ -66,7 +66,7 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
         float Je_new = std::sqrt(-2.f*p0 / kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
         Fe = U*Sigma_new*V.transpose();
-        if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
+        if(true) alpha += std::log(Je_tr / Je_new);
     }
 
     // line 14 (case 2)
@@ -75,13 +75,13 @@ void icy::Point::NACCUpdateDeformationGradient(const float &dt,
         float Je_new = std::sqrt(2.f*beta*p0/kappa + 1.f);
         Eigen::Matrix2f Sigma_new = Eigen::Matrix2f::Identity() * pow(Je_new, 1.f/(float)d);
         Fe = U*Sigma_new*V.transpose();
-        if(prms.NACC_hardening) alpha += std::log(Je_tr / Je_new);
+        if(true) alpha += std::log(Je_tr / Je_new);
     }
 
     // line 19 (case 3)
     else if(y >= magic_epsilon*10)
     {
-        if(prms.NACC_hardening && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+        if(true && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
         {
             float p_c = (1.f-beta)*p0/2.f;  // line 23
             float q_tr = sqrt(3.f-d/2.f)*s_hat_tr.norm();   // line 24
@@ -232,15 +232,15 @@ float icy::Point::dwqs(float x)
     return 0;
 }
 
-float icy::Point::wq(Eigen::Vector2f dx, double h)
+float icy::Point::wq(Eigen::Vector2f dx)
 {
-    return wqs(dx[0]/h)*wqs(dx[1]/h);
+    return wqs(dx[0])*wqs(dx[1]);
 }
 
-Eigen::Vector2f icy::Point::gradwq(Eigen::Vector2f dx, double h)
+Eigen::Vector2f icy::Point::gradwq(Eigen::Vector2f dx)
 {
     Eigen::Vector2f result;
-    result[0] = dwqs(dx[0]/h)*wqs(dx[1]/h)/h;
-    result[1] = wqs(dx[0]/h)*dwqs(dx[1]/h)/h;
+    result[0] = dwqs(dx[0])*wqs(dx[1]);
+    result[1] = wqs(dx[0])*dwqs(dx[1]);
     return result;
 }
