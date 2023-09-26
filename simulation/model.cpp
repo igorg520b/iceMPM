@@ -2,7 +2,11 @@
 #include <spdlog/spdlog.h>
 
 
-
+void icy::Model::ResetGrid()
+{
+    if(isTimeToUpdate()) spdlog::info("s {}; reset grid", prms.SimulationStep);
+    memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
+}
 
 
 void icy::Model::P2G()
@@ -10,24 +14,81 @@ void icy::Model::P2G()
     if(isTimeToUpdate()) spdlog::info("s {}; p2g", prms.SimulationStep);
 
     const float &h = prms.cellsize;
-//    const float Dp_inv = 3.f/(h*h); // cubic
+    const float &dt = prms.InitialTimeStep;
+    const float &Dinv = prms.Dp_inv;
+    const float &vol = prms.ParticleVolume;
+    const float &particle_mass = prms.ParticleMass;
 
 #pragma omp parallel for
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
     {
         Point &p = points[pt_idx];
 
-        Eigen::Matrix2f Ap;
+//        Eigen::Matrix2f Ap;
         //Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
         //Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
-        Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
+//        Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
 
+        Eigen::Matrix2f Re = icy::Point::polar_decomp_R(p.Fe);
+        float Je = p.Fe.determinant();
+        Eigen::Matrix2f dFe = 2.f * prms.mu*(p.Fe - Re)* p.Fe.transpose() +
+                prms.lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
 
-        // TODO: this is unfinished
+        Eigen::Matrix2f stress = - (dt * vol) * (Dinv * dFe);
+
+        // Fused APIC momentum + MLS-MPM stress contribution
+         // See http://taichi.graphics/wp-content/uploads/2019/03/mls-mpm-cpic.pdf
+         // Eqn 29
+        Eigen::Matrix2f affine = stress + particle_mass * p.Bp;
+
         constexpr float offset = 0.5f;  // 0 for cubic; 0.5 for quadratic
         const int i0 = (int)((p.pos[0])/h - offset);
         const int j0 = (int)((p.pos[1])/h - offset);
 
+        Eigen::Vector2f base_coord(i0,j0);
+        Eigen::Vector2f fx = p.pos/h - base_coord;
+
+        Eigen::Vector2f v0(1.5-fx[0],1.5-fx[1]);
+        Eigen::Vector2f v1(fx[0]-1.,fx[1]-1.);
+        Eigen::Vector2f v2(fx[0]-.5,fx[1]-.5);
+
+        Eigen::Vector2f w[3];
+        w[0] << 0.5f*v0[0]*v0[0], 0.5f*v0[1]*v0[1];
+        w[1] << 0.75f-v1[0]*v1[0], 0.75f-v1[1]*v1[1];
+        w[2] << 0.5f*v2[0]*v2[0], 0.5f*v2[1]*v2[1];
+
+
+        for (int i = 0; i < 3; i++)
+        {
+            for (int j = 0; j < 3; j++)
+            {
+                float Wip = w[i].x()*w[j].y();
+
+                Eigen::Vector2f dpos((i-fx[0])*h, (j-fx[1])*h);
+                Eigen::Vector2f incV = Wip*(p.velocity*particle_mass+affine*dpos);
+                float incM = Wip*particle_mass;
+
+                int idx_gridnode = (i+i0) + (j+j0)*prms.GridX;
+                if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=prms.GridX || (j+j0)>=prms.GridY || idx_gridnode < 0 || idx_gridnode >= grid.size())
+                {
+                    spdlog::critical("point {} in cell [{}, {}]", pt_idx, (i+i0), (j+j0));
+                    throw std::runtime_error("particle is out of grid bounds");
+                }
+
+                GridNode &gn = grid[idx_gridnode];
+#pragma omp atomic
+                gn.mass += incM;
+
+#pragma omp atomic
+                gn.velocity[0] += incV[0];
+#pragma omp atomic
+                gn.velocity[1] += incV[1];
+            }
+        }
+
+
+
+        /*
         for (int i = i0; i < i0+3; i++)
             for (int j = j0; j < j0+3; j++)
             {
@@ -63,8 +124,95 @@ void icy::Model::P2G()
                 #pragma omp atomic
                 gn.force[1] += incFi[1];
             }
+        */
     }
 }
+
+
+void icy::Model::UpdateNodes()
+{
+    if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
+
+    const float dt = prms.InitialTimeStep;
+    const Eigen::Vector2f gravity(0,-prms.Gravity);
+    const float indRsq = prms.IndDiameter*prms.IndDiameter/4.f;
+    const Eigen::Vector2f vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
+    const Eigen::Vector2f indCenter(indenter_x, indenter_y);
+
+    for (int idx = 0; idx < grid.size(); idx++)
+    {
+        GridNode &gn = grid[idx];
+        if(gn.mass == 0) continue;
+        gn.velocity /= gn.mass;
+        gn.velocity[1] -= dt*prms.Gravity;
+
+        int idx_x = idx % prms.GridX;
+        int idx_y = idx / prms.GridX;
+
+        // indenter
+        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
+        Eigen::Vector2f n = gnpos - indCenter;
+        if(n.squaredNorm() < indRsq)
+        {
+            // grid node is inside the indenter
+            Eigen::Vector2f vrel = gn.velocity - vco;
+            n.normalize();
+            float vn = vrel.dot(n);   // normal component of the velocity
+            if(vn < 0)
+            {
+                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
+            }
+        }
+
+        // attached bottom layer
+        if(idx_y <= 3) gn.velocity.setZero();
+        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
+        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
+        else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
+    }
+
+
+
+
+
+    /*
+#pragma omp parallel for schedule (dynamic)
+    for (int idx = 0; idx < grid.size(); idx++)
+    {
+        GridNode &gn = grid[idx];
+        if(gn.mass == 0) continue;
+        gn.velocity = gn.velocity/gn.mass + dt*(-gn.force/gn.mass + gravity);
+
+        int idx_x = idx % prms.GridX;
+        int idx_y = idx / prms.GridX;
+
+        // indenter
+        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
+        Eigen::Vector2f n = gnpos - indCenter;
+        if(n.squaredNorm() < indRsq)
+        {
+            // grid node is inside the indenter
+            Eigen::Vector2f vrel = gn.velocity - vco;
+            n.normalize();
+            float vn = vrel.dot(n);   // normal component of the velocity
+            if(vn < 0)
+            {
+                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
+            }
+        }
+
+        // attached bottom layer
+        if(idx_y <= 3) gn.velocity.setZero();
+        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
+        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
+        else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
+    }
+
+    */
+}
+
 
 
 void icy::Model::G2P()
@@ -75,6 +223,63 @@ void icy::Model::G2P()
     const float &h = prms.cellsize;
     constexpr float offset = 0.5f;  // 0 for cubic
 
+
+    visual_update_mutex.lock();
+#pragma omp parallel for
+    for(int idx_p = 0; idx_p<points.size(); idx_p++)
+    {
+        icy::Point &p = points[idx_p];
+
+        const int i0 = (int)((p.pos[0])/h - offset);
+        const int j0 = (int)((p.pos[1])/h - offset);
+
+        Eigen::Vector2f base_coord(i0,j0);
+        Eigen::Vector2f fx = p.pos/h - base_coord;
+
+        Eigen::Vector2f v0(1.5-fx[0],1.5-fx[1]);
+        Eigen::Vector2f v1(fx[0]-1.,fx[1]-1.);
+        Eigen::Vector2f v2(fx[0]-.5,fx[1]-.5);
+
+        Eigen::Vector2f w[3];
+        w[0] << 0.5f*v0[0]*v0[0], 0.5f*v0[1]*v0[1];
+        w[1] << 0.75f-v1[0]*v1[0], 0.75f-v1[1]*v1[1];
+        w[2] << 0.5f*v2[0]*v2[0], 0.5f*v2[1]*v2[1];
+
+        //const Eigen::Vector2f pointPos_copy = p.pos;
+        //p.pos.setZero();
+        p.velocity.setZero();
+        p.Bp.setZero();
+
+        for (int i = 0; i < 3; i++)
+            for (int j = 0; j < 3; j++)
+            {
+                Eigen::Vector2f dpos = Eigen::Vector2f(i, j) - fx;
+                float weight = w[i].x() * w[j].y();
+
+                int idx_gridnode = i+i0 + (j+j0)*prms.GridX;
+                const icy::GridNode &node = grid[idx_gridnode];
+                const Eigen::Vector2f &grid_v = node.velocity;
+                p.velocity += weight * grid_v;
+                p.Bp += (4.f/h)*weight *(grid_v*dpos.transpose());
+            }
+
+        // Advection
+        p.pos += dt * p.velocity;
+
+
+        p.Fe = (Eigen::Matrix2f::Identity() + dt*p.Bp) * p.Fe;
+
+
+//        p.NACCUpdateDeformationGradient(dt,T,prms);
+//        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
+//        p.ElasticUpdateDeformationGradient(dt,T);
+
+    }
+    visual_update_mutex.unlock();
+
+
+
+/*
     visual_update_mutex.lock();
 #pragma omp parallel for
     for(int idx_p = 0; idx_p<points.size(); idx_p++)
@@ -114,53 +319,10 @@ void icy::Model::G2P()
 
     }
     visual_update_mutex.unlock();
+    */
 }
 
 
-void icy::Model::UpdateNodes()
-{
-    if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
-
-    const float dt = prms.InitialTimeStep;
-    const Eigen::Vector2f gravity(0,-prms.Gravity);
-    const float indRsq = prms.IndDiameter*prms.IndDiameter/4.f;
-    const Eigen::Vector2f vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
-    const Eigen::Vector2f indCenter(indenter_x, indenter_y);
-
-#pragma omp parallel for schedule (dynamic)
-    for (int idx = 0; idx < grid.size(); idx++)
-    {
-        GridNode &gn = grid[idx];
-        if(gn.mass == 0) continue;
-        gn.velocity = gn.velocity/gn.mass + dt*(-gn.force/gn.mass + gravity);
-
-        int idx_x = idx % prms.GridX;
-        int idx_y = idx / prms.GridX;
-
-        // indenter
-        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
-        Eigen::Vector2f n = gnpos - indCenter;
-        if(n.squaredNorm() < indRsq)
-        {
-            // grid node is inside the indenter
-            Eigen::Vector2f vrel = gn.velocity - vco;
-            n.normalize();
-            float vn = vrel.dot(n);   // normal component of the velocity
-            if(vn < 0)
-            {
-                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
-                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
-            }
-        }
-
-        // attached bottom layer
-        if(idx_y <= 3) gn.velocity.setZero();
-        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
-        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
-        else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
-
-    }
-}
 
 void icy::Model::Reset()
 {
@@ -192,13 +354,12 @@ void icy::Model::Reset()
         Point &p = points[k];
         p.pos[0] = prresult[k][0];
         p.pos[1] = prresult[k][1];
+        p.Fe.setIdentity();
+        p.velocity.setZero();
 //        p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
 //        p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
-        p.velocity.setZero();
-        p.Fe.setIdentity();
         //p.Fp.setIdentity();
         p.Bp.setZero();
-        //p.visualized_value = 0;
         p.NACC_alpha_p = prms.NACC_alpha;
     }
     grid.resize(prms.GridX*prms.GridY);
@@ -268,11 +429,7 @@ bool icy::Model::Step()
 }
 
 
-void icy::Model::ResetGrid()
-{
-    if(isTimeToUpdate()) spdlog::info("s {}; reset grid", prms.SimulationStep);
-    memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
-}
+
 
 icy::Model::Model()
 {

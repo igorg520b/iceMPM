@@ -24,7 +24,7 @@ public:
     float NACC_friction_angle;
 
     int GridX, GridY;
-    float cellsize, Dp_inv;
+    float cellsize, cellsize_inv, Dp_inv;
 
     int UpdateEveryNthStep;
 
@@ -41,7 +41,7 @@ public:
     bool useGPU;
     void Reset()
     {
-//#define PARAMS2
+#define PARAMS2
 #ifdef PARAMS2
         InitialTimeStep = 5.e-6;
         YoungsModulus = 5.e8;
@@ -50,21 +50,32 @@ public:
         NACC_alpha = std::log(1.-1.e-6);
         PointsWanted = 1'000'000;
         GridX = 512;
-        GridY = 256;
+        GridY = 240;
         ParticleViewSize = 1.1f;
 #else
         InitialTimeStep = 1.e-5;
-        YoungsModulus = 1.e9;
+        YoungsModulus = 5.e8;
         NACC_beta = 0.3;
         NACC_xi = 0.9;
-        NACC_alpha = std::log(1.-1.e-8);
+        NACC_alpha = std::log(1.-5.e-5);
+        PointsWanted = 45'000;
+        GridX = 128;
+        GridY = 55;
+        ParticleViewSize = 3.5f;
+        /*
+        InitialTimeStep = 1e-4;//1.e-5;
+        YoungsModulus = 1.e7;
+        NACC_beta = 0.3;
+        NACC_xi = 0.9;
+        NACC_alpha = std::log(1.-5.e-5);
         PointsWanted = 25'000;
         GridX = 128;
-        GridY = 64;
+        GridY = 55;
         ParticleViewSize = 5.5f;
+        */
 #endif
 
-        NACC_friction_angle = 45;//60;
+        NACC_friction_angle = 80;
         ComputeCamClayParams();
 
         useGPU = true;
@@ -72,7 +83,8 @@ public:
         SimulationEndTime = 15;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
 
-        cellsize = 3.33/(GridX);  // this better have a form of 2^n, where n is an integer
+        cellsize = (float)3.33f/(GridX);
+        cellsize_inv = 1.f/cellsize;
         Dp_inv = 4.f/(cellsize*cellsize);
 
         PoissonsRatio = 0.3;

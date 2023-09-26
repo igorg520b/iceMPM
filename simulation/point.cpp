@@ -126,7 +126,9 @@ Eigen::Matrix2f icy::Point::ElasticConstitutiveModel(const float &prmsMu,
     float Je = Fe.determinant();
     Eigen::Matrix2f dFe = 2.f * prmsMu*(Fe - Re)* Fe.transpose() +
             prmsLambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
+
     Eigen::Matrix2f Ap = dFe * particle_volume;
+
     return Ap;
 }
 

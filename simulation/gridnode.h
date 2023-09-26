@@ -7,12 +7,11 @@ namespace icy {struct GridNode;}
 
 struct icy::GridNode
 {
-    Eigen::Vector2f momentum, velocity, force;
+    Eigen::Vector2f velocity, force;
     float mass;
 
     void Reset()
     {
-        momentum.setZero();
         velocity.setZero();
         force.setZero();
         mass = 0;

@@ -45,12 +45,12 @@ struct icy::Point
     void ElasticUpdateDeformationGradient(const float &dt,
                                        const Eigen::Matrix2f &FModifier);
 
+    static Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val);
 private:
     static float wcs(float x);   // cubic spline
     static float dwcs(float x);  // cubic spline derivative
     static float wqs(float x);   // cubic spline
     static float dwqs(float x);  // cubic spline derivative
-    static Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val);
 
 };
 

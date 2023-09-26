@@ -49,8 +49,10 @@ add_library(NACC_cpu SHARED
     simulation/helper_math.cuh
 #    simulation/gpu_implementation0.h
 #    simulation/gpu_implementation0.cu
-    simulation/gpu_implementation1.h
-    simulation/gpu_implementation1.cu
+#    simulation/gpu_implementation1.h
+#    simulation/gpu_implementation1.cu
+    simulation/gpu_implementation2.h
+    simulation/gpu_implementation2.cu
 )
 set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
 
