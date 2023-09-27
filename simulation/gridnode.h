@@ -2,13 +2,14 @@
 #define GRIDNODE_H
 
 #include <Eigen/Core>
+#include "parameters_sim.h"
 
 namespace icy {struct GridNode;}
 
 struct icy::GridNode
 {
-    Eigen::Vector2f velocity, force;
-    float mass;
+    Vector2r velocity, force;
+    real mass;
 
     void Reset()
     {

@@ -1,6 +1,6 @@
 #include "vtk_representation.h"
 #include "model.h"
-
+#include "parameters_sim.h"
 #include <omp.h>
 
 icy::VisualRepresentation::VisualRepresentation()
@@ -102,7 +102,7 @@ void icy::VisualRepresentation::SynchronizeTopology()
     // structured grid
     int &gx = model->prms.GridX;
     int &gy = model->prms.GridY;
-    float &h = model->prms.cellsize;
+    real &h = model->prms.cellsize;
     structuredGrid->SetDimensions(model->prms.GridX, model->prms.GridY, 1);
 
     grid_points->SetNumberOfPoints(gx*gy);

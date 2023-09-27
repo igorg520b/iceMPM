@@ -41,7 +41,7 @@ public:
     icy::SimParams prms;
     float compute_time_per_cycle;
 
-    float indenter_x, indenter_x_initial, indenter_y;
+    real indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;

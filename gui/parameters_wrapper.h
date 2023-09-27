@@ -93,6 +93,10 @@ class ParamsWrapper : public QObject
     double getNaccBeta() {return prms->NACC_beta;}
     void setNaccBeta(double val) {prms->NACC_beta = val;}
 
+//    Q_PROPERTY(double nacc_beta_p0_MPa READ get_beta_p0_MPa NOTIFY propertyChanged)
+//    double get_beta_p0_MPa() {return 1.e-6*prms->NACC_beta*prms->kappa*std::sinh(prms->NACC_xi*std::max(0.,-prms->NACC_alpha));}
+
+
     Q_PROPERTY(double nacc_xi READ getNaccXi WRITE setNaccXi NOTIFY propertyChanged)
     double getNaccXi() {return prms->NACC_xi;}
     void setNaccXi(double val) {prms->NACC_xi = val;}

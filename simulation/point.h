@@ -10,16 +10,14 @@ namespace icy { struct Point; }
 
 struct icy::Point
 {
-    Eigen::Vector2f pos, velocity;
-    Eigen::Matrix2f Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
-//    Eigen::Matrix2f Fp; // for snow
-//    float visualized_value;
-    float NACC_alpha_p;
+    Vector2r pos, velocity;
+    Matrix2r Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
+    real NACC_alpha_p;
 
-    static float wc(Eigen::Vector2f dx, double h);
-    static Eigen::Vector2f gradwc(Eigen::Vector2f dx, double h);
-    static float wq(Eigen::Vector2f dx);
-    static Eigen::Vector2f gradwq(Eigen::Vector2f dx);
+    static real wc(Vector2r dx);
+    static Vector2r gradwc(Vector2r dx);
+    static real wq(Vector2r dx);
+    static Vector2r gradwq(Vector2r dx);
 /*
     Eigen::Matrix2f SnowConstitutiveModel(const float &XiSnow,
                                           const float &prmsMu,
@@ -31,30 +29,27 @@ struct icy::Point
                                        const Eigen::Matrix2f &FModifier);
 */
 
-    Eigen::Matrix2f NACCConstitutiveModel(const float &prmsMu,
-                                          const float &prmsLambda,
-                                          const float &particle_volume) const;
-    void NACCUpdateDeformationGradient(const float &dt,
-                                       const Eigen::Matrix2f &FModifier,
+    Matrix2r NACCConstitutiveModel(const real &prmsMu,
+                                          const real &prmsLambda,
+                                          const real &particle_volume) const;
+
+    void NACCUpdateDeformationGradient(const real &dt,
+                                       const Matrix2r &FModifier,
                                        const icy::SimParams &prms);
 
 
-    Eigen::Matrix2f ElasticConstitutiveModel(const float &prmsMu,
-                                          const float &prmsLambda,
-                                          const float &particle_volume) const;
-    void ElasticUpdateDeformationGradient(const float &dt,
-                                       const Eigen::Matrix2f &FModifier);
+    Matrix2r ElasticConstitutiveModel(const real &prmsMu,
+                                          const real &prmsLambda,
+                                          const real &particle_volume) const;
+    void ElasticUpdateDeformationGradient(const real &dt, const Matrix2r &FModifier);
 
-    static Eigen::Matrix2f polar_decomp_R(const Eigen::Matrix2f &val);
+    static Matrix2r polar_decomp_R(const Matrix2r &val);
 private:
-    static float wcs(float x);   // cubic spline
-    static float dwcs(float x);  // cubic spline derivative
-    static float wqs(float x);   // cubic spline
-    static float dwqs(float x);  // cubic spline derivative
-
+    static real wcs(real x);   // cubic spline
+    static real dwcs(real x);  // cubic spline derivative
+    static real wqs(real x);   // cubic spline
+    static real dwqs(real x);  // cubic spline derivative
 };
-
-
 
 
 #endif // PARTICLE_H

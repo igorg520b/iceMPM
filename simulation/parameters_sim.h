@@ -2,6 +2,11 @@
 #define P_SIM_H
 
 #include <iostream>
+#include <Eigen/Core>
+
+typedef double real;
+typedef Eigen::Vector2<real> Vector2r;
+typedef Eigen::Matrix2<real> Matrix2r;
 
 // variables related to the formulation of the model
 
@@ -13,52 +18,52 @@ public:
     constexpr static double pi = 3.14159265358979323846;
 
 
-    float InitialTimeStep, SimulationEndTime;
-    float Gravity, Density, PoissonsRatio, YoungsModulus;
-    float lambda, mu; // Lame
-    float kappa; // bulk modulus
-    float IceFrictionCoefficient;
+    real InitialTimeStep, SimulationEndTime;
+    real Gravity, Density, PoissonsRatio, YoungsModulus;
+    real lambda, mu; // Lame
+    real kappa; // bulk modulus
+    real IceFrictionCoefficient;
 
-    float XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
-    float NACC_xi, NACC_alpha, NACC_beta, NACC_M_sq;
-    float NACC_friction_angle;
+    real XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
+    real NACC_xi, NACC_alpha, NACC_beta, NACC_M_sq;
+    real NACC_friction_angle;
 
     int GridX, GridY;
-    float cellsize, cellsize_inv, Dp_inv;
+    real cellsize, cellsize_inv, Dp_inv;
 
     int UpdateEveryNthStep;
 
-    float IndDiameter, IndRSq, IndVelocity, IndDepth;
+    real IndDiameter, IndRSq, IndVelocity, IndDepth;
     int PointsWanted, PointCountActual;
-    float BlockHeight, BlockLength;
+    real BlockHeight, BlockLength;
 
-    float ParticleVolume, ParticleMass, ParticleViewSize;
+    real ParticleVolume, ParticleMass, ParticleViewSize;
 
     int SimulationStep;
-    float SimulationTime;
-    float MemAllocGrid, MemAllocPoints, MemAllocTotal;
+    real SimulationTime;
+    real MemAllocGrid, MemAllocPoints, MemAllocTotal;
 
     bool useGPU;
     void Reset()
     {
 #define PARAMS2
 #ifdef PARAMS2
-        InitialTimeStep = 5.e-6;
+        InitialTimeStep = 8.e-6;
         YoungsModulus = 5.e8;
-        NACC_beta = 0.4;
-        NACC_xi = 0.9;
+        NACC_beta = 2;
+        NACC_xi = 5;
         NACC_alpha = std::log(1.-1.e-6);
         PointsWanted = 1'000'000;
         GridX = 512;
-        GridY = 240;
+        GridY = 200;
         ParticleViewSize = 1.1f;
 #else
-        InitialTimeStep = 1.e-5;
+        InitialTimeStep = 3.e-5;
         YoungsModulus = 5.e8;
-        NACC_beta = 0.3;
-        NACC_xi = 0.9;
+        NACC_beta = 0.1;
+        NACC_xi = 3;
         NACC_alpha = std::log(1.-5.e-5);
-        PointsWanted = 45'000;
+        PointsWanted = 35'000;
         GridX = 128;
         GridY = 55;
         ParticleViewSize = 3.5f;
@@ -83,9 +88,9 @@ public:
         SimulationEndTime = 15;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
 
-        cellsize = (float)3.33f/(GridX);
-        cellsize_inv = 1.f/cellsize;
-        Dp_inv = 4.f/(cellsize*cellsize);
+        cellsize = (real)3.33/(GridX);
+        cellsize_inv = 1./cellsize;
+        Dp_inv = 4./(cellsize*cellsize);
 
         PoissonsRatio = 0.3;
         ComputeLame();
@@ -94,14 +99,14 @@ public:
         IceFrictionCoefficient = 0;//0.03;
 
         IndDiameter = 0.324;
-        IndRSq = IndDiameter*IndDiameter/4.f;
+        IndRSq = IndDiameter*IndDiameter/4.;
         IndVelocity = 0.2;
         IndDepth = 0.101;
 
-        BlockHeight = 1.0f;
-        BlockLength = 2.5f;
+        BlockHeight = 1.0;
+        BlockLength = 2.5;
 
-        XiSnow = 10.f;
+        XiSnow = 10.;
         THT_C_snow = 2.0e-2;				// Critical compression
         THT_S_snow = 6.0e-3;				// Critical stretch
 
@@ -114,16 +119,15 @@ public:
     {
         lambda = YoungsModulus*PoissonsRatio/((1+PoissonsRatio)*(1-2*PoissonsRatio));
         mu = YoungsModulus/(2*(1+PoissonsRatio));
-
-        kappa = mu*2.f/3 + lambda;
+        kappa = mu*2./3. + lambda;
     }
 
     void ComputeCamClayParams()
     {
         constexpr int dim = 2;
-        float sin_phi = std::sin(NACC_friction_angle / 180.f * pi);
-        float mohr_columb_friction = std::sqrt(2.f / 3.f) * 2.f * sin_phi / (3.f - sin_phi);
-        float NACC_M = mohr_columb_friction * (float)dim / std::sqrt(2.f / (6.f - dim));
+        real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
+        real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
+        real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
         std::cout << "SimParams: NACC M is " << NACC_M << '\n';
         NACC_M_sq = NACC_M*NACC_M;
     }

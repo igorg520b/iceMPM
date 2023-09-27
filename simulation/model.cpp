@@ -13,60 +13,60 @@ void icy::Model::P2G()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; p2g", prms.SimulationStep);
 
-    const float &h = prms.cellsize;
-    const float &dt = prms.InitialTimeStep;
-    const float &Dinv = prms.Dp_inv;
-    const float &vol = prms.ParticleVolume;
-    const float &particle_mass = prms.ParticleMass;
+    const real &h = prms.cellsize;
+    const real &dt = prms.InitialTimeStep;
+    const real &Dinv = prms.Dp_inv;
+    const real &vol = prms.ParticleVolume;
+    const real &particle_mass = prms.ParticleMass;
 
 #pragma omp parallel for
     for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
     {
         Point &p = points[pt_idx];
 
-//        Eigen::Matrix2f Ap;
+//        Matrix2r Ap;
         //Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
         //Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
 //        Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
 
-        Eigen::Matrix2f Re = icy::Point::polar_decomp_R(p.Fe);
-        float Je = p.Fe.determinant();
-        Eigen::Matrix2f dFe = 2.f * prms.mu*(p.Fe - Re)* p.Fe.transpose() +
-                prms.lambda * (Je - 1.f) * Je * Eigen::Matrix2f::Identity();
+        Matrix2r Re = icy::Point::polar_decomp_R(p.Fe);
+        real Je = p.Fe.determinant();
+        Matrix2r dFe = 2. * prms.mu*(p.Fe - Re)* p.Fe.transpose() +
+                prms.lambda * (Je - 1.) * Je * Matrix2r::Identity();
 
-        Eigen::Matrix2f stress = - (dt * vol) * (Dinv * dFe);
+        Matrix2r stress = - (dt * vol) * (Dinv * dFe);
 
         // Fused APIC momentum + MLS-MPM stress contribution
          // See http://taichi.graphics/wp-content/uploads/2019/03/mls-mpm-cpic.pdf
          // Eqn 29
-        Eigen::Matrix2f affine = stress + particle_mass * p.Bp;
+        Matrix2r affine = stress + particle_mass * p.Bp;
 
-        constexpr float offset = 0.5f;  // 0 for cubic; 0.5 for quadratic
+        constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
         const int i0 = (int)((p.pos[0])/h - offset);
         const int j0 = (int)((p.pos[1])/h - offset);
 
-        Eigen::Vector2f base_coord(i0,j0);
-        Eigen::Vector2f fx = p.pos/h - base_coord;
+        Vector2r base_coord(i0,j0);
+        Vector2r fx = p.pos/h - base_coord;
 
-        Eigen::Vector2f v0(1.5-fx[0],1.5-fx[1]);
-        Eigen::Vector2f v1(fx[0]-1.,fx[1]-1.);
-        Eigen::Vector2f v2(fx[0]-.5,fx[1]-.5);
+        Vector2r v0(1.5-fx[0],1.5-fx[1]);
+        Vector2r v1(fx[0]-1.,fx[1]-1.);
+        Vector2r v2(fx[0]-.5,fx[1]-.5);
 
-        Eigen::Vector2f w[3];
-        w[0] << 0.5f*v0[0]*v0[0], 0.5f*v0[1]*v0[1];
-        w[1] << 0.75f-v1[0]*v1[0], 0.75f-v1[1]*v1[1];
-        w[2] << 0.5f*v2[0]*v2[0], 0.5f*v2[1]*v2[1];
+        Vector2r w[3];
+        w[0] << .5*v0[0]*v0[0],  .5*v0[1]*v0[1];
+        w[1] << .75-v1[0]*v1[0], .75-v1[1]*v1[1];
+        w[2] << .5*v2[0]*v2[0],  .5*v2[1]*v2[1];
 
 
         for (int i = 0; i < 3; i++)
         {
             for (int j = 0; j < 3; j++)
             {
-                float Wip = w[i].x()*w[j].y();
+                real Wip = w[i].x()*w[j].y();
 
-                Eigen::Vector2f dpos((i-fx[0])*h, (j-fx[1])*h);
-                Eigen::Vector2f incV = Wip*(p.velocity*particle_mass+affine*dpos);
-                float incM = Wip*particle_mass;
+                Vector2r dpos((i-fx[0])*h, (j-fx[1])*h);
+                Vector2r incV = Wip*(p.velocity*particle_mass+affine*dpos);
+                real incM = Wip*particle_mass;
 
                 int idx_gridnode = (i+i0) + (j+j0)*prms.GridX;
                 if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=prms.GridX || (j+j0)>=prms.GridY || idx_gridnode < 0 || idx_gridnode >= grid.size())
@@ -99,15 +99,15 @@ void icy::Model::P2G()
                     throw std::runtime_error("particle is out of grid bounds");
                 }
 
-                Eigen::Vector2f pos_node(i, j);
-                Eigen::Vector2f d = p.pos/h - pos_node;
-                float Wip = Point::wq(d);   // weight
-                Eigen::Vector2f dWip = Point::gradwq(d);    // weight gradient
+                Vector2r pos_node(i, j);
+                Vector2r d = p.pos/h - pos_node;
+                real Wip = Point::wq(d);   // weight
+                Vector2r dWip = Point::gradwq(d);    // weight gradient
 
                 // APIC increments
-                float incM = Wip * prms.ParticleMass;
-                Eigen::Vector2f incV = incM * (p.velocity - p.Bp * (d*4.f/h));
-                Eigen::Vector2f incFi = Ap * dWip/h;
+                real incM = Wip * prms.ParticleMass;
+                Vector2r incV = incM * (p.velocity - p.Bp * (d*4.f/h));
+                Vector2r incFi = Ap * dWip/h;
 
                 // Udpate mass, velocity and force
                 GridNode &gn = grid[idx_gridnode];
@@ -133,11 +133,11 @@ void icy::Model::UpdateNodes()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
 
-    const float dt = prms.InitialTimeStep;
-    const Eigen::Vector2f gravity(0,-prms.Gravity);
-    const float indRsq = prms.IndDiameter*prms.IndDiameter/4.f;
-    const Eigen::Vector2f vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
-    const Eigen::Vector2f indCenter(indenter_x, indenter_y);
+    const real dt = prms.InitialTimeStep;
+    const Vector2r gravity(0,-prms.Gravity);
+    const real indRsq = prms.IndRSq;
+    const Vector2r vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
+    const Vector2r indCenter(indenter_x, indenter_y);
 
     for (int idx = 0; idx < grid.size(); idx++)
     {
@@ -150,17 +150,17 @@ void icy::Model::UpdateNodes()
         int idx_y = idx / prms.GridX;
 
         // indenter
-        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
-        Eigen::Vector2f n = gnpos - indCenter;
+        Vector2r gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
+        Vector2r n = gnpos - indCenter;
         if(n.squaredNorm() < indRsq)
         {
             // grid node is inside the indenter
-            Eigen::Vector2f vrel = gn.velocity - vco;
+            Vector2r vrel = gn.velocity - vco;
             n.normalize();
-            float vn = vrel.dot(n);   // normal component of the velocity
+            real vn = vrel.dot(n);   // normal component of the velocity
             if(vn < 0)
             {
-                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+                Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
                 gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
             }
         }
@@ -188,17 +188,17 @@ void icy::Model::UpdateNodes()
         int idx_y = idx / prms.GridX;
 
         // indenter
-        Eigen::Vector2f gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
-        Eigen::Vector2f n = gnpos - indCenter;
+        Vector2r gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
+        Vector2r n = gnpos - indCenter;
         if(n.squaredNorm() < indRsq)
         {
             // grid node is inside the indenter
-            Eigen::Vector2f vrel = gn.velocity - vco;
+            Vector2r vrel = gn.velocity - vco;
             n.normalize();
-            float vn = vrel.dot(n);   // normal component of the velocity
+            real vn = vrel.dot(n);   // normal component of the velocity
             if(vn < 0)
             {
-                Eigen::Vector2f vt = vrel - n*vn;   // tangential portion of relative velocity
+                Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
                 gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
             }
         }
@@ -219,9 +219,9 @@ void icy::Model::G2P()
 {
     if(isTimeToUpdate()) spdlog::info("s {}; g2p", prms.SimulationStep);
 
-    const float &dt = prms.InitialTimeStep;
-    const float &h = prms.cellsize;
-    constexpr float offset = 0.5f;  // 0 for cubic
+    const real &dt = prms.InitialTimeStep;
+    const real &h = prms.cellsize;
+    constexpr real offset = 0.5;  // 0 for cubic
 
 
     visual_update_mutex.lock();
@@ -233,19 +233,19 @@ void icy::Model::G2P()
         const int i0 = (int)((p.pos[0])/h - offset);
         const int j0 = (int)((p.pos[1])/h - offset);
 
-        Eigen::Vector2f base_coord(i0,j0);
-        Eigen::Vector2f fx = p.pos/h - base_coord;
+        Vector2r base_coord(i0,j0);
+        Vector2r fx = p.pos/h - base_coord;
 
-        Eigen::Vector2f v0(1.5-fx[0],1.5-fx[1]);
-        Eigen::Vector2f v1(fx[0]-1.,fx[1]-1.);
-        Eigen::Vector2f v2(fx[0]-.5,fx[1]-.5);
+        Vector2r v0(1.5-fx[0],1.5-fx[1]);
+        Vector2r v1(fx[0]-1.,fx[1]-1.);
+        Vector2r v2(fx[0]-.5,fx[1]-.5);
 
-        Eigen::Vector2f w[3];
+        Vector2r w[3];
         w[0] << 0.5f*v0[0]*v0[0], 0.5f*v0[1]*v0[1];
         w[1] << 0.75f-v1[0]*v1[0], 0.75f-v1[1]*v1[1];
         w[2] << 0.5f*v2[0]*v2[0], 0.5f*v2[1]*v2[1];
 
-        //const Eigen::Vector2f pointPos_copy = p.pos;
+        //const Vector2r pointPos_copy = p.pos;
         //p.pos.setZero();
         p.velocity.setZero();
         p.Bp.setZero();
@@ -253,21 +253,21 @@ void icy::Model::G2P()
         for (int i = 0; i < 3; i++)
             for (int j = 0; j < 3; j++)
             {
-                Eigen::Vector2f dpos = Eigen::Vector2f(i, j) - fx;
-                float weight = w[i].x() * w[j].y();
+                Vector2r dpos = Vector2r(i, j) - fx;
+                real weight = w[i].x() * w[j].y();
 
                 int idx_gridnode = i+i0 + (j+j0)*prms.GridX;
                 const icy::GridNode &node = grid[idx_gridnode];
-                const Eigen::Vector2f &grid_v = node.velocity;
+                const Vector2r &grid_v = node.velocity;
                 p.velocity += weight * grid_v;
-                p.Bp += (4.f/h)*weight *(grid_v*dpos.transpose());
+                p.Bp += (4./h)*weight *(grid_v*dpos.transpose());
             }
 
         // Advection
         p.pos += dt * p.velocity;
 
 
-        p.Fe = (Eigen::Matrix2f::Identity() + dt*p.Bp) * p.Fe;
+        p.Fe = (Matrix2r::Identity() + dt*p.Bp) * p.Fe;
 
 
 //        p.NACCUpdateDeformationGradient(dt,T,prms);
@@ -290,10 +290,10 @@ void icy::Model::G2P()
 
         const int i0 = (int)((p.pos[0])/h - offset);
         const int j0 = (int)((p.pos[1])/h - offset);
-        const Eigen::Vector2f pointPos_copy = p.pos;
+        const Vector2r pointPos_copy = p.pos;
         p.pos.setZero();
 
-        Eigen::Matrix2f T;
+        Matrix2r T;
         T.setZero();
 
         for (int i = i0; i < i0+3; i++)
@@ -302,10 +302,10 @@ void icy::Model::G2P()
                 int idx_gridnode = i + j*prms.GridX;
                 const icy::GridNode &node = grid[idx_gridnode];
 
-                Eigen::Vector2f pos_node(i, j);
-                Eigen::Vector2f d = pointPos_copy/h - pos_node;   // dist
-                float Wip = Point::wq(d);   // weight
-                Eigen::Vector2f dWip = Point::gradwq(d);    // weight gradient
+                Vector2r pos_node(i, j);
+                Vector2r d = pointPos_copy/h - pos_node;   // dist
+                real Wip = Point::wq(d);   // weight
+                Vector2r dWip = Point::gradwq(d);    // weight gradient
 
                 p.velocity += Wip * node.velocity;
                 p.Bp += Wip *(node.velocity*(-d*h).transpose());
@@ -333,15 +333,15 @@ void icy::Model::Reset()
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
 
-    const float &block_length = prms.BlockLength;
-    const float &block_height = prms.BlockHeight;
-    const float &h = prms.cellsize;
+    const real &block_length = prms.BlockLength;
+    const real &block_height = prms.BlockHeight;
+    const real &h = prms.cellsize;
 
-    const float kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)*100./97.));
-    const std::array<float, 2>kXMin{5.0f*h, 2.0f*h};
-    const std::array<float, 2>kXMax{5.0f*h+block_length, 2.0f*h+block_height};
+    const real kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)*100./97.));
+    const std::array<real, 2>kXMin{5.0*h, 2.0*h};
+    const std::array<real, 2>kXMax{5.0*h+block_length, 2.0*h+block_height};
     spdlog::info("starting thinks::PoissonDiskSampling");
-    std::vector<std::array<float, 2>> prresult = thinks::PoissonDiskSampling(kRadius, kXMin, kXMax);
+    std::vector<std::array<real, 2>> prresult = thinks::PoissonDiskSampling(kRadius, kXMin, kXMax);
     const size_t nPoints = prresult.size();
     points.resize(nPoints);
     prms.PointCountActual = nPoints;
@@ -366,8 +366,8 @@ void icy::Model::Reset()
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
-    prms.MemAllocGrid = (float)sizeof(GridNode)*grid.size()/(1024*1024);
-    prms.MemAllocPoints = (float)sizeof(Point)*points.size()/(1024*1024);
+    prms.MemAllocGrid = (real)sizeof(GridNode)*grid.size()/(1024*1024);
+    prms.MemAllocPoints = (real)sizeof(Point)*points.size()/(1024*1024);
     prms.MemAllocTotal = prms.MemAllocGrid + prms.MemAllocPoints;
     spdlog::info("icy::Model::Reset(); grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  prms.MemAllocGrid, prms.MemAllocPoints, prms.MemAllocTotal);
