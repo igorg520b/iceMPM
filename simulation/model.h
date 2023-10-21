@@ -47,7 +47,6 @@ public:
     std::vector<GridNode> grid;
 
     std::mutex visual_update_mutex; // to prevent modifying mesh data while updating VTK representation
-    bool visual_update_requested = false;  // true when signal has been already emitted to update vtk geometry
 
     bool isTimeToUpdate() { return prms.SimulationStep % prms.UpdateEveryNthStep == 0;}
 private:

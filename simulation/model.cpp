@@ -59,7 +59,6 @@ void icy::Model::P2G()
 
 
         for (int i = 0; i < 3; i++)
-        {
             for (int j = 0; j < 3; j++)
             {
                 real Wip = w[i].x()*w[j].y();
@@ -84,47 +83,6 @@ void icy::Model::P2G()
 #pragma omp atomic
                 gn.velocity[1] += incV[1];
             }
-        }
-
-
-
-        /*
-        for (int i = i0; i < i0+3; i++)
-            for (int j = j0; j < j0+3; j++)
-            {
-                int idx_gridnode = i + j*prms.GridX;
-                if(i < 0 || j < 0 || i >=prms.GridX || j>=prms.GridY || idx_gridnode < 0 || idx_gridnode >= grid.size())
-                {
-                    spdlog::critical("point {} in cell [{}, {}]", pt_idx, i, j);
-                    throw std::runtime_error("particle is out of grid bounds");
-                }
-
-                Vector2r pos_node(i, j);
-                Vector2r d = p.pos/h - pos_node;
-                real Wip = Point::wq(d);   // weight
-                Vector2r dWip = Point::gradwq(d);    // weight gradient
-
-                // APIC increments
-                real incM = Wip * prms.ParticleMass;
-                Vector2r incV = incM * (p.velocity - p.Bp * (d*4.f/h));
-                Vector2r incFi = Ap * dWip/h;
-
-                // Udpate mass, velocity and force
-                GridNode &gn = grid[idx_gridnode];
-                #pragma omp atomic
-                gn.mass += incM;
-
-                #pragma omp atomic
-                gn.velocity[0] += incV[0];
-                #pragma omp atomic
-                gn.velocity[1] += incV[1];
-
-                #pragma omp atomic
-                gn.force[0] += incFi[0];
-                #pragma omp atomic
-                gn.force[1] += incFi[1];
-            }
-        */
     }
 }
 
@@ -139,6 +97,7 @@ void icy::Model::UpdateNodes()
     const Vector2r vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
     const Vector2r indCenter(indenter_x, indenter_y);
 
+#pragma omp parallel for schedule (dynamic)
     for (int idx = 0; idx < grid.size(); idx++)
     {
         GridNode &gn = grid[idx];
@@ -172,45 +131,6 @@ void icy::Model::UpdateNodes()
         else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
     }
 
-
-
-
-
-    /*
-#pragma omp parallel for schedule (dynamic)
-    for (int idx = 0; idx < grid.size(); idx++)
-    {
-        GridNode &gn = grid[idx];
-        if(gn.mass == 0) continue;
-        gn.velocity = gn.velocity/gn.mass + dt*(-gn.force/gn.mass + gravity);
-
-        int idx_x = idx % prms.GridX;
-        int idx_y = idx / prms.GridX;
-
-        // indenter
-        Vector2r gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
-        Vector2r n = gnpos - indCenter;
-        if(n.squaredNorm() < indRsq)
-        {
-            // grid node is inside the indenter
-            Vector2r vrel = gn.velocity - vco;
-            n.normalize();
-            real vn = vrel.dot(n);   // normal component of the velocity
-            if(vn < 0)
-            {
-                Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
-                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
-            }
-        }
-
-        // attached bottom layer
-        if(idx_y <= 3) gn.velocity.setZero();
-        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
-        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
-        else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
-    }
-
-    */
 }
 
 
@@ -278,48 +198,6 @@ void icy::Model::G2P()
     visual_update_mutex.unlock();
 
 
-
-/*
-    visual_update_mutex.lock();
-#pragma omp parallel for
-    for(int idx_p = 0; idx_p<points.size(); idx_p++)
-    {
-        icy::Point &p = points[idx_p];
-        p.velocity.setZero();
-        p.Bp.setZero();
-
-        const int i0 = (int)((p.pos[0])/h - offset);
-        const int j0 = (int)((p.pos[1])/h - offset);
-        const Vector2r pointPos_copy = p.pos;
-        p.pos.setZero();
-
-        Matrix2r T;
-        T.setZero();
-
-        for (int i = i0; i < i0+3; i++)
-            for (int j = j0; j < j0+3; j++)
-            {
-                int idx_gridnode = i + j*prms.GridX;
-                const icy::GridNode &node = grid[idx_gridnode];
-
-                Vector2r pos_node(i, j);
-                Vector2r d = pointPos_copy/h - pos_node;   // dist
-                real Wip = Point::wq(d);   // weight
-                Vector2r dWip = Point::gradwq(d);    // weight gradient
-
-                p.velocity += Wip * node.velocity;
-                p.Bp += Wip *(node.velocity*(-d*h).transpose());
-                // Update position and nodal deformation
-                p.pos += Wip * (pos_node*h + dt * node.velocity);
-                T += node.velocity * dWip.transpose()/h;
-            }
-//        p.NACCUpdateDeformationGradient(dt,T,prms);
-//        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
-        p.ElasticUpdateDeformationGradient(dt,T);
-
-    }
-    visual_update_mutex.unlock();
-    */
 }
 
 

@@ -49,7 +49,11 @@ void BackgroundWorker::run()
 
         bool result = controller->Step();
         if(!result) timeToPause = true;
-        if(controller->isTimeToUpdate()) Q_EMIT stepCompleted();
+        if(controller->isTimeToUpdate() && !visual_update_requested)
+        {
+            visual_update_requested = true;
+            Q_EMIT stepCompleted();
+        }
     }
     qDebug() << "BackgroundWorker::run() terminated";
 }

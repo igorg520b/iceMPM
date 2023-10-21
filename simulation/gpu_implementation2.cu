@@ -11,11 +11,12 @@
 
 #include "helper_math.cuh"
 
-__device__ Vector2r *gpu_pts_pos, *gpu_pts_velocity;
-__device__ real *gpu_pts_Bp[4], *gpu_pts_Fe[4];
-__device__ real *gpu_pts_NACC_alpha_p;
-__device__ Vector2r *gpu_grid_momentum, *gpu_grid_velocity;
-__device__ real *gpu_grid_mass;
+//__device__ Vector2r *gpu_pts_pos, *gpu_pts_velocity;
+//__device__ real *gpu_pts_Bp[4], *gpu_pts_Fe[4];
+//__device__ real *gpu_pts_NACC_alpha_p;
+//__device__ Vector2r *gpu_grid_momentum, *gpu_grid_velocity;
+//__device__ real *gpu_grid_mass;
+__device__ real *device_grid_arrays[GPU_Implementation2::nGridArrays], *device_pts_arrays[GPU_Implementation2::nPtsArrays];
 
 __constant__ icy::SimParams gprms;
 __device__ int gpu_error_indicator;
@@ -60,44 +61,24 @@ void GPU_Implementation2::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
 {
     cudaError_t err;
 
-    err = cudaMalloc(&_gpu_pts_pos, sizeof(Vector2r)*nPoints);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    err = cudaMalloc(&_gpu_pts_velocity, sizeof(Vector2r)*nPoints);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    for(int k=0;k<4;k++)
+    for(int k=0;k<nGridArrays;k++)
     {
-        err = cudaMalloc(&_gpu_pts_Bp[k], sizeof(real)*nPoints);
-        if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-        err = cudaMalloc(&_gpu_pts_Fe[k], sizeof(real)*nPoints);
+        err = cudaMalloc(&grid_arrays[k], sizeof(real)*nGridNodes);
         if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     }
-    err = cudaMalloc(&_gpu_pts_NACC_alpha_p, sizeof(real)*nPoints);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
 
-    err = cudaMalloc(&_gpu_grid_momentum, sizeof(Vector2r)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    err = cudaMalloc(&_gpu_grid_velocity, sizeof(Vector2r)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    err = cudaMalloc(&_gpu_grid_mass, sizeof(real)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    for(int k=0;k<nPtsArrays;k++)
+    {
+        err = cudaMalloc(&pts_arrays[k], sizeof(real)*nPoints);
+        if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    }
 
-    err = cudaMemcpyToSymbol(gpu_pts_pos, &_gpu_pts_pos, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol gpu_pts_pos");
-    err = cudaMemcpyToSymbol(gpu_pts_velocity, &_gpu_pts_velocity, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol");
-    err = cudaMemcpyToSymbol(gpu_pts_Bp, _gpu_pts_Bp, sizeof(void*)*4);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol gpu_pts_Bp");
-    err = cudaMemcpyToSymbol(gpu_pts_Fe, _gpu_pts_Fe, sizeof(void*)*4);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol gpu_pts_Fe");
-    err = cudaMemcpyToSymbol(gpu_pts_NACC_alpha_p, &_gpu_pts_NACC_alpha_p, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol");
+    err = cudaMemcpyToSymbol(device_grid_arrays, grid_arrays, sizeof(void*)*nGridArrays);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol device_grid_arrays");
 
-    err = cudaMemcpyToSymbol(gpu_grid_momentum, &_gpu_grid_momentum, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol");
-    err = cudaMemcpyToSymbol(gpu_grid_velocity, &_gpu_grid_velocity, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol gpu_grid_velocity");
-    err = cudaMemcpyToSymbol(gpu_grid_mass, &_gpu_grid_mass, sizeof(void*));
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol gpu_grid_mass");
+    err = cudaMemcpyToSymbol(device_pts_arrays, pts_arrays, sizeof(void*)*nPtsArrays);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol device_pts_arrays");
+
     std::cout << "cuda_allocate_arrays done\n";
 }
 
@@ -105,46 +86,83 @@ void GPU_Implementation2::transfer_ponts_to_device(const std::vector<icy::Point>
 {
     cudaError_t err;
     int n = points.size();
-    tmp1.resize(n);
-    tmp2.resize(n);
+    tmp_transfer_buffer.resize(n);
 
-    for(int k=0;k<n;k++) tmp1[k]=points[k].pos;
-    err = cudaMemcpy(_gpu_pts_pos, (void*)tmp1.data(), sizeof(Vector2r)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp1[k]=points[k].velocity;
-    err = cudaMemcpy(_gpu_pts_velocity, (void*)tmp1.data(), sizeof(Vector2r)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Bp(0,0);
-    err = cudaMemcpy(_gpu_pts_Bp[0], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Bp(0,1);
-    err = cudaMemcpy(_gpu_pts_Bp[1], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Bp(1,0);
-    err = cudaMemcpy(_gpu_pts_Bp[2], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Bp(1,1);
-    err = cudaMemcpy(_gpu_pts_Bp[3], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Fe(0,0);
-    err = cudaMemcpy(_gpu_pts_Fe[0], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Fe(0,1);
-    err = cudaMemcpy(_gpu_pts_Fe[1], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Fe(1,0);
-    err = cudaMemcpy(_gpu_pts_Fe[2], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].Fe(1,1);
-    err = cudaMemcpy(_gpu_pts_Fe[3], (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
-    for(int k=0;k<n;k++) tmp2[k]=points[k].NACC_alpha_p;
-    err = cudaMemcpy(_gpu_pts_NACC_alpha_p, (void*)tmp2.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    // transfer point positions
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].pos[0];
+    err = cudaMemcpy(pts_arrays[0], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    if(err != cudaSuccess) throw std::runtime_error("transfer_ponts_to_device");
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].pos[1];
+    err = cudaMemcpy(pts_arrays[1], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    // transfer velocity
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].velocity[0];
+    err = cudaMemcpy(pts_arrays[2], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].velocity[1];
+    err = cudaMemcpy(pts_arrays[3], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    // transfer Bp
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(0,0);
+    err = cudaMemcpy(pts_arrays[4], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(0,1);
+    err = cudaMemcpy(pts_arrays[5], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(1,0);
+    err = cudaMemcpy(pts_arrays[6], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(1,1);
+    err = cudaMemcpy(pts_arrays[7], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    // transfer Fe
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(0,0);
+    err = cudaMemcpy(pts_arrays[8], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(0,1);
+    err = cudaMemcpy(pts_arrays[9], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(1,0);
+    err = cudaMemcpy(pts_arrays[10], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(1,1);
+    err = cudaMemcpy(pts_arrays[11], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    // transfer NACC_alpha
+    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].NACC_alpha_p;
+    err = cudaMemcpy(pts_arrays[12], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 }
 
 void GPU_Implementation2::cuda_transfer_from_device(std::vector<icy::Point> &points)
 {
     int n = points.size();
+    tmp_transfer_buffer.resize(n);
     cudaError_t err;
-    err = cudaMemcpy(tmp1.data(), _gpu_pts_pos, sizeof(Vector2r)*n, cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-    for(int k=0;k<n;k++)points[k].pos = tmp1[k];
 
-    err = cudaMemcpy(tmp2.data(), _gpu_pts_NACC_alpha_p, sizeof(real)*n, cudaMemcpyDeviceToHost);
+    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[0], sizeof(real)*n, cudaMemcpyDeviceToHost);
     if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-    for(int k=0;k<n;k++)points[k].NACC_alpha_p = tmp2[k];
+    for(int k=0;k<n;k++)points[k].pos[0] = tmp_transfer_buffer[k];
+
+    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[1], sizeof(real)*n, cudaMemcpyDeviceToHost);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+    for(int k=0;k<n;k++)points[k].pos[1] = tmp_transfer_buffer[k];
+
+    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[12], sizeof(real)*n, cudaMemcpyDeviceToHost);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+    for(int k=0;k<n;k++)points[k].NACC_alpha_p = tmp_transfer_buffer[k];
 
     int error_code = 0;
     err = cudaMemcpyFromSymbol(&error_code, gpu_error_indicator, sizeof(int));
@@ -167,12 +185,11 @@ void GPU_Implementation2::cuda_device_synchronize()
 
 void GPU_Implementation2::cuda_reset_grid(size_t nGridNodes)
 {
-    cudaError_t err = cudaMemsetAsync(_gpu_grid_momentum, 0, sizeof(Vector2r)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid memset error");
-    err = cudaMemsetAsync(_gpu_grid_velocity, 0, sizeof(Vector2r)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid memset error");
-    err = cudaMemsetAsync(_gpu_grid_mass, 0, sizeof(real)*nGridNodes);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid memset error");
+    for(int k=0;k<3;k++)
+    {
+        cudaError_t err = cudaMemsetAsync(grid_arrays[k], 0, sizeof(real)*nGridNodes);
+        if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
+    }
 }
 
 
@@ -244,17 +261,20 @@ __global__ void v2_kernel_p2g(const int nPoints)
     const real &particle_mass = gprms.ParticleMass;
 
     icy::Point p;
-    p.pos = gpu_pts_pos[pt_idx];
-    p.velocity = gpu_pts_velocity[pt_idx];
-    p.Bp(0,0) = gpu_pts_Bp[0][pt_idx];
-    p.Bp(0,1) = gpu_pts_Bp[1][pt_idx];
-    p.Bp(1,0) = gpu_pts_Bp[2][pt_idx];
-    p.Bp(1,1) = gpu_pts_Bp[3][pt_idx];
-    p.Fe(0,0) = gpu_pts_Fe[0][pt_idx];
-    p.Fe(0,1) = gpu_pts_Fe[1][pt_idx];
-    p.Fe(1,0) = gpu_pts_Fe[2][pt_idx];
-    p.Fe(1,1) = gpu_pts_Fe[3][pt_idx];
-//    p.NACC_alpha_p = gpu_pts_NACC_alpha_p[pt_idx];
+    p.pos[0] = device_pts_arrays[0][pt_idx];
+    p.pos[1] = device_pts_arrays[1][pt_idx];
+    p.velocity[0] = device_pts_arrays[2][pt_idx];
+    p.velocity[1] = device_pts_arrays[3][pt_idx];
+
+    p.Bp(0,0) = device_pts_arrays[4][pt_idx];
+    p.Bp(0,1) = device_pts_arrays[5][pt_idx];
+    p.Bp(1,0) = device_pts_arrays[6][pt_idx];
+    p.Bp(1,1) = device_pts_arrays[7][pt_idx];
+    p.Fe(0,0) = device_pts_arrays[8][pt_idx];
+    p.Fe(0,1) = device_pts_arrays[9][pt_idx];
+    p.Fe(1,0) = device_pts_arrays[10][pt_idx];
+    p.Fe(1,1) = device_pts_arrays[11][pt_idx];
+//    p.NACC_alpha_p = device_pts_arrays[12][pt_idx];
 
     Matrix2r Re = polar_decomp_R(p.Fe);
     real Je = p.Fe.determinant();
@@ -292,9 +312,9 @@ __global__ void v2_kernel_p2g(const int nPoints)
                 gpu_error_indicator = 1;
 
             // Udpate mass, velocity and force
-            atomicAdd(&gpu_grid_mass[idx_gridnode], incM);
-            atomicAdd(&gpu_grid_velocity[idx_gridnode][0], incV[0]);
-            atomicAdd(&gpu_grid_velocity[idx_gridnode][1], incV[1]);
+            atomicAdd(&device_grid_arrays[0][idx_gridnode], incM);
+            atomicAdd(&device_grid_arrays[1][idx_gridnode], incV[0]);
+            atomicAdd(&device_grid_arrays[2][idx_gridnode], incV[1]);
         }
 }
 
@@ -304,10 +324,11 @@ __global__ void v2_kernel_update_nodes(const int nGridNodes, real indenter_x, re
     if(idx >= nGridNodes) return;
 
     icy::GridNode gn;
-    gn.mass = gpu_grid_mass[idx];
+    gn.mass = device_grid_arrays[0][idx];
     if(gn.mass == 0) return;
 
-    gn.velocity = gpu_grid_velocity[idx];
+    gn.velocity[0] = device_grid_arrays[1][idx];
+    gn.velocity[1] = device_grid_arrays[2][idx];
 
     const real &gravity = gprms.Gravity;
     const real &indRsq = gprms.IndRSq;
@@ -350,7 +371,9 @@ __global__ void v2_kernel_update_nodes(const int nGridNodes, real indenter_x, re
     if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
     else if(idx_x >= gridX-5) gn.velocity[0] = 0;
 
-    gpu_grid_velocity[idx] = gn.velocity;
+    // write the updated grid velocity back to memory
+    device_grid_arrays[1][idx] = gn.velocity[0];
+    device_grid_arrays[2][idx] = gn.velocity[1];
 }
 
 __global__ void v2_kernel_g2p(const int nPoints)
@@ -359,14 +382,17 @@ __global__ void v2_kernel_g2p(const int nPoints)
     if(pt_idx >= nPoints) return;
 
     icy::Point p;
-    p.Fe(0,0) = gpu_pts_Fe[0][pt_idx];
-    p.Fe(0,1) = gpu_pts_Fe[1][pt_idx];
-    p.Fe(1,0) = gpu_pts_Fe[2][pt_idx];
-    p.Fe(1,1) = gpu_pts_Fe[3][pt_idx];
-    p.NACC_alpha_p = gpu_pts_NACC_alpha_p[pt_idx];
+    p.pos[0] = device_pts_arrays[0][pt_idx];
+    p.pos[1] = device_pts_arrays[1][pt_idx];
+
+    p.Fe(0,0) = device_pts_arrays[8][pt_idx];
+    p.Fe(0,1) = device_pts_arrays[9][pt_idx];
+    p.Fe(1,0) = device_pts_arrays[10][pt_idx];
+    p.Fe(1,1) = device_pts_arrays[11][pt_idx];
+    p.NACC_alpha_p = device_pts_arrays[12][pt_idx];
+
     p.velocity.setZero();
     p.Bp.setZero();
-    p.pos = gpu_pts_pos[pt_idx];
 
     const real &h_inv = gprms.cellsize_inv;
     const real &dt = gprms.InitialTimeStep;
@@ -396,8 +422,9 @@ __global__ void v2_kernel_g2p(const int nPoints)
 
             int idx_gridnode = i+i0 + (j+j0)*gridX;
             icy::GridNode node;
-            node.velocity = gpu_grid_velocity[idx_gridnode];
-            node.mass = gpu_grid_mass[idx_gridnode];
+            node.mass = device_grid_arrays[0][idx_gridnode];
+            node.velocity[0] = device_grid_arrays[1][idx_gridnode];
+            node.velocity[1] = device_grid_arrays[2][idx_gridnode];
 
             const Vector2r &grid_v = node.velocity;
             p.velocity += weight * grid_v;
@@ -409,17 +436,22 @@ __global__ void v2_kernel_g2p(const int nPoints)
 
     NACCUpdateDeformationGradient(p);
 
-    gpu_pts_pos[pt_idx] = p.pos;
-    gpu_pts_velocity[pt_idx] = p.velocity;
-    gpu_pts_Bp[0][pt_idx] = p.Bp(0,0);
-    gpu_pts_Bp[1][pt_idx] = p.Bp(0,1);
-    gpu_pts_Bp[2][pt_idx] = p.Bp(1,0);
-    gpu_pts_Bp[3][pt_idx] = p.Bp(1,1);
-    gpu_pts_Fe[0][pt_idx] = p.Fe(0,0);
-    gpu_pts_Fe[1][pt_idx] = p.Fe(0,1);
-    gpu_pts_Fe[2][pt_idx] = p.Fe(1,0);
-    gpu_pts_Fe[3][pt_idx] = p.Fe(1,1);
-    gpu_pts_NACC_alpha_p[pt_idx] = p.NACC_alpha_p;
+    device_pts_arrays[0][pt_idx] = p.pos[0];
+    device_pts_arrays[1][pt_idx] = p.pos[1];
+    device_pts_arrays[2][pt_idx] = p.velocity[0];
+    device_pts_arrays[3][pt_idx] = p.velocity[1];
+
+    device_pts_arrays[4][pt_idx] = p.Bp(0,0);
+    device_pts_arrays[5][pt_idx] = p.Bp(0,1);
+    device_pts_arrays[6][pt_idx] = p.Bp(1,0);
+    device_pts_arrays[7][pt_idx] = p.Bp(1,1);
+
+    device_pts_arrays[8][pt_idx] = p.Fe(0,0);
+    device_pts_arrays[9][pt_idx] = p.Fe(0,1);
+    device_pts_arrays[10][pt_idx] = p.Fe(1,0);
+    device_pts_arrays[11][pt_idx] = p.Fe(1,1);
+
+    device_pts_arrays[12][pt_idx] = p.NACC_alpha_p;
 }
 
 

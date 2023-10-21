@@ -46,7 +46,7 @@ public:
     bool useGPU;
     void Reset()
     {
-#define PARAMS2
+//#define PARAMS2
 #ifdef PARAMS2
         InitialTimeStep = 8.e-6;
         YoungsModulus = 5.e8;
@@ -60,9 +60,9 @@ public:
 #else
         InitialTimeStep = 3.e-5;
         YoungsModulus = 5.e8;
-        NACC_beta = 0.1;
-        NACC_xi = 3;
-        NACC_alpha = std::log(1.-5.e-5);
+        NACC_beta = 0.8;
+        NACC_xi = 2;
+        NACC_alpha = std::log(1. - 5.e-5);
         PointsWanted = 35'000;
         GridX = 128;
         GridY = 55;
@@ -80,7 +80,7 @@ public:
         */
 #endif
 
-        NACC_friction_angle = 80;
+        NACC_friction_angle = 35;
         ComputeCamClayParams();
 
         useGPU = true;

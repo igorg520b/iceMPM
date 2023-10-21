@@ -20,6 +20,7 @@ public:
 
     bool timeToPause = true;
     bool running = false;
+    bool visual_update_requested = false;
     icy::Model *controller;
 
 protected:

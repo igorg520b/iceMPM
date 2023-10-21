@@ -192,13 +192,14 @@ MainWindow::MainWindow(QWidget *parent)
     representation.SynchronizeTopology();
     pbrowser->setActiveObject(params);
     updateGUI();
+
+    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
+    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
 }
 
 
 void MainWindow::showEvent( QShowEvent*)
 {
-    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
-    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
 }
 
 
@@ -394,6 +395,7 @@ void MainWindow::updateGUI()
     renderWindow->Render();
 
     if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
+    worker->visual_update_requested = false;
 }
 
 void MainWindow::simulation_start_pause(bool checked)

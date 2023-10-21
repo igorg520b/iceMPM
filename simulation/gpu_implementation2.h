@@ -43,19 +43,22 @@ public:
     void start_timing();
     float end_timing();
 
+    constexpr static int nGridArrays = 3, nPtsArrays = 13;
+
 private:
     constexpr static int threadsPerBlock = 128;
+    real *grid_arrays[nGridArrays], *pts_arrays[nPtsArrays];
 
-    Vector2r *_gpu_pts_pos, *_gpu_pts_velocity;
-    real *_gpu_pts_Bp[4], *_gpu_pts_Fe[4];
-    real *_gpu_pts_NACC_alpha_p;
-    Vector2r *_gpu_grid_momentum, *_gpu_grid_velocity;
-    real *_gpu_grid_mass;
+
+//    Vector2r *_gpu_pts_pos, *_gpu_pts_velocity;
+//    real *_gpu_pts_Bp[4], *_gpu_pts_Fe[4];
+//    real *_gpu_pts_NACC_alpha_p;
+//    Vector2r *_gpu_grid_momentum, *_gpu_grid_velocity;
+//    real *_gpu_grid_mass;
 
     cudaEvent_t start, stop;
 
-    std::vector<Vector2r> tmp1;
-    std::vector<real> tmp2;
+    std::vector<real> tmp_transfer_buffer;
 };
 
 #endif // GPU_IMPLEMENTATION0_H
