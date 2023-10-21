@@ -11,12 +11,8 @@
 
 #include "helper_math.cuh"
 
-//__device__ Vector2r *gpu_pts_pos, *gpu_pts_velocity;
-//__device__ real *gpu_pts_Bp[4], *gpu_pts_Fe[4];
-//__device__ real *gpu_pts_NACC_alpha_p;
-//__device__ Vector2r *gpu_grid_momentum, *gpu_grid_velocity;
-//__device__ real *gpu_grid_mass;
-__device__ real *device_grid_arrays[GPU_Implementation2::nGridArrays], *device_pts_arrays[GPU_Implementation2::nPtsArrays];
+__device__ real *device_grid_arrays[GPU_Implementation2::nGridArrays];
+__device__ real *device_pts_arrays[GPU_Implementation2::nPtsArrays];
 
 __constant__ icy::SimParams gprms;
 __device__ int gpu_error_indicator;
