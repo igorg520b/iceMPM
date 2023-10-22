@@ -1,206 +1,44 @@
 #include "model.h"
 #include <spdlog/spdlog.h>
 
-
-void icy::Model::ResetGrid()
+icy::Model::Model()
 {
-    if(isTimeToUpdate()) spdlog::info("s {}; reset grid", prms.SimulationStep);
-    memset(grid.data(), 0, grid.size()*sizeof(icy::GridNode));
+    prms.Reset();
 }
 
-
-void icy::Model::P2G()
+bool icy::Model::Step()
 {
-    if(isTimeToUpdate()) spdlog::info("s {}; p2g", prms.SimulationStep);
-
-    const real &h = prms.cellsize;
-    const real &dt = prms.InitialTimeStep;
-    const real &Dinv = prms.Dp_inv;
-    const real &vol = prms.ParticleVolume;
-    const real &particle_mass = prms.ParticleMass;
-
-#pragma omp parallel for
-    for(int pt_idx=0; pt_idx<points.size(); pt_idx++)
+    spdlog::info("step {} started", prms.SimulationStep);
+    real simulation_time = prms.SimulationTime;
+    gpu.start_timing();
+    int count_unupdated_steps = 0;
+    do
     {
-        Point &p = points[pt_idx];
+        indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
+        gpu.cuda_reset_grid(grid.size());
+        gpu.cuda_p2g(points.size());
+        gpu.cuda_update_nodes(grid.size(),indenter_x, indenter_y);
+        gpu.cuda_g2p(points.size());
 
-//        Matrix2r Ap;
-        //Ap = p.NACCConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
-        //Ap = p.SnowConstitutiveModel(prms.XiSnow, prms.mu, prms.lambda, prms.ParticleVolume);
-//        Ap = p.ElasticConstitutiveModel(prms.mu, prms.lambda, prms.ParticleVolume);
+        count_unupdated_steps++;
+        simulation_time += prms.InitialTimeStep;
+    } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep == 0);
 
-        Matrix2r Re = icy::Point::polar_decomp_R(p.Fe);
-        real Je = p.Fe.determinant();
-        Matrix2r dFe = 2. * prms.mu*(p.Fe - Re)* p.Fe.transpose() +
-                prms.lambda * (Je - 1.) * Je * Matrix2r::Identity();
+    // TODO: abort procedure - need to be able to abort GPU computation while waiting on it
 
-        Matrix2r stress = - (dt * vol) * (Dinv * dFe);
+    gpu.cuda_device_synchronize();
+    compute_time_per_cycle = gpu.end_timing()/count_unupdated_steps;
 
-        // Fused APIC momentum + MLS-MPM stress contribution
-         // See http://taichi.graphics/wp-content/uploads/2019/03/mls-mpm-cpic.pdf
-         // Eqn 29
-        Matrix2r affine = stress + particle_mass * p.Bp;
-
-        constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
-        const int i0 = (int)((p.pos[0])/h - offset);
-        const int j0 = (int)((p.pos[1])/h - offset);
-
-        Vector2r base_coord(i0,j0);
-        Vector2r fx = p.pos/h - base_coord;
-
-        Vector2r v0(1.5-fx[0],1.5-fx[1]);
-        Vector2r v1(fx[0]-1.,fx[1]-1.);
-        Vector2r v2(fx[0]-.5,fx[1]-.5);
-
-        Vector2r w[3];
-        w[0] << .5*v0[0]*v0[0],  .5*v0[1]*v0[1];
-        w[1] << .75-v1[0]*v1[0], .75-v1[1]*v1[1];
-        w[2] << .5*v2[0]*v2[0],  .5*v2[1]*v2[1];
+    hostside_data_update_mutex.lock();
+    gpu.cuda_transfer_from_device(points);
+    prms.SimulationTime = simulation_time;
+    prms.SimulationStep += count_unupdated_steps;
+    hostside_data_update_mutex.unlock();
 
 
-        for (int i = 0; i < 3; i++)
-            for (int j = 0; j < 3; j++)
-            {
-                real Wip = w[i].x()*w[j].y();
-
-                Vector2r dpos((i-fx[0])*h, (j-fx[1])*h);
-                Vector2r incV = Wip*(p.velocity*particle_mass+affine*dpos);
-                real incM = Wip*particle_mass;
-
-                int idx_gridnode = (i+i0) + (j+j0)*prms.GridX;
-                if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=prms.GridX || (j+j0)>=prms.GridY || idx_gridnode < 0 || idx_gridnode >= grid.size())
-                {
-                    spdlog::critical("point {} in cell [{}, {}]", pt_idx, (i+i0), (j+j0));
-                    throw std::runtime_error("particle is out of grid bounds");
-                }
-
-                GridNode &gn = grid[idx_gridnode];
-#pragma omp atomic
-                gn.mass += incM;
-
-#pragma omp atomic
-                gn.velocity[0] += incV[0];
-#pragma omp atomic
-                gn.velocity[1] += incV[1];
-            }
-    }
+    if(prms.SimulationTime >= prms.SimulationEndTime) return false;
+    return true;
 }
-
-
-void icy::Model::UpdateNodes()
-{
-    if(isTimeToUpdate()) spdlog::info("s {}; update nodes", prms.SimulationStep);
-
-    const real dt = prms.InitialTimeStep;
-    const Vector2r gravity(0,-prms.Gravity);
-    const real indRsq = prms.IndRSq;
-    const Vector2r vco(prms.IndVelocity,0);  // velocity of the collision object (indenter)
-    const Vector2r indCenter(indenter_x, indenter_y);
-
-#pragma omp parallel for schedule (dynamic)
-    for (int idx = 0; idx < grid.size(); idx++)
-    {
-        GridNode &gn = grid[idx];
-        if(gn.mass == 0) continue;
-        gn.velocity /= gn.mass;
-        gn.velocity[1] -= dt*prms.Gravity;
-
-        int idx_x = idx % prms.GridX;
-        int idx_y = idx / prms.GridX;
-
-        // indenter
-        Vector2r gnpos(idx_x * prms.cellsize,idx_y * prms.cellsize);
-        Vector2r n = gnpos - indCenter;
-        if(n.squaredNorm() < indRsq)
-        {
-            // grid node is inside the indenter
-            Vector2r vrel = gn.velocity - vco;
-            n.normalize();
-            real vn = vrel.dot(n);   // normal component of the velocity
-            if(vn < 0)
-            {
-                Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
-                gn.velocity = vco + vt + prms.IceFrictionCoefficient*vn*vt.normalized();
-            }
-        }
-
-        // attached bottom layer
-        if(idx_y <= 3) gn.velocity.setZero();
-        else if(idx_y >= prms.GridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
-        if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
-        else if(idx_x >= prms.GridX-5) gn.velocity[0] = 0;
-    }
-
-}
-
-
-
-void icy::Model::G2P()
-{
-    if(isTimeToUpdate()) spdlog::info("s {}; g2p", prms.SimulationStep);
-
-    const real &dt = prms.InitialTimeStep;
-    const real &h = prms.cellsize;
-    constexpr real offset = 0.5;  // 0 for cubic
-
-
-    visual_update_mutex.lock();
-#pragma omp parallel for
-    for(int idx_p = 0; idx_p<points.size(); idx_p++)
-    {
-        icy::Point &p = points[idx_p];
-
-        const int i0 = (int)((p.pos[0])/h - offset);
-        const int j0 = (int)((p.pos[1])/h - offset);
-
-        Vector2r base_coord(i0,j0);
-        Vector2r fx = p.pos/h - base_coord;
-
-        Vector2r v0(1.5-fx[0],1.5-fx[1]);
-        Vector2r v1(fx[0]-1.,fx[1]-1.);
-        Vector2r v2(fx[0]-.5,fx[1]-.5);
-
-        Vector2r w[3];
-        w[0] << 0.5f*v0[0]*v0[0], 0.5f*v0[1]*v0[1];
-        w[1] << 0.75f-v1[0]*v1[0], 0.75f-v1[1]*v1[1];
-        w[2] << 0.5f*v2[0]*v2[0], 0.5f*v2[1]*v2[1];
-
-        //const Vector2r pointPos_copy = p.pos;
-        //p.pos.setZero();
-        p.velocity.setZero();
-        p.Bp.setZero();
-
-        for (int i = 0; i < 3; i++)
-            for (int j = 0; j < 3; j++)
-            {
-                Vector2r dpos = Vector2r(i, j) - fx;
-                real weight = w[i].x() * w[j].y();
-
-                int idx_gridnode = i+i0 + (j+j0)*prms.GridX;
-                const icy::GridNode &node = grid[idx_gridnode];
-                const Vector2r &grid_v = node.velocity;
-                p.velocity += weight * grid_v;
-                p.Bp += (4./h)*weight *(grid_v*dpos.transpose());
-            }
-
-        // Advection
-        p.pos += dt * p.velocity;
-
-
-        p.Fe = (Matrix2r::Identity() + dt*p.Bp) * p.Fe;
-
-
-//        p.NACCUpdateDeformationGradient(dt,T,prms);
-//        p.SnowUpdateDeformationGradient(dt,prms.THT_C_snow,prms.THT_S_snow,T);
-//        p.ElasticUpdateDeformationGradient(dt,T);
-
-    }
-    visual_update_mutex.unlock();
-
-
-}
-
-
 
 void icy::Model::Reset()
 {
@@ -263,61 +101,9 @@ void icy::Model::Prepare()
 }
 
 
-bool icy::Model::Step()
-{
-    if(isTimeToUpdate()) spdlog::info("step {} started", prms.SimulationStep);
-
-    indenter_x = indenter_x_initial + prms.SimulationTime*prms.IndVelocity;
-    if(isTimeToUpdate()) gpu.start_timing();
-    if(prms.useGPU)
-    {
-        gpu.cuda_reset_grid(grid.size());
-        gpu.cuda_p2g(points.size());
-        gpu.cuda_update_nodes(grid.size(),indenter_x, indenter_y);
-        gpu.cuda_g2p(points.size());
-    }
-    else
-    {
-        ResetGrid();
-        P2G();
-        if(abortRequested) return false;
-        UpdateNodes();
-        if(abortRequested) return false;
-        G2P();
-        if(abortRequested) return false;
-    }
-
-    prms.SimulationStep++;
-    prms.SimulationTime += prms.InitialTimeStep;
-    if(isTimeToUpdate())
-    {
-        spdlog::info("step {} completed\n", prms.SimulationStep-1);
-        if(prms.useGPU)
-        {
-            compute_time_per_cycle = gpu.end_timing()/prms.UpdateEveryNthStep;
-            gpu.cuda_device_synchronize();
-            visual_update_mutex.lock();
-            gpu.cuda_transfer_from_device(points);
-            visual_update_mutex.unlock();
-        }
-    }
-
-    if(prms.SimulationTime >= prms.SimulationEndTime) return false;
-    return true;
-}
 
 
 
 
-icy::Model::Model()
-{
-    prms.Reset();
-    spdlog::info("num threads {}", omp_get_max_threads());
-    int nthreads, tid;
-#pragma omp parallel
-    { spdlog::info("thread {}", omp_get_thread_num()); }
-    std::cout << std::endl;
-    spdlog::info("sizeof(Point) = {}", sizeof(icy::Point));
-    spdlog::info("sizeof(GridNode) = {}", sizeof(icy::GridNode));
 
-}
+

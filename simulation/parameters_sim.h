@@ -43,7 +43,6 @@ public:
     real SimulationTime;
     real MemAllocGrid, MemAllocPoints, MemAllocTotal;
 
-    bool useGPU;
     void Reset()
     {
 //#define PARAMS2
@@ -82,8 +81,6 @@ public:
 
         NACC_friction_angle = 35;
         ComputeCamClayParams();
-
-        useGPU = true;
 
         SimulationEndTime = 15;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));

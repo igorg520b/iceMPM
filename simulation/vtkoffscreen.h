@@ -1,65 +1,61 @@
-#ifndef MESHREPRESENTATION_H
-#define MESHREPRESENTATION_H
+#ifndef VTKOFFSCREEN_H
+#define VTKOFFSCREEN_H
 
-#include <QObject>
-
-#include <vtkNew.h>
-#include <vtkUnstructuredGrid.h>
-#include <vtkCellType.h>
-#include <vtkDataSetMapper.h>
 #include <vtkActor.h>
+#include <vtkGraphicsFactory.h>
+#include <vtkNew.h>
+#include <vtkPNGWriter.h>
+#include <vtkPolyDataMapper.h>
 #include <vtkProperty.h>
-#include <vtkNamedColors.h>
-#include <vtkDoubleArray.h>
-#include <vtkFloatArray.h>
-#include <vtkIntArray.h>
-#include <vtkPolyDataMapper.h>
+#include <vtkRenderWindow.h>
+#include <vtkRenderer.h>
+#include <vtkWindowToImageFilter.h>
+
+#include <vtkRegularPolygonSource.h>
 #include <vtkDataSetMapper.h>
-#include <vtkLookupTable.h>
-#include <vtkPolyData.h>
-#include <vtkPolyDataMapper.h>
-#include <vtkPolyLine.h>
 #include <vtkPointData.h>
 #include <vtkCellArray.h>
 #include <vtkCellData.h>
 #include <vtkPoints.h>
 #include <vtkVertexGlyphFilter.h>
 #include <vtkStructuredGrid.h>
+#include <vtkCamera.h>
+#include <vtkLookupTable.h>
+#include <vtkFloatArray.h>
 
-#include <vtkRegularPolygonSource.h>
-#include <vtkCylinderSource.h>
+#include <vtkSphereSource.h>
 
 
 
-namespace icy { class VisualRepresentation; class Model;}
+#include <string>
 
-class icy::VisualRepresentation : public QObject
+namespace icy {class VTKOffscreen; class Model;}
+
+class icy::VTKOffscreen
 {
-    Q_OBJECT
-
 public:
-    VisualRepresentation();
+    VTKOffscreen();
+    void SetupCamera();
+    void SaveScreenshot(std::string fileName);
+
+    void SynchronizeTopology();
+    void SynchronizeValues();
 
     icy::Model *model;
 
-    double limit_low = 0, limit_high = 1e7; // limits for color scale
+private:
+    vtkNew<vtkGraphicsFactory> graphics_factory;
+    vtkNew<vtkRenderer> renderer;
+    vtkNew<vtkRenderWindow> renderWindow;
+    vtkNew<vtkWindowToImageFilter> windowToImageFilter;
+    vtkNew<vtkPNGWriter> writer;
 
-    enum VisOpt { none, velocity, stress_mises, stress_maxP, stress_minP};
-    Q_ENUM(VisOpt)
 
-    void SynchronizeValues();
-    void SynchronizeTopology();
-    void ChangeVisualizationOption(int option);  // invoked from GUI/main thread
 
-    vtkNew<vtkLookupTable> hueLut, lutMPM;
+    vtkNew<vtkLookupTable> lutMPM;
     vtkNew<vtkActor> actor_points;
     vtkNew<vtkActor> actor_grid;
     vtkNew<vtkActor> actor_indenter;
-
-private:
-    VisOpt VisualizingVariable = VisOpt::none;
-
-    vtkNew<vtkLookupTable> hueLut_pastel;
 
     // indenter
     vtkNew<vtkRegularPolygonSource> indenterSource;
@@ -77,6 +73,13 @@ private:
     vtkNew<vtkStructuredGrid> structuredGrid;
     vtkNew<vtkDataSetMapper> grid_mapper;
     vtkNew<vtkPoints> grid_points;
+
+    // testing
+    vtkNew<vtkSphereSource> sphereSource;
+    vtkNew<vtkPolyDataMapper> sphereMapper;
+    vtkNew<vtkActor> sphereActor;
+
+
 
     static constexpr float lutArrayMPMColors[101][3] =
     {{0.25098, 0.556863, 0.756863}, {0.245961, 0.547294,
@@ -203,4 +206,5 @@ private:
         {244/255.0,154/255.0,154/255.0}   // 39
     };
 };
-#endif
+
+#endif // VTKOFFSCREEN_H

@@ -36,7 +36,7 @@ add_compile_definitions(QT_NO_KEYWORDS)
 
 # Functions that implement the model, but not IO
 
-add_library(NACC_cpu SHARED
+add_library(MPM_GPU_shared SHARED
     simulation/parameters_sim.h
     simulation/model.cpp
     simulation/model.h
@@ -47,55 +47,72 @@ add_library(NACC_cpu SHARED
 
     simulation/givens.cuh
     simulation/helper_math.cuh
-#    simulation/gpu_implementation0.h
-#    simulation/gpu_implementation0.cu
-#    simulation/gpu_implementation1.h
-#    simulation/gpu_implementation1.cu
     simulation/gpu_implementation2.h
     simulation/gpu_implementation2.cu
-)
-set_target_properties(NACC_cpu PROPERTIES VERSION 1.1)
 
-target_include_directories(NACC_cpu PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
+    simulation/vtkoffscreen.h
+    simulation/vtkoffscreen.cpp
+
+    simulation/unused_code.cpp
+)
+set_target_properties(MPM_GPU_shared PROPERTIES VERSION 1.2)
+
+target_include_directories(MPM_GPU_shared PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
 
 # OpenMP
-if(WIN32)
-    target_compile_options(NACC_cpu PRIVATE /openmp)
-else()
-    target_compile_options(NACC_cpu PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
-    target_link_libraries(NACC_cpu PRIVATE gomp)
-endif()
+#if(WIN32)
+#    target_compile_options(NACC_cpu PRIVATE /openmp)
+#else()
+#    target_compile_options(NACC_cpu PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
+#    target_link_libraries(NACC_cpu PRIVATE gomp)
+#endif()
+
+# VTK
+target_link_libraries(MPM_GPU_shared PRIVATE ${VTK_LIBRARIES})
 
 # spdlog
 if (WIN32)
-    target_link_libraries(NACC_cpu PRIVATE spdlog)
-    target_include_directories(NACC_cpu PRIVATE "C:\\libraries\\spdlog\\include")
-    target_link_directories(NACC_cpu PRIVATE "C:\\libraries\\spdlog-build\\Release")
+    target_link_libraries(MPM_GPU_shared PRIVATE spdlog)
+    target_include_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\spdlog\\include")
+    target_link_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\spdlog-build\\Release")
 else()
     find_package(spdlog REQUIRED)
-    target_link_libraries(NACC_cpu PRIVATE spdlog::spdlog)
+    target_link_libraries(MPM_GPU_shared PRIVATE spdlog::spdlog)
 endif()
 
 # Eigen
 find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
-target_link_libraries(NACC_cpu PRIVATE Eigen3::Eigen)
+target_link_libraries(MPM_GPU_shared PRIVATE Eigen3::Eigen)
 
 #CUDA
-set_target_properties(NACC_cpu PROPERTIES CUDA_ARCHITECTURES "61")
+set_target_properties(MPM_GPU_shared PROPERTIES CUDA_ARCHITECTURES "61")
 set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.2")
 find_package(CUDA REQUIRED)
-#target_link_libraries(NACC_cpu PRIVATE cudart)
 
-set_target_properties(NACC_cpu PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored")
+set_target_properties(MPM_GPU_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
+set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
 include_directories(${CUDA_INCLUDE_DIRS})
 # --device-c
 # -use_fast_maths
 
+# HDF5
+if(WIN32)
+    add_compile_definitions(H5_BUILT_AS_DYNAMIC_LIB)
+    target_include_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\hdf5-build\\src")
+    target_include_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\hdf5-develop\\src")
+    target_include_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\hdf5-develop\\c++\\src")
+    target_link_directories(MPM_GPU_shared PRIVATE "C:\\libraries\\hdf5-build\\bin\\Release")
+    target_link_libraries(MPM_GPU_shared PRIVATE hdf5_cpp hdf5 )
+else()
+    find_package(HDF5 REQUIRED COMPONENTS CXX)
+    target_link_libraries(MPM_GPU_shared PRIVATE ${HDF5_LIBRARIES})
+    target_include_directories(MPM_GPU_shared PRIVATE ${HDF5_INCLUDE_DIRS})
+endif()
+
 
 # Qt GUI executable
 
-add_executable(iceMPM
+add_executable(iceMPM_GUI
     gui/main.cpp
 
     gui/windows/mainwindow.cpp
@@ -112,45 +129,37 @@ add_executable(iceMPM
 )
 
 
-target_include_directories(iceMPM PRIVATE gui geometry gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
+target_include_directories(iceMPM_GUI PRIVATE gui geometry gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
 
-target_link_libraries(iceMPM PRIVATE Qt5::Widgets Qt5::Core)
-target_link_libraries(iceMPM PRIVATE NACC_cpu)
+target_link_libraries(iceMPM_GUI PRIVATE Qt5::Widgets Qt5::Core)
+target_link_libraries(iceMPM_GUI PRIVATE MPM_GPU_shared)
 
 # Eigen
 find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
-target_link_libraries(iceMPM PRIVATE Eigen3::Eigen)
+target_link_libraries(iceMPM_GUI PRIVATE Eigen3::Eigen)
 
 
 # VTK
-target_link_libraries(iceMPM PRIVATE ${VTK_LIBRARIES})
+target_link_libraries(iceMPM_GUI PRIVATE ${VTK_LIBRARIES})
 
 #PBrowser
 if(WIN32)
-    target_link_directories(iceMPM PRIVATE "C:\\libraries\\pbrowser-build")
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\PBrowser")
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\PBrowser\\propertybrowser")
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\PBrowser\\objectpropertybrowser")
+    target_link_directories(iceMPM_GUI PRIVATE "C:\\libraries\\pbrowser-build")
+    target_include_directories(iceMPM_GUI PRIVATE "C:\\libraries\\PBrowser")
+    target_include_directories(iceMPM_GUI PRIVATE "C:\\libraries\\PBrowser\\propertybrowser")
+    target_include_directories(iceMPM_GUI PRIVATE "C:\\libraries\\PBrowser\\objectpropertybrowser")
 else()
-    target_link_directories(iceMPM PRIVATE "/home/s2/Projects-Libraries/build-PBrowser-Desktop_Qt_5_15_2_GCC_64bit-Release")
-    target_include_directories(iceMPM PRIVATE /home/s2/Projects-Libraries/PBrowser/objectpropertybrowser)
-    target_include_directories(iceMPM PRIVATE /home/s2/Projects-Libraries/PBrowser/propertybrowser)
-    target_include_directories(iceMPM PRIVATE /home/s2/Projects-Libraries/PBrowser)
+    target_link_directories(iceMPM_GUI PRIVATE "/home/s2/Projects-Libraries/build-PBrowser-Desktop_Qt_5_15_2_GCC_64bit-Release")
+    target_include_directories(iceMPM_GUI PRIVATE /home/s2/Projects-Libraries/PBrowser/objectpropertybrowser)
+    target_include_directories(iceMPM_GUI PRIVATE /home/s2/Projects-Libraries/PBrowser/propertybrowser)
+    target_include_directories(iceMPM_GUI PRIVATE /home/s2/Projects-Libraries/PBrowser)
 endif()
-target_link_libraries(iceMPM PRIVATE PBrowser)
+target_link_libraries(iceMPM_GUI PRIVATE PBrowser)
 
-# HDF5
+# OpenMP
 if(WIN32)
-    add_compile_definitions(H5_BUILT_AS_DYNAMIC_LIB)
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-build\\src")
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-develop\\src")
-    target_include_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-develop\\c++\\src")
-    target_link_directories(iceMPM PRIVATE "C:\\libraries\\hdf5-build\\bin\\Release")
-    target_link_libraries(iceMPM PRIVATE hdf5_cpp hdf5 )
+    target_compile_options(iceMPM_GUI PRIVATE /openmp)
 else()
-    find_package(HDF5 REQUIRED COMPONENTS CXX)
-    target_link_libraries(iceMPM PRIVATE ${HDF5_LIBRARIES})
-    target_include_directories(iceMPM PRIVATE ${HDF5_INCLUDE_DIRS})
+    target_compile_options(iceMPM_GUI PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
+    target_link_libraries(iceMPM_GUI PRIVATE gomp)
 endif()
-
-

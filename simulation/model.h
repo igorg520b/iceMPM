@@ -10,6 +10,7 @@
 #include <random>
 #include <mutex>
 #include <iostream>
+#include <string>
 
 #include "parameters_sim.h"
 #include "point.h"
@@ -34,22 +35,18 @@ public:
     bool Step();           // either invoked by Worker or via GUI
     void RequestAbort() {abortRequested = true;}   // asynchronous stop
 
-private:
-    GPU_Implementation2 gpu;
-
 public:
     icy::SimParams prms;
     float compute_time_per_cycle;
-
     real indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
     std::vector<GridNode> grid;
 
-    std::mutex visual_update_mutex; // to prevent modifying mesh data while updating VTK representation
+    std::mutex hostside_data_update_mutex; // locks "points" and "grid" vectors
 
-    bool isTimeToUpdate() { return prms.SimulationStep % prms.UpdateEveryNthStep == 0;}
 private:
+    GPU_Implementation2 gpu;
     void ResetGrid();
     void P2G();
     void UpdateNodes();

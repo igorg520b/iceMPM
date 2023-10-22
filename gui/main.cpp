@@ -7,11 +7,15 @@
 #include "point.h"
 #include "gridnode.h"
 
-//void test_cuda();
+#include <omp.h>
+
 
 int main(int argc, char *argv[])
 {
-//    test_cuda();
+    std::cout << "num threads " << omp_get_max_threads() << '\n';
+#pragma omp parallel
+    { std::cout << "thread " <<  omp_get_thread_num() << '\n'; }
+    std::cout << std::endl;
 
 
     QApplication a(argc, argv);

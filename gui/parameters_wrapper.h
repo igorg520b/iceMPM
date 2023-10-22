@@ -27,10 +27,6 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(int in_UpdateEvery READ getUpdateEveryNthStep NOTIFY propertyChanged)
     int getUpdateEveryNthStep() {return prms->UpdateEveryNthStep;}
 
-    Q_PROPERTY(bool in_useGPU READ getUseGpu WRITE setUseGpu NOTIFY propertyChanged)
-    bool getUseGpu() {return prms->useGPU;}
-    void setUseGpu(bool val) {prms->useGPU = val;}
-
     Q_PROPERTY(double p_Gravity READ getGravity NOTIFY propertyChanged)
     double getGravity() {return prms->Gravity;}
 

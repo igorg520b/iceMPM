@@ -42,6 +42,7 @@
 
 #include "objectpropertybrowser.h"
 #include "vtk_representation.h"
+#include "vtkoffscreen.h"
 #include "model.h"
 #include "parameters_wrapper.h"
 #include "backgroundworker.h"
@@ -88,6 +89,7 @@ private:
     BackgroundWorker *worker;
     icy::Model model;
     icy::VisualRepresentation representation;
+    icy::VTKOffscreen offscreen;
     ParamsWrapper *params;
 
     QString settingsFileName;       // includes current dir

@@ -92,7 +92,7 @@ MainWindow::MainWindow(QWidget *parent)
     ui->statusbar->addPermanentWidget(labelStepCount);
 
 // anything that includes the Model
-    representation.model = &model;
+
 
     scalarBar->SetLookupTable(representation.hueLut);
     renderer->AddActor(representation.actor_points);
@@ -189,7 +189,10 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
 
+    representation.model = &model;
+    offscreen.model = &model;
     representation.SynchronizeTopology();
+    offscreen.SynchronizeTopology();
     pbrowser->setActiveObject(params);
     updateGUI();
 
@@ -223,6 +226,11 @@ void MainWindow::quit_triggered()
     renderer->GetActiveCamera()->GetPosition(&data[0]);
     renderer->GetActiveCamera()->GetFocalPoint(&data[3]);
     data[6] = renderer->GetActiveCamera()->GetParallelScale();
+
+    qDebug() << "cam pos " << data[0] << "," << data[1] << "," << data[2];
+    qDebug() << "cam focal pt " << data[3] << "," << data[4] << "," << data[5];
+    qDebug() << "cam par scale " << data[6];
+
 
     QByteArray arr((char*)&data[0], sizeof(double)*10);
     settings.setValue("camData", arr);
@@ -378,6 +386,12 @@ void MainWindow::screenshot_triggered()
     writerPNG->SetFileName(outputPath.toUtf8().constData());
     writerPNG->Write();
     renderWindow->DoubleBufferOn();
+
+
+    offscreen.SynchronizeValues();
+    outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/_" +
+            QString::number(screenshot_number).rightJustified(5, '0') + ".png";
+    offscreen.SaveScreenshot(outputPath.toStdString());
 }
 
 

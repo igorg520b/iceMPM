@@ -1,32 +1,15 @@
-#include "vtk_representation.h"
+#include "vtkoffscreen.h"
 #include "model.h"
-#include "parameters_sim.h"
-#include <omp.h>
 
-icy::VisualRepresentation::VisualRepresentation()
+
+icy::VTKOffscreen::VTKOffscreen()
 {
-    int nLut = sizeof lutArrayTemperatureAdj / sizeof lutArrayTemperatureAdj[0];
-    hueLut->SetNumberOfTableValues(nLut);
-    for ( int i=0; i<nLut; i++)
-        hueLut->SetTableValue(i, lutArrayTemperatureAdj[i][0],
-                              lutArrayTemperatureAdj[i][1],
-                              lutArrayTemperatureAdj[i][2], 1.0);
-
-    nLut = sizeof lutArrayPastel / sizeof lutArrayPastel[0];
-    hueLut_pastel->SetNumberOfTableValues(nLut);
-    for ( int i=0; i<nLut; i++)
-        hueLut_pastel->SetTableValue(i, lutArrayPastel[i][0],
-                              lutArrayPastel[i][1],
-                              lutArrayPastel[i][2], 1.0);
-    hueLut_pastel->SetTableRange(0,39);
-
-    nLut = sizeof lutArrayMPMColors / sizeof lutArrayMPMColors[0];
+    int nLut = sizeof lutArrayMPMColors / sizeof lutArrayMPMColors[0];
     lutMPM->SetNumberOfTableValues(nLut);
     for ( int i=0; i<nLut; i++)
         lutMPM->SetTableValue(i, lutArrayMPMColors[i][0],
                               lutArrayMPMColors[i][1],
                               lutArrayMPMColors[i][2], 1.0);
-
 
     indenterMapper->SetInputConnection(indenterSource->GetOutputPort());
     actor_indenter->SetMapper(indenterMapper);
@@ -70,7 +53,6 @@ icy::VisualRepresentation::VisualRepresentation()
 
 
     grid_mapper->SetInputData(structuredGrid);
-    grid_mapper->SetLookupTable(hueLut);
 
 //    mapper_structuredGrid->SetScalarRange(0, dataSize - 1);
 //    mapper_structuredGrid->ScalarVisibilityOn();
@@ -83,11 +65,53 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_grid->GetProperty()->SetInterpolationToFlat();
     actor_grid->PickableOff();
     actor_grid->GetProperty()->SetColor(0.95,0.95,0.95);
+
+
+    // set up offscreen render
+    graphics_factory->SetOffScreenOnlyMode(1);
+    graphics_factory->SetUseMesaClasses(1);
+    renderWindow->SetOffScreenRendering(1);
+    renderWindow->AddRenderer(renderer);
+    renderWindow->SetSize(1920,1080);
+
+    renderer->SetBackground(1.0,1.0,1.0);
+
+    renderer->AddActor(actor_grid);
+    renderer->AddActor(actor_points);
+    renderer->AddActor(actor_indenter);
+
+    windowToImageFilter->SetInput(renderWindow);
+    writer->SetInputConnection(windowToImageFilter->GetOutputPort());
+
+    // testing
+    sphereMapper->SetInputConnection(sphereSource->GetOutputPort());
+    sphereActor->SetMapper(sphereMapper);
+//    renderer->AddActor(sphereActor);
+
+    vtkCamera* camera = renderer->GetActiveCamera();
+    renderer->ResetCamera();
+    camera->ParallelProjectionOn();
+    camera->SetClippingRange(1e-1,1e3);
+    camera->SetFocalPoint(1.53819 , 0.759985 , 0);
+    camera->SetPosition(1.53819 , 0.759985 , 50);
+    camera->SetViewUp(0.0, 1.0, 0.0);
+    camera->SetParallelScale(1.07824);
+    camera->Modified();
+
+}
+
+void icy::VTKOffscreen::SaveScreenshot(std::string fileName)
+{
+    renderWindow->Render();
+    windowToImageFilter->Update();
+    windowToImageFilter->Modified();
+    writer->Modified();
+    writer->SetFileName(fileName.c_str());
+    writer->Write();
 }
 
 
-
-void icy::VisualRepresentation::SynchronizeTopology()
+void icy::VTKOffscreen::SynchronizeTopology()
 {
     points->SetNumberOfPoints(model->points.size());
     visualized_values->SetNumberOfValues(model->points.size());
@@ -122,12 +146,12 @@ void icy::VisualRepresentation::SynchronizeTopology()
 }
 
 
-void icy::VisualRepresentation::SynchronizeValues()
+void icy::VTKOffscreen::SynchronizeValues()
 {
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->hostside_data_update_mutex.lock();
-#pragma omp parallel
+//#pragma omp parallel
     for(int i=0;i<model->points.size();i++)
     {
         const icy::Point &p = model->points[i];
@@ -154,8 +178,5 @@ void icy::VisualRepresentation::SynchronizeValues()
 }
 
 
-void icy::VisualRepresentation::ChangeVisualizationOption(int option)
-{
-    VisualizingVariable = (VisOpt)option;
-    SynchronizeTopology();
-}
+
+
