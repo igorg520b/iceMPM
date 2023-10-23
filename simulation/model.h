@@ -38,8 +38,8 @@ public:
     void FinalizeDataTransfer();
     void UnlockCycleMutex();
 
-public:
     icy::SimParams prms;
+    GPU_Implementation2 gpu;
     float compute_time_per_cycle;
     real indenter_x, indenter_x_initial, indenter_y;
 
@@ -50,7 +50,6 @@ public:
     std::mutex processing_current_cycle_data; // locked until the current cycle results' are copied to host and processed
 
 private:
-    GPU_Implementation2 gpu;
     void ResetGrid();
     void P2G();
     void UpdateNodes();

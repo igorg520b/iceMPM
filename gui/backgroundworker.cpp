@@ -1,8 +1,14 @@
 #include "backgroundworker.h"
+#include <functional>
 
 BackgroundWorker::BackgroundWorker(icy::Model *controller_) : controller(controller_)
 {
     this->start();
+    controller->gpu.transfer_completion_callback = [&]() {
+        //std::cout << "callback invoked\n";
+        controller->FinalizeDataTransfer();
+        Q_EMIT stepCompleted();
+    };
 }
 
 // resume the worker thread
@@ -52,7 +58,7 @@ void BackgroundWorker::run()
         if(!visual_update_requested)
         {
             visual_update_requested = true;
-            Q_EMIT stepCompleted();
+            //Q_EMIT stepCompleted();
         }
     }
     qDebug() << "BackgroundWorker::run() terminated";

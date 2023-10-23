@@ -13,6 +13,15 @@ bool icy::Model::Step()
 
 
     int count_unupdated_steps = 0;
+
+    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2)==1)
+    {
+        cudaEventSynchronize(gpu.eventTimingStop);
+        float milliseconds;
+        cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
+        compute_time_per_cycle = milliseconds/count_unupdated_steps;
+    }
+
     cudaEventRecord(gpu.eventTimingStart);
     do
     {
@@ -35,23 +44,19 @@ bool icy::Model::Step()
     gpu.cuda_transfer_from_device(points);
     cudaEventRecord(gpu.eventDataCopiedToHost);
 
-//    float milliseconds = 0;
-//    cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
-//    compute_time_per_cycle = milliseconds/count_unupdated_steps;
-
     prms.SimulationTime = simulation_time;
     prms.SimulationStep += count_unupdated_steps;
 
-    FinalizeDataTransfer();
+//    FinalizeDataTransfer();
 
-    if(prms.SimulationTime >= prms.SimulationEndTime) return false;
+    if(prms.SimulationTime >= prms.SimulationEndTime || gpu.error_code) return false;
     return true;
 }
 
 
 void icy::Model::FinalizeDataTransfer()
 {
-    cudaEventSynchronize(gpu.eventDataCopiedToHost);
+//    cudaEventSynchronize(gpu.eventDataCopiedToHost);
 
     hostside_data_update_mutex.lock();
     gpu.transfer_ponts_to_host_finalize(points);
@@ -123,6 +128,7 @@ void icy::Model::Prepare()
 {
     spdlog::info("icy::Model::Prepare()");
     gpu.cuda_update_constants(prms);
+    gpu.error_code = 0;
     abortRequested = false;
 }
 

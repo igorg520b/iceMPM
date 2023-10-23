@@ -4,12 +4,13 @@
 
 #include "parameters_sim.h"
 #include "point.h"
-//#include "gridnode.h"
 
 #include <Eigen/Core>
 
 #include <cuda.h>
 #include <cuda_runtime.h>
+
+#include <functional>
 
 
 __global__ void v2_kernel_p2g(const int nPoints);
@@ -30,6 +31,8 @@ class GPU_Implementation2
 public:
     GPU_Implementation2();
     constexpr static int nGridArrays = 3, nPtsArrays = 16;
+    int error_code;
+    std::function<void()> transfer_completion_callback;
 
     void cuda_update_constants(const icy::SimParams &prms);
     void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
@@ -45,12 +48,15 @@ public:
     void transfer_ponts_to_host_finalize(std::vector<icy::Point> &points);
 
     cudaEvent_t eventTimingStart, eventTimingStop, eventCycleComplete, eventDataCopiedToHost;
+
 private:
     constexpr static int threadsPerBlock = 512;
     real *grid_arrays[nGridArrays], *pts_arrays[nPtsArrays];
 
     cudaStream_t streamCompute, streamTransfer;
     void *tmp_transfer_buffer = nullptr; // nPoints*sizeof(real)
+
+    static void CUDART_CB callback_transfer_from_device_completion(cudaStream_t stream, cudaError_t status, void *userData);
 };
 
 #endif // GPU_IMPLEMENTATION0_H

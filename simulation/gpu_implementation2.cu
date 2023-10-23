@@ -171,21 +171,24 @@ void GPU_Implementation2::cuda_transfer_from_device(std::vector<icy::Point> &poi
     err = cudaMemcpyAsync((void*) tmp3, pts_arrays[12], sizeof(real)*n, cudaMemcpyDeviceToHost, streamTransfer);
     if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
 
-
-    int error_code = 0;
     err = cudaMemcpyFromSymbolAsync(&error_code, gpu_error_indicator, sizeof(int), 0, cudaMemcpyDeviceToHost, streamTransfer);
     if(err != cudaSuccess)
     {
         std::cout << "cuda_p2g cudaMemcpyFromSymbol error\n";
         throw std::runtime_error("cuda_p2g");
     }
-    if(error_code)
-    {
-        std::cout << "point is out of bounds\n";
-        throw std::runtime_error("cuda_p2g");
-    }
 
+    void* userData = reinterpret_cast<void*>(this);
+    cudaStreamAddCallback(streamTransfer, GPU_Implementation2::callback_transfer_from_device_completion, userData, 0);
 }
+
+void CUDART_CB GPU_Implementation2::callback_transfer_from_device_completion(cudaStream_t stream, cudaError_t status, void *userData)
+{
+//    std::cout << "hello from callback\n";
+    GPU_Implementation2 *m = reinterpret_cast<GPU_Implementation2*>(userData);
+    if(m->transfer_completion_callback) m->transfer_completion_callback();
+}
+
 
 void GPU_Implementation2::transfer_ponts_to_host_finalize(std::vector<icy::Point> &points)
 {
@@ -196,7 +199,6 @@ void GPU_Implementation2::transfer_ponts_to_host_finalize(std::vector<icy::Point
     for(int k=0;k<n;k++) points[k].pos[0] = tmp1[k];
     for(int k=0;k<n;k++) points[k].pos[1] = tmp2[k];
     for(int k=0;k<n;k++) points[k].NACC_alpha_p = tmp3[k];
-
 }
 
 

@@ -31,7 +31,8 @@ public:
     int GridX, GridY;
     real cellsize, cellsize_inv, Dp_inv;
 
-    int UpdateEveryNthStep;
+    int UpdateEveryNthStep; // run N
+    int SaveEveryNthUpdate; // taking screenshot is slow - this controls the frequency of screenshots
 
     real IndDiameter, IndRSq, IndVelocity, IndDepth;
     int PointsWanted, PointCountActual;
@@ -45,17 +46,17 @@ public:
 
     void Reset()
     {
-//#define PARAMS2
+#define PARAMS2
 #ifdef PARAMS2
         InitialTimeStep = 8.e-6;
         YoungsModulus = 5.e8;
-        NACC_beta = 2;
-        NACC_xi = 5;
-        NACC_alpha = std::log(1.-1.e-6);
+        NACC_beta = 0.7;
+        NACC_xi = 1.5;
+        NACC_alpha = std::log(1.-1.e-5);
         PointsWanted = 1'000'000;
         GridX = 512;
-        GridY = 200;
-        ParticleViewSize = 1.1f;
+        GridY = 220;
+        ParticleViewSize = 1.0f;
 #else
         InitialTimeStep = 3.e-5;
         YoungsModulus = 5.e8;
@@ -65,25 +66,15 @@ public:
         PointsWanted = 35'000;
         GridX = 128;
         GridY = 55;
-        ParticleViewSize = 3.5f;
-        /*
-        InitialTimeStep = 1e-4;//1.e-5;
-        YoungsModulus = 1.e7;
-        NACC_beta = 0.3;
-        NACC_xi = 0.9;
-        NACC_alpha = std::log(1.-5.e-5);
-        PointsWanted = 25'000;
-        GridX = 128;
-        GridY = 55;
-        ParticleViewSize = 5.5f;
-        */
+        ParticleViewSize = 2.5f;
 #endif
 
         NACC_friction_angle = 35;
         ComputeCamClayParams();
 
-        SimulationEndTime = 3;
+        SimulationEndTime = 12;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+        SaveEveryNthUpdate = 1;
 
         cellsize = (real)3.33/(GridX);
         cellsize_inv = 1./cellsize;

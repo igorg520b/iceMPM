@@ -369,9 +369,11 @@ void MainWindow::limits_changed(double val)
 
 void MainWindow::screenshot_triggered()
 {
-    int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
+    if(model.prms.SimulationStep % (model.prms.UpdateEveryNthStep * model.prms.SaveEveryNthUpdate)) return;
+    int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep / model.prms.SaveEveryNthUpdate;
     QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
             QString::number(screenshot_number).rightJustified(5, '0') + ".png";
+    /*
 
     renderWindow->DoubleBufferOff();
     renderWindow->Render();
@@ -386,7 +388,7 @@ void MainWindow::screenshot_triggered()
     writerPNG->SetFileName(outputPath.toUtf8().constData());
     writerPNG->Write();
     renderWindow->DoubleBufferOn();
-
+*/
 
     offscreen.SynchronizeValues();
     outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/_" +
