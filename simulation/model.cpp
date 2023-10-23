@@ -14,13 +14,6 @@ bool icy::Model::Step()
 
     int count_unupdated_steps = 0;
 
-    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2)==1)
-    {
-        cudaEventSynchronize(gpu.eventTimingStop);
-        float milliseconds;
-        cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
-        compute_time_per_cycle = milliseconds/count_unupdated_steps;
-    }
 
     cudaEventRecord(gpu.eventTimingStart);
     do
@@ -37,6 +30,12 @@ bool icy::Model::Step()
     } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
 
     cudaEventRecord(gpu.eventTimingStop);   // we want to time the computation steps excluding data transfer
+
+    cudaEventSynchronize(gpu.eventTimingStop);
+    float milliseconds;
+    cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
+    compute_time_per_cycle = milliseconds/prms.UpdateEveryNthStep;
+
     processing_current_cycle_data.lock();   // if locked, previous results are not yet processed by the host
     gpu.backup_point_positions(points.size());  // make a copy of nodal positions on the device
     cudaEventRecord(gpu.eventCycleComplete);
