@@ -35,6 +35,9 @@ public:
     bool Step();           // either invoked by Worker or via GUI
     void RequestAbort() {abortRequested = true;}   // asynchronous stop
 
+    void FinalizeDataTransfer();
+    void UnlockCycleMutex();
+
 public:
     icy::SimParams prms;
     float compute_time_per_cycle;
@@ -44,6 +47,7 @@ public:
     std::vector<GridNode> grid;
 
     std::mutex hostside_data_update_mutex; // locks "points" and "grid" vectors
+    std::mutex processing_current_cycle_data; // locked until the current cycle results' are copied to host and processed
 
 private:
     GPU_Implementation2 gpu;

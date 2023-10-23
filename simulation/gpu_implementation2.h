@@ -4,7 +4,7 @@
 
 #include "parameters_sim.h"
 #include "point.h"
-#include "gridnode.h"
+//#include "gridnode.h"
 
 #include <Eigen/Core>
 
@@ -29,29 +29,28 @@ class GPU_Implementation2
 {
 public:
     GPU_Implementation2();
+    constexpr static int nGridArrays = 3, nPtsArrays = 16;
 
     void cuda_update_constants(const icy::SimParams &prms);
     void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
     void cuda_reset_grid(size_t nGridNodes);
     void transfer_ponts_to_device(const std::vector<icy::Point> &points);
-    void cuda_transfer_from_device(std::vector<icy::Point> &points);
     void cuda_p2g(const int nPoints);
     void cuda_g2p(const int nPoints);
     void cuda_update_nodes(const int nGridNodes, real indenter_x, real indenter_y);
     void cuda_device_synchronize();
+    void backup_point_positions(const int nPoints);
 
-    void start_timing();
-    float end_timing();
+    void cuda_transfer_from_device(std::vector<icy::Point> &points);
+    void transfer_ponts_to_host_finalize(std::vector<icy::Point> &points);
 
-    constexpr static int nGridArrays = 3, nPtsArrays = 13;
-
+    cudaEvent_t eventTimingStart, eventTimingStop, eventCycleComplete, eventDataCopiedToHost;
 private:
-    constexpr static int threadsPerBlock = 128;
+    constexpr static int threadsPerBlock = 512;
     real *grid_arrays[nGridArrays], *pts_arrays[nPtsArrays];
 
-    cudaEvent_t start, stop;
-
-    std::vector<real> tmp_transfer_buffer;
+    cudaStream_t streamCompute, streamTransfer;
+    void *tmp_transfer_buffer = nullptr; // nPoints*sizeof(real)
 };
 
 #endif // GPU_IMPLEMENTATION0_H

@@ -20,24 +20,17 @@ __device__ int gpu_error_indicator;
 
 GPU_Implementation2::GPU_Implementation2()
 {
-    cudaEventCreate(&start);
-    cudaEventCreate(&stop);
+    cudaEventCreate(&eventTimingStart);
+    cudaEventCreate(&eventTimingStop);
+
+    cudaEventCreate(&eventCycleComplete);
+    cudaEventCreate(&eventDataCopiedToHost);
+
+    cudaStreamCreate(&streamCompute);
+    cudaStreamCreate(&streamTransfer);
 }
 
 
-void GPU_Implementation2::start_timing()
-{
-    cudaEventRecord(start);
-}
-
-float GPU_Implementation2::end_timing()
-{
-    cudaEventRecord(stop);
-    cudaEventSynchronize(stop);
-    float milliseconds = 0;
-    cudaEventElapsedTime(&milliseconds, start, stop);
-    return milliseconds;
-}
 
 
 void GPU_Implementation2::cuda_update_constants(const icy::SimParams &prms)
@@ -57,12 +50,19 @@ void GPU_Implementation2::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
 {
     cudaError_t err;
 
+    // pinned host memory
+    if(tmp_transfer_buffer) cudaFreeHost(tmp_transfer_buffer);
+    err = cudaMallocHost(&tmp_transfer_buffer, sizeof(real)*nPoints*3);
+    if(err!=cudaSuccess) throw std::runtime_error("GPU_Implementation2::Prepare(int nPoints)");
+
+    // device memory for grid
     for(int k=0;k<nGridArrays;k++)
     {
         err = cudaMalloc(&grid_arrays[k], sizeof(real)*nGridNodes);
         if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     }
 
+    // device memory for points
     for(int k=0;k<nPtsArrays;k++)
     {
         err = cudaMalloc(&pts_arrays[k], sizeof(real)*nPoints);
@@ -82,86 +82,98 @@ void GPU_Implementation2::transfer_ponts_to_device(const std::vector<icy::Point>
 {
     cudaError_t err;
     int n = points.size();
-    tmp_transfer_buffer.resize(n);
+    real *tmp = (real*) tmp_transfer_buffer;
 
     // transfer point positions
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].pos[0];
-    err = cudaMemcpy(pts_arrays[0], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].pos[0];
+    err = cudaMemcpy(pts_arrays[0], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].pos[1];
-    err = cudaMemcpy(pts_arrays[1], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].pos[1];
+    err = cudaMemcpy(pts_arrays[1], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
     // transfer velocity
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].velocity[0];
-    err = cudaMemcpy(pts_arrays[2], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].velocity[0];
+    err = cudaMemcpy(pts_arrays[2], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].velocity[1];
-    err = cudaMemcpy(pts_arrays[3], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].velocity[1];
+    err = cudaMemcpy(pts_arrays[3], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
     // transfer Bp
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(0,0);
-    err = cudaMemcpy(pts_arrays[4], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Bp(0,0);
+    err = cudaMemcpy(pts_arrays[4], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(0,1);
-    err = cudaMemcpy(pts_arrays[5], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Bp(0,1);
+    err = cudaMemcpy(pts_arrays[5], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(1,0);
-    err = cudaMemcpy(pts_arrays[6], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Bp(1,0);
+    err = cudaMemcpy(pts_arrays[6], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Bp(1,1);
-    err = cudaMemcpy(pts_arrays[7], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Bp(1,1);
+    err = cudaMemcpy(pts_arrays[7], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
     // transfer Fe
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(0,0);
-    err = cudaMemcpy(pts_arrays[8], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Fe(0,0);
+    err = cudaMemcpy(pts_arrays[8], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(0,1);
-    err = cudaMemcpy(pts_arrays[9], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Fe(0,1);
+    err = cudaMemcpy(pts_arrays[9], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(1,0);
-    err = cudaMemcpy(pts_arrays[10], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Fe(1,0);
+    err = cudaMemcpy(pts_arrays[10], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].Fe(1,1);
-    err = cudaMemcpy(pts_arrays[11], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].Fe(1,1);
+    err = cudaMemcpy(pts_arrays[11], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
     // transfer NACC_alpha
-    for(int i=0;i<n;i++) tmp_transfer_buffer[i] = points[i].NACC_alpha_p;
-    err = cudaMemcpy(pts_arrays[12], (void*)tmp_transfer_buffer.data(), sizeof(real)*n, cudaMemcpyHostToDevice);
+    for(int i=0;i<n;i++) tmp[i] = points[i].NACC_alpha_p;
+    err = cudaMemcpy(pts_arrays[12], tmp_transfer_buffer, sizeof(real)*n, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 }
+
+
+void GPU_Implementation2::backup_point_positions(const int nPoints)
+{
+    cudaError_t err;
+    err = cudaMemcpyAsync(pts_arrays[13], pts_arrays[0], sizeof(real)*nPoints, cudaMemcpyDeviceToDevice, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("backup_point_positions");
+    err = cudaMemcpyAsync(pts_arrays[14], pts_arrays[1], sizeof(real)*nPoints, cudaMemcpyDeviceToDevice, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("backup_point_positions");
+    err = cudaMemcpyAsync(pts_arrays[15], pts_arrays[12], sizeof(real)*nPoints, cudaMemcpyDeviceToDevice, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("backup_point_positions");
+}
+
 
 void GPU_Implementation2::cuda_transfer_from_device(std::vector<icy::Point> &points)
 {
     int n = points.size();
-    tmp_transfer_buffer.resize(n);
     cudaError_t err;
 
-    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[0], sizeof(real)*n, cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-    for(int k=0;k<n;k++)points[k].pos[0] = tmp_transfer_buffer[k];
+    real* tmp2 = (real*)tmp_transfer_buffer + n;
+    real* tmp3 = (real*)tmp_transfer_buffer + n*2;
 
-    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[1], sizeof(real)*n, cudaMemcpyDeviceToHost);
+    cudaStreamWaitEvent(streamTransfer, eventCycleComplete);    // wait until streamCompute has the data ready
+    err = cudaMemcpyAsync(tmp_transfer_buffer, pts_arrays[0], sizeof(real)*n, cudaMemcpyDeviceToHost, streamTransfer);
     if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-    for(int k=0;k<n;k++)points[k].pos[1] = tmp_transfer_buffer[k];
+    err = cudaMemcpyAsync((void*) tmp2, pts_arrays[1], sizeof(real)*n, cudaMemcpyDeviceToHost, streamTransfer);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+    err = cudaMemcpyAsync((void*) tmp3, pts_arrays[12], sizeof(real)*n, cudaMemcpyDeviceToHost, streamTransfer);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
 
-    err = cudaMemcpy(tmp_transfer_buffer.data(), pts_arrays[12], sizeof(real)*n, cudaMemcpyDeviceToHost);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-    for(int k=0;k<n;k++)points[k].NACC_alpha_p = tmp_transfer_buffer[k];
 
     int error_code = 0;
-    err = cudaMemcpyFromSymbol(&error_code, gpu_error_indicator, sizeof(int));
+    err = cudaMemcpyFromSymbolAsync(&error_code, gpu_error_indicator, sizeof(int), 0, cudaMemcpyDeviceToHost, streamTransfer);
     if(err != cudaSuccess)
     {
         std::cout << "cuda_p2g cudaMemcpyFromSymbol error\n";
@@ -172,18 +184,27 @@ void GPU_Implementation2::cuda_transfer_from_device(std::vector<icy::Point> &poi
         std::cout << "point is out of bounds\n";
         throw std::runtime_error("cuda_p2g");
     }
+
 }
 
-void GPU_Implementation2::cuda_device_synchronize()
+void GPU_Implementation2::transfer_ponts_to_host_finalize(std::vector<icy::Point> &points)
 {
-    if(cudaDeviceSynchronize() != cudaSuccess) throw std::runtime_error("cuda_device_synchronize");
+    int n = points.size();
+    real* tmp1 = (real*)tmp_transfer_buffer;
+    real* tmp2 = (real*)tmp_transfer_buffer + n;
+    real* tmp3 = (real*)tmp_transfer_buffer + n*2;
+    for(int k=0;k<n;k++) points[k].pos[0] = tmp1[k];
+    for(int k=0;k<n;k++) points[k].pos[1] = tmp2[k];
+    for(int k=0;k<n;k++) points[k].NACC_alpha_p = tmp3[k];
+
 }
+
 
 void GPU_Implementation2::cuda_reset_grid(size_t nGridNodes)
 {
     for(int k=0;k<3;k++)
     {
-        cudaError_t err = cudaMemsetAsync(grid_arrays[k], 0, sizeof(real)*nGridNodes);
+        cudaError_t err = cudaMemsetAsync(grid_arrays[k], 0, sizeof(real)*nGridNodes, streamCompute);
         if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
     }
 }
@@ -195,7 +216,7 @@ void GPU_Implementation2::cuda_p2g(const int nPoints)
     cudaError_t err;
 
     int blocksPerGrid = (nPoints + threadsPerBlock - 1) / threadsPerBlock;
-    v2_kernel_p2g<<<blocksPerGrid, threadsPerBlock>>>(nPoints);
+    v2_kernel_p2g<<<blocksPerGrid, threadsPerBlock, 0, streamCompute>>>(nPoints);
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -209,7 +230,7 @@ void GPU_Implementation2::cuda_g2p(const int nPoints)
 {
     cudaError_t err;
     int blocksPerGrid = (nPoints + threadsPerBlock - 1) / threadsPerBlock;
-    v2_kernel_g2p<<<blocksPerGrid, threadsPerBlock>>>(nPoints);
+    v2_kernel_g2p<<<blocksPerGrid, threadsPerBlock, 0, streamCompute>>>(nPoints);
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -223,7 +244,7 @@ void GPU_Implementation2::cuda_update_nodes(const int nGridNodes,real indenter_x
 {
     cudaError_t err;
     int blocksPerGrid = (nGridNodes + threadsPerBlock - 1) / threadsPerBlock;
-    v2_kernel_update_nodes<<<blocksPerGrid, threadsPerBlock>>>(nGridNodes, indenter_x, indenter_y);
+    v2_kernel_update_nodes<<<blocksPerGrid, threadsPerBlock, 0, streamCompute>>>(nGridNodes, indenter_x, indenter_y);
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {

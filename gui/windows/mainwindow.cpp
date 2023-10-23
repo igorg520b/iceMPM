@@ -410,6 +410,7 @@ void MainWindow::updateGUI()
 
     if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
     worker->visual_update_requested = false;
+    model.UnlockCycleMutex();
 }
 
 void MainWindow::simulation_start_pause(bool checked)

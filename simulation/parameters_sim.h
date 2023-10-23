@@ -82,7 +82,7 @@ public:
         NACC_friction_angle = 35;
         ComputeCamClayParams();
 
-        SimulationEndTime = 15;
+        SimulationEndTime = 3;
         UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
 
         cellsize = (real)3.33/(GridX);

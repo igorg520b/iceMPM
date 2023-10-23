@@ -10,8 +10,10 @@ bool icy::Model::Step()
 {
     spdlog::info("step {} started", prms.SimulationStep);
     real simulation_time = prms.SimulationTime;
-    gpu.start_timing();
+
+
     int count_unupdated_steps = 0;
+    cudaEventRecord(gpu.eventTimingStart);
     do
     {
         indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
@@ -21,24 +23,48 @@ bool icy::Model::Step()
         gpu.cuda_g2p(points.size());
 
         count_unupdated_steps++;
+
         simulation_time += prms.InitialTimeStep;
-    } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep == 0);
+    } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
 
-    // TODO: abort procedure - need to be able to abort GPU computation while waiting on it
+    cudaEventRecord(gpu.eventTimingStop);   // we want to time the computation steps excluding data transfer
+    processing_current_cycle_data.lock();   // if locked, previous results are not yet processed by the host
+    gpu.backup_point_positions(points.size());  // make a copy of nodal positions on the device
+    cudaEventRecord(gpu.eventCycleComplete);
 
-    gpu.cuda_device_synchronize();
-    compute_time_per_cycle = gpu.end_timing()/count_unupdated_steps;
-
-    hostside_data_update_mutex.lock();
     gpu.cuda_transfer_from_device(points);
+    cudaEventRecord(gpu.eventDataCopiedToHost);
+
+//    float milliseconds = 0;
+//    cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
+//    compute_time_per_cycle = milliseconds/count_unupdated_steps;
+
     prms.SimulationTime = simulation_time;
     prms.SimulationStep += count_unupdated_steps;
-    hostside_data_update_mutex.unlock();
 
+    FinalizeDataTransfer();
 
     if(prms.SimulationTime >= prms.SimulationEndTime) return false;
     return true;
 }
+
+
+void icy::Model::FinalizeDataTransfer()
+{
+    cudaEventSynchronize(gpu.eventDataCopiedToHost);
+
+    hostside_data_update_mutex.lock();
+    gpu.transfer_ponts_to_host_finalize(points);
+    hostside_data_update_mutex.unlock();
+
+}
+
+void icy::Model::UnlockCycleMutex()
+{
+    // current data was handled by host - allow next cycle to proceed
+    processing_current_cycle_data.unlock();
+}
+
 
 void icy::Model::Reset()
 {
