@@ -43,6 +43,7 @@ void BackgroundWorker::run()
     {
         if (timeToPause)
         {
+            controller->gpu.synchronize();
             timeToPause = false;
             running = false;
             Q_EMIT workerPaused();

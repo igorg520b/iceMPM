@@ -640,5 +640,9 @@ void GPU_Implementation2::test()
         std::cout << "hello kernel executed successfully\n";
     }
     cudaDeviceSynchronize();
+}
 
+void GPU_Implementation2::synchronize()
+{
+    cudaDeviceSynchronize();
 }

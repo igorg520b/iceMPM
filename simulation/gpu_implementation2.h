@@ -35,6 +35,7 @@ public:
     std::function<void()> transfer_completion_callback;
 
     void test();
+    void synchronize(); // call before terminating the main thread
     void cuda_update_constants(const icy::SimParams &prms);
     void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
     void cuda_reset_grid(size_t nGridNodes);
@@ -42,7 +43,6 @@ public:
     void cuda_p2g(const int nPoints);
     void cuda_g2p(const int nPoints);
     void cuda_update_nodes(const int nGridNodes, real indenter_x, real indenter_y);
-    void cuda_device_synchronize();
     void backup_point_positions(const int nPoints);
 
     void cuda_transfer_from_device(std::vector<icy::Point> &points);
