@@ -112,6 +112,12 @@ else()
 endif()
 
 
+vtk_module_autoinit(
+  TARGETS MPM_GPU_shared
+  MODULES ${VTK_LIBRARIES}
+)
+
+
 # Qt GUI executable
 
 add_executable(iceMPM_GUI
@@ -131,7 +137,7 @@ add_executable(iceMPM_GUI
 )
 
 
-target_include_directories(iceMPM_GUI PRIVATE gui geometry gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
+target_include_directories(iceMPM_GUI PRIVATE gui gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)
 
 target_link_libraries(iceMPM_GUI PRIVATE Qt5::Widgets Qt5::Core)
 target_link_libraries(iceMPM_GUI PRIVATE MPM_GPU_shared)
@@ -165,3 +171,19 @@ else()
     target_compile_options(iceMPM_GUI PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
     target_link_libraries(iceMPM_GUI PRIVATE gomp)
 endif()
+
+vtk_module_autoinit(
+  TARGETS iceMPM_GUI
+  MODULES ${VTK_LIBRARIES}
+)
+
+# CLI version
+add_executable(cm
+    cli/main.cpp
+)
+target_include_directories(cm PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
+target_link_libraries(cm PRIVATE MPM_GPU_shared Eigen3::Eigen ${VTK_LIBRARIES})
+vtk_module_autoinit(
+  TARGETS cm
+  MODULES ${VTK_LIBRARIES}
+)

@@ -20,7 +20,10 @@ __device__ int gpu_error_indicator;
 
 GPU_Implementation2::GPU_Implementation2()
 {
-    cudaEventCreate(&eventTimingStart);
+    cudaError_t err;
+
+    err = cudaEventCreate(&eventTimingStart);
+    if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation2::GPU_Implementation2() cudaEventCreate");
     cudaEventCreate(&eventTimingStop);
 
     cudaEventCreate(&eventCycleComplete);
@@ -615,3 +618,27 @@ __device__ Matrix2r polar_decomp_R(const Matrix2r &val)
     return result;
 }
 
+__global__ void kernel_hello()
+{
+    printf("hello from CUDA\n");
+}
+
+
+void GPU_Implementation2::test()
+{
+    cudaError_t err;
+    kernel_hello<<<1,1,0,streamCompute>>>();
+    err = cudaGetLastError();
+
+    if(err != cudaSuccess)
+    {
+        std::cout << "cuda test error " << err << '\n';
+        throw std::runtime_error("cuda test");
+    }
+    else
+    {
+        std::cout << "hello kernel executed successfully\n";
+    }
+    cudaDeviceSynchronize();
+
+}
