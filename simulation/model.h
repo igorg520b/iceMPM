@@ -29,7 +29,7 @@ namespace icy { class Model; }
 class icy::Model
 {
 public:
-    Model();
+    Model(){prms.Reset();};
     void Reset();
     void Prepare();        // invoked once, at simulation start
     bool Step();           // either invoked by Worker or via GUI

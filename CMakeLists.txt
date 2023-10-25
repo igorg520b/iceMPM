@@ -39,6 +39,7 @@ add_compile_definitions(QT_NO_KEYWORDS)
 
 add_library(MPM_GPU_shared SHARED
     simulation/parameters_sim.h
+    simulation/parameters_sim.cpp
     simulation/model.cpp
     simulation/model.h
     simulation/point.h

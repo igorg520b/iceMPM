@@ -75,29 +75,13 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(QString b_Grid READ getGridDimensions NOTIFY propertyChanged)
     QString getGridDimensions() {return QString("%1 x %2").arg(prms->GridX).arg(prms->GridY);}
 
-
-    Q_PROPERTY(QString mem_Pts READ getMemPts NOTIFY propertyChanged)
-    QString getMemPts() {return QString("%1 MB").arg(prms->MemAllocPoints,0,'f',3);}
-
-    Q_PROPERTY(QString mem_Grid READ getMemGrid NOTIFY propertyChanged)
-    QString getMemGrid() {return QString("%1 MB").arg(prms->MemAllocGrid,0,'f',3);}
-
-    Q_PROPERTY(QString mem_Total READ getMemTotal NOTIFY propertyChanged)
-    QString getMemTotal() {return QString("%1 MB").arg(prms->MemAllocTotal,0,'f',3);}
-
     Q_PROPERTY(double nacc_beta READ getNaccBeta WRITE setNaccBeta NOTIFY propertyChanged)
     double getNaccBeta() {return prms->NACC_beta;}
     void setNaccBeta(double val) {prms->NACC_beta = val;}
 
-//    Q_PROPERTY(double nacc_beta_p0_MPa READ get_beta_p0_MPa NOTIFY propertyChanged)
-//    double get_beta_p0_MPa() {return 1.e-6*prms->NACC_beta*prms->kappa*std::sinh(prms->NACC_xi*std::max(0.,-prms->NACC_alpha));}
-
-
     Q_PROPERTY(double nacc_xi READ getNaccXi WRITE setNaccXi NOTIFY propertyChanged)
     double getNaccXi() {return prms->NACC_xi;}
     void setNaccXi(double val) {prms->NACC_xi = val;}
-
-
 
 public:
     ParamsWrapper(icy::SimParams *p)

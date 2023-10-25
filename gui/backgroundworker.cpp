@@ -5,8 +5,6 @@ BackgroundWorker::BackgroundWorker(icy::Model *controller_) : controller(control
 {
     this->start();
     controller->gpu.transfer_completion_callback = [&]() {
-        //std::cout << "callback invoked\n";
-        controller->FinalizeDataTransfer();
         Q_EMIT stepCompleted();
     };
 }

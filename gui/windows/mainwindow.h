@@ -65,13 +65,13 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void closeEvent( QCloseEvent* event ) override;
-    void showEvent( QShowEvent* event ) override;
+    //void showEvent( QShowEvent* event ) override;
 
 private Q_SLOTS:
     void quit_triggered();
 
     void background_worker_paused();
-    void updateGUI();   // when simulation is started/stopped or when a step is advanced
+    void simulation_data_ready();
 
     void simulation_start_pause(bool checked);
 
@@ -85,6 +85,7 @@ private Q_SLOTS:
     void limits_changed(double val);
 
 private:
+    void updateGUI();   // when simulation is started/stopped or when a step is advanced
     void updateActorText();
     BackgroundWorker *worker;
     icy::Model model;

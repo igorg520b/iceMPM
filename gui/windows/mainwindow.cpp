@@ -189,22 +189,16 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
 
+    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
+    connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
+
     representation.model = &model;
     offscreen.model = &model;
     representation.SynchronizeTopology();
     offscreen.SynchronizeTopology();
     pbrowser->setActiveObject(params);
     updateGUI();
-
-    connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
-    connect(worker, SIGNAL(stepCompleted()), SLOT(updateGUI()));
 }
-
-
-void MainWindow::showEvent( QShowEvent*)
-{
-}
-
 
 
 void MainWindow::closeEvent( QCloseEvent* event )
@@ -369,8 +363,8 @@ void MainWindow::limits_changed(double val)
 
 void MainWindow::screenshot_triggered()
 {
-    if(model.prms.SimulationStep % (model.prms.UpdateEveryNthStep * model.prms.SaveEveryNthUpdate)) return;
-    int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep / model.prms.SaveEveryNthUpdate;
+    if(model.prms.SimulationStep % model.prms.UpdateEveryNthStep) return;
+    int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
     QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
             QString::number(screenshot_number).rightJustified(5, '0') + ".png";
     /*
@@ -397,6 +391,14 @@ void MainWindow::screenshot_triggered()
 }
 
 
+void MainWindow::simulation_data_ready()
+{
+    model.FinalizeDataTransfer();
+    updateGUI();
+    if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
+    model.UnlockCycleMutex();
+}
+
 
 void MainWindow::updateGUI()
 {
@@ -406,13 +408,10 @@ void MainWindow::updateGUI()
     labelElapsedTime->setText(QString("%1 s").arg(model.prms.SimulationTime,0,'f',3));
     statusLabel->setText(QString("per cycle: %1 ms").arg(model.compute_time_per_cycle,0,'f',3));
 
-
     representation.SynchronizeValues();
     renderWindow->Render();
 
-    if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
     worker->visual_update_requested = false;
-    model.UnlockCycleMutex();
 }
 
 void MainWindow::simulation_start_pause(bool checked)

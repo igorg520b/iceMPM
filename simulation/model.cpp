@@ -1,21 +1,15 @@
 #include "model.h"
 #include <spdlog/spdlog.h>
 
-icy::Model::Model()
-{
-    prms.Reset();
-}
 
 bool icy::Model::Step()
 {
     spdlog::info("step {} started", prms.SimulationStep);
     real simulation_time = prms.SimulationTime;
 
-
     int count_unupdated_steps = 0;
 
-
-    cudaEventRecord(gpu.eventTimingStart);
+    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventTimingStart);
     do
     {
         indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
@@ -23,18 +17,18 @@ bool icy::Model::Step()
         gpu.cuda_p2g(points.size());
         gpu.cuda_update_nodes(grid.size(),indenter_x, indenter_y);
         gpu.cuda_g2p(points.size());
-
         count_unupdated_steps++;
-
         simulation_time += prms.InitialTimeStep;
     } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
 
-    cudaEventRecord(gpu.eventTimingStop);   // we want to time the computation steps excluding data transfer
-
-    cudaEventSynchronize(gpu.eventTimingStop);
-    float milliseconds;
-    cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
-    compute_time_per_cycle = milliseconds/prms.UpdateEveryNthStep;
+    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventTimingStop);   // we want to time the computation steps excluding data transfer
+    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) != 0)
+    {
+        float milliseconds;
+        cudaEventElapsedTime(&milliseconds, gpu.eventTimingStart, gpu.eventTimingStop);
+        compute_time_per_cycle = milliseconds/prms.UpdateEveryNthStep;
+        spdlog::info("cycle time {} ms", compute_time_per_cycle);
+    }
 
     processing_current_cycle_data.lock();   // if locked, previous results are not yet processed by the host
     gpu.backup_point_positions(points.size());  // make a copy of nodal positions on the device
@@ -46,8 +40,6 @@ bool icy::Model::Step()
     prms.SimulationTime = simulation_time;
     prms.SimulationStep += count_unupdated_steps;
 
-//    FinalizeDataTransfer();
-
     if(prms.SimulationTime >= prms.SimulationEndTime || gpu.error_code) return false;
     return true;
 }
@@ -55,12 +47,9 @@ bool icy::Model::Step()
 
 void icy::Model::FinalizeDataTransfer()
 {
-//    cudaEventSynchronize(gpu.eventDataCopiedToHost);
-
     hostside_data_update_mutex.lock();
     gpu.transfer_ponts_to_host_finalize(points);
     hostside_data_update_mutex.unlock();
-
 }
 
 void icy::Model::UnlockCycleMutex()
@@ -112,14 +101,16 @@ void icy::Model::Reset()
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
-    prms.MemAllocGrid = (real)sizeof(GridNode)*grid.size()/(1024*1024);
-    prms.MemAllocPoints = (real)sizeof(Point)*points.size()/(1024*1024);
-    prms.MemAllocTotal = prms.MemAllocGrid + prms.MemAllocPoints;
-    spdlog::info("icy::Model::Reset(); grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
-                 prms.MemAllocGrid, prms.MemAllocPoints, prms.MemAllocTotal);
+    double MemAllocGrid = (double)sizeof(real)*gpu.nGridArrays*grid.size()/(1024*1024);
+    double MemAllocPoints = (double)sizeof(real)*gpu.nPtsArrays*points.size()/(1024*1024);
+    double MemAllocTotal = MemAllocGrid + MemAllocPoints;
+    spdlog::info("memory use: grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
+                 MemAllocGrid, MemAllocPoints, MemAllocTotal);
 
     gpu.cuda_allocate_arrays(grid.size(), points.size());
     gpu.transfer_ponts_to_device(points);
+
+    Prepare();
     spdlog::info("icy::Model::Reset() done");
 }
 
@@ -130,11 +121,4 @@ void icy::Model::Prepare()
     gpu.error_code = 0;
     abortRequested = false;
 }
-
-
-
-
-
-
-
 

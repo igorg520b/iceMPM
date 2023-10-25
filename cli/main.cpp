@@ -21,27 +21,37 @@ icy::VTKOffscreen offscreen;
 
 void simulation_loop()
 {
-    bool result;
-    do
-    {
-        result = model.Step();
-    } while(!stop && result);
+
 }
 
 
-int main()
+int main(int argc, char** argv)
 {
+    // parse options
+    cxxopts::Options options("Ice MPM", "CLI version of MPM simulation");
+
+    options.add_options()
+        ("f,file", "Configuration file", cxxopts::value<std::string>())
+        ;
+
+    auto option_parse_result = options.parse(argc, argv);
+
+    if (option_parse_result.count("file"))
+    {
+        std::string params_file = option_parse_result["file"].as<std::string>();
+        model.prms.ParseFile(params_file, screenshot_directory);
+    }
+
+    // initialize the model
     model.Reset();
-    model.Prepare();
     offscreen.model = &model;
     offscreen.SynchronizeTopology();
 
+    // what to do once the data is available
     model.gpu.transfer_completion_callback = [&](){
-        if(model.prms.SimulationStep % (model.prms.UpdateEveryNthStep * model.prms.SaveEveryNthUpdate)) return;
-
         if(screenshot_thread.joinable()) screenshot_thread.join();
         screenshot_thread = std::thread([&](){
-        int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep / model.prms.SaveEveryNthUpdate;
+        int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
         std::string outputPath = screenshot_directory + "/" + std::to_string(screenshot_number) + ".png";
         std::cout << "screenshot " << outputPath << "\n";
         model.UnlockCycleMutex();
@@ -58,9 +68,15 @@ int main()
     std::filesystem::path outputFolder(screenshot_directory);
     std::filesystem::create_directory(outputFolder);
 
-    std::thread t(simulation_loop);
+    std::thread t([&](){
+        bool result;
+        do
+        {
+            result = model.Step();
+        } while(!stop && result);
+    });
 
-    char c = 0;
+/*    char c = 0;
     do
     {
         cin.get(c);
@@ -69,6 +85,7 @@ int main()
 
     stop = true;
     std::cout << "terminating...\n";
+*/
     t.join();
     model.gpu.synchronize();
     screenshot_thread.join();

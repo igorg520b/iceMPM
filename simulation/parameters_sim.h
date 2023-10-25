@@ -2,7 +2,15 @@
 #define P_SIM_H
 
 #include <iostream>
+#include <string>
+#include <filesystem>
+#include <fstream>
+
 #include <Eigen/Core>
+#include "rapidjson/reader.h"
+#include "rapidjson/document.h"
+#include <rapidjson/stringbuffer.h>
+#include <rapidjson/writer.h>
 
 typedef double real;
 typedef Eigen::Vector2<real> Vector2r;
@@ -17,7 +25,6 @@ struct icy::SimParams
 public:
     constexpr static double pi = 3.14159265358979323846;
 
-
     real InitialTimeStep, SimulationEndTime;
     real Gravity, Density, PoissonsRatio, YoungsModulus;
     real lambda, mu; // Lame
@@ -31,8 +38,7 @@ public:
     int GridX, GridY;
     real cellsize, cellsize_inv, Dp_inv;
 
-    int UpdateEveryNthStep; // run N
-    int SaveEveryNthUpdate; // taking screenshot is slow - this controls the frequency of screenshots
+    int UpdateEveryNthStep; // run N steps without update
 
     real IndDiameter, IndRSq, IndVelocity, IndDepth;
     int PointsWanted, PointCountActual;
@@ -42,83 +48,12 @@ public:
 
     int SimulationStep;
     real SimulationTime;
-    real MemAllocGrid, MemAllocPoints, MemAllocTotal;
 
-    void Reset()
-    {
-#define PARAMS2
-#ifdef PARAMS2
-        InitialTimeStep = 8.e-6;
-        YoungsModulus = 5.e8;
-        NACC_beta = 0.7;
-        NACC_xi = 1.5;
-        NACC_alpha = std::log(1.-1.e-5);
-        PointsWanted = 1'000'000;
-        GridX = 512;
-        GridY = 220;
-        ParticleViewSize = 1.0f;
-#else
-        InitialTimeStep = 3.e-5;
-        YoungsModulus = 5.e8;
-        NACC_beta = 0.8;
-        NACC_xi = 2;
-        NACC_alpha = std::log(1. - 5.e-5);
-        PointsWanted = 35'000;
-        GridX = 128;
-        GridY = 55;
-        ParticleViewSize = 2.5f;
-#endif
+    void Reset();
+    void ParseFile(std::string fileName, std::string &outputDirectory);
 
-        NACC_friction_angle = 35;
-        ComputeCamClayParams();
-
-        SimulationEndTime = 12;
-        UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
-        SaveEveryNthUpdate = 1;
-
-        cellsize = (real)3.33/(GridX);
-        cellsize_inv = 1./cellsize;
-        Dp_inv = 4./(cellsize*cellsize);
-
-        PoissonsRatio = 0.3;
-        ComputeLame();
-        Gravity = 9.81;
-        Density = 980;
-        IceFrictionCoefficient = 0;//0.03;
-
-        IndDiameter = 0.324;
-        IndRSq = IndDiameter*IndDiameter/4.;
-        IndVelocity = 0.2;
-        IndDepth = 0.101;
-
-        BlockHeight = 1.0;
-        BlockLength = 2.5;
-
-        XiSnow = 10.;
-        THT_C_snow = 2.0e-2;				// Critical compression
-        THT_S_snow = 6.0e-3;				// Critical stretch
-
-        SimulationStep = 0;
-        SimulationTime = 0;
-        MemAllocGrid = MemAllocPoints = MemAllocTotal = 0;
-    }
-
-    void ComputeLame()
-    {
-        lambda = YoungsModulus*PoissonsRatio/((1+PoissonsRatio)*(1-2*PoissonsRatio));
-        mu = YoungsModulus/(2*(1+PoissonsRatio));
-        kappa = mu*2./3. + lambda;
-    }
-
-    void ComputeCamClayParams()
-    {
-        constexpr int dim = 2;
-        real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
-        real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
-        real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
-        std::cout << "SimParams: NACC M is " << NACC_M << '\n';
-        NACC_M_sq = NACC_M*NACC_M;
-    }
+    void ComputeLame();
+    void ComputeCamClayParams();
 };
 
 #endif
