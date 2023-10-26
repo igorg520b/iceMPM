@@ -25,7 +25,7 @@
 
 #include <vtkSphereSource.h>
 
-
+#include <vtkPolyDataWriter.h>
 
 #include <string>
 
@@ -37,6 +37,7 @@ public:
     VTKOffscreen();
     void SetupCamera();
     void SaveScreenshot(std::string fileName);
+    void SaveVTK(std::string fileName);
 
     void SynchronizeTopology();
     void SynchronizeValues();
@@ -79,7 +80,8 @@ private:
     vtkNew<vtkPolyDataMapper> sphereMapper;
     vtkNew<vtkActor> sphereActor;
 
-
+// write file
+    vtkNew<vtkPolyDataWriter> pdwriter;
 
     static constexpr float lutArrayMPMColors[101][3] =
     {{0.25098, 0.556863, 0.756863}, {0.245961, 0.547294,

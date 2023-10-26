@@ -9,7 +9,7 @@ set(CMAKE_AUTOUIC ON)
 set(CMAKE_AUTOMOC ON)
 set(CMAKE_AUTORCC ON)
 
-
+option(GUI_VERSION_BUILD "Build the Qt version" ON)
 
 find_package(VTK 9.1 HINTS "C:\\libraries\\vtk-build\\lib\\cmake\\vtk-9.1" REQUIRED COMPONENTS
   CommonColor
@@ -22,12 +22,11 @@ find_package(VTK 9.1 HINTS "C:\\libraries\\vtk-build\\lib\\cmake\\vtk-9.1" REQUI
   RenderingFreeType
   RenderingGL2PSOpenGL2
   RenderingOpenGL2
-  ViewsQt
   IOGeometry
   RenderingAnnotation
   RenderingLabel
   IOImage
-  QUIET
+  ViewsQt
 )
 
 find_package(Qt5 COMPONENTS Widgets REQUIRED)
@@ -54,6 +53,8 @@ add_library(MPM_GPU_shared SHARED
 
     simulation/vtkoffscreen.h
     simulation/vtkoffscreen.cpp
+    simulation/snapshotwriter.h
+    simulation/snapshotwriter.cpp
 
     simulation/unused_code.cpp
 )
@@ -94,9 +95,6 @@ set_target_properties(MPM_GPU_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CU
 set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
 find_package(CUDA REQUIRED)
 include_directories(${CUDA_INCLUDE_DIRS})
-# --device-c
-# -use_fast_maths
-#  -arch=compute_75 -code=sm_75
 
 # HDF5
 if(WIN32)
@@ -112,15 +110,27 @@ else()
     target_include_directories(MPM_GPU_shared PRIVATE ${HDF5_INCLUDE_DIRS})
 endif()
 
-
 vtk_module_autoinit(
   TARGETS MPM_GPU_shared
   MODULES ${VTK_LIBRARIES}
 )
 
 
-# Qt GUI executable
+# CLI version
+add_executable(cm
+    cli/main.cpp
+)
+target_include_directories(cm PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
+target_link_libraries(cm PRIVATE MPM_GPU_shared Eigen3::Eigen ${VTK_LIBRARIES})
+vtk_module_autoinit(
+  TARGETS cm
+  MODULES ${VTK_LIBRARIES}
+)
 
+
+
+# Qt GUI executable
+if(GUI_VERSION_BUILD)
 add_executable(iceMPM_GUI
     gui/main.cpp
 
@@ -178,13 +188,5 @@ vtk_module_autoinit(
   MODULES ${VTK_LIBRARIES}
 )
 
-# CLI version
-add_executable(cm
-    cli/main.cpp
-)
-target_include_directories(cm PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
-target_link_libraries(cm PRIVATE MPM_GPU_shared Eigen3::Eigen ${VTK_LIBRARIES})
-vtk_module_autoinit(
-  TARGETS cm
-  MODULES ${VTK_LIBRARIES}
-)
+endif()
+

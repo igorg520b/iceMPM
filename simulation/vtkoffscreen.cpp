@@ -110,6 +110,15 @@ void icy::VTKOffscreen::SaveScreenshot(std::string fileName)
     writer->Write();
 }
 
+void icy::VTKOffscreen::SaveVTK(std::string fileName)
+{
+    pdwriter->SetFileName(fileName.c_str());
+    pdwriter->SetInputData(points_polydata);
+    pdwriter->SetFileTypeToBinary();
+    pdwriter->Write();
+}
+
+
 
 void icy::VTKOffscreen::SynchronizeTopology()
 {

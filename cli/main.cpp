@@ -31,8 +31,9 @@ int main(int argc, char** argv)
     cxxopts::Options options("Ice MPM", "CLI version of MPM simulation");
 
     options.add_options()
-        ("f,file", "Configuration file", cxxopts::value<std::string>())
+        ("file", "Configuration file", cxxopts::value<std::string>())
         ;
+    options.parse_positional({"file"});
 
     auto option_parse_result = options.parse(argc, argv);
 
@@ -53,13 +54,17 @@ int main(int argc, char** argv)
         screenshot_thread = std::thread([&](){
         int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
         std::string outputPath = screenshot_directory + "/" + std::to_string(screenshot_number) + ".png";
-        std::cout << "screenshot " << outputPath << "\n";
+        std::cout << "saving " << screenshot_number << "\n";
         model.UnlockCycleMutex();
         if(stop) { std::cout << "screenshot aborted\n"; return; }
         model.FinalizeDataTransfer();
         offscreen.SynchronizeValues();
-        offscreen.SaveScreenshot(outputPath);
-        std::cout << "screenshot done\n";
+        //offscreen.SaveScreenshot(outputPath);
+
+        std::string outputPathVTK = screenshot_directory + "/" + std::to_string(screenshot_number) + ".vtk";
+        offscreen.SaveVTK(outputPathVTK);
+
+        std::cout << "file export done\n";
         }
         );
     };
