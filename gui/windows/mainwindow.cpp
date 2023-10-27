@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
     params = new ParamsWrapper(&model.prms);
     model.Reset();
     worker = new BackgroundWorker(&model);
+    snapshot.model = &model;
 
     // VTK
     qt_vtk_widget = new QVTKOpenGLNativeWidget();
@@ -382,7 +383,10 @@ void MainWindow::screenshot_triggered()
     writerPNG->Write();
     renderWindow->DoubleBufferOn();
 
-
+    //
+    QString outputPathSnapshot = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
+                         QString::number(screenshot_number).rightJustified(5, '0') + ".h5";
+    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
 }
 
 

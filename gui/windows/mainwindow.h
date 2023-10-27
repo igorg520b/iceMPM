@@ -45,6 +45,7 @@
 #include "model.h"
 #include "parameters_wrapper.h"
 #include "backgroundworker.h"
+#include "snapshotwriter.h"
 
 #include <fstream>
 #include <iomanip>
@@ -89,6 +90,7 @@ private:
     BackgroundWorker *worker;
     icy::Model model;
     icy::VisualRepresentation representation;
+    icy::SnapshotWriter snapshot;
     ParamsWrapper *params;
 
     QString settingsFileName;       // includes current dir

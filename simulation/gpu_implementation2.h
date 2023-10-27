@@ -50,12 +50,12 @@ public:
 
     cudaEvent_t eventTimingStart, eventTimingStop, eventCycleComplete, eventDataCopiedToHost;
 
+    void *tmp_transfer_buffer = nullptr; // nPoints*sizeof(real)
 private:
     constexpr static int threadsPerBlock = 512;
     real *grid_arrays[nGridArrays], *pts_arrays[nPtsArrays];
 
     cudaStream_t streamCompute, streamTransfer;
-    void *tmp_transfer_buffer = nullptr; // nPoints*sizeof(real)
 
     static void CUDART_CB callback_transfer_from_device_completion(cudaStream_t stream, cudaError_t status, void *userData);
 };
