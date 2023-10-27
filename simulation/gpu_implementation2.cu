@@ -178,7 +178,7 @@ void GPU_Implementation2::cuda_transfer_from_device(std::vector<icy::Point> &poi
     if(err != cudaSuccess)
     {
         std::cout << "cuda_p2g cudaMemcpyFromSymbol error\n";
-        throw std::runtime_error("cuda_p2g");
+        throw std::runtime_error("cuda_transfer_from_device");
     }
 
     void* userData = reinterpret_cast<void*>(this);
@@ -393,6 +393,12 @@ __global__ void v2_kernel_update_nodes(const int nGridNodes, real indenter_x, re
     if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
     else if(idx_x >= gridX-5) gn.velocity[0] = 0;
 
+    if(gn.velocity.norm() > gprms.cellsize/gprms.InitialTimeStep)
+    {
+        gn.velocity.normalize();
+        gn.velocity *= gprms.cellsize/gprms.InitialTimeStep;
+    }
+
     // write the updated grid velocity back to memory
     device_grid_arrays[1][idx] = gn.velocity[0];
     device_grid_arrays[2][idx] = gn.velocity[1];
@@ -443,14 +449,10 @@ __global__ void v2_kernel_g2p(const int nPoints)
             real weight = w[i][0]*w[j][1];
 
             int idx_gridnode = i+i0 + (j+j0)*gridX;
-            icy::GridNode node;
-            node.mass = device_grid_arrays[0][idx_gridnode];
-            node.velocity[0] = device_grid_arrays[1][idx_gridnode];
-            node.velocity[1] = device_grid_arrays[2][idx_gridnode];
-
-            const Vector2r &grid_v = node.velocity;
-            p.velocity += weight * grid_v;
-            p.Bp += (4.*h_inv)*weight *(grid_v*dpos.transpose());
+            Vector2r node_velocity;
+            node_velocity << device_grid_arrays[1][idx_gridnode], device_grid_arrays[2][idx_gridnode];
+            p.velocity += weight * node_velocity;
+            p.Bp += (4.*h_inv)*weight *(node_velocity*dpos.transpose());
         }
 
     // Advection
@@ -533,7 +535,7 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p)
     svd2x2(FeTr, U, Sigma, V);
 
     // line 4
-    real p0 = kappa * (magic_epsilon + sinh(xi * fmaxf(-alpha, 0.)));
+    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
 
     // line 5
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D

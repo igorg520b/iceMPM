@@ -9,7 +9,6 @@
 #include <cxxopts.hpp>
 
 #include "model.h"
-#include "vtkoffscreen.h"
 
 
 std::atomic<bool> stop = false;
@@ -17,7 +16,6 @@ std::string screenshot_directory = "cm_screenshots";
 std::thread screenshot_thread;
 
 icy::Model model;
-icy::VTKOffscreen offscreen;
 
 void simulation_loop()
 {
@@ -45,8 +43,8 @@ int main(int argc, char** argv)
 
     // initialize the model
     model.Reset();
-    offscreen.model = &model;
-    offscreen.SynchronizeTopology();
+//    offscreen.model = &model;
+//    offscreen.SynchronizeTopology();
 
     // what to do once the data is available
     model.gpu.transfer_completion_callback = [&](){
@@ -58,11 +56,11 @@ int main(int argc, char** argv)
         model.UnlockCycleMutex();
         if(stop) { std::cout << "screenshot aborted\n"; return; }
         model.FinalizeDataTransfer();
-        offscreen.SynchronizeValues();
+//        offscreen.SynchronizeValues();
         //offscreen.SaveScreenshot(outputPath);
 
         std::string outputPathVTK = screenshot_directory + "/" + std::to_string(screenshot_number) + ".vtk";
-        offscreen.SaveVTK(outputPathVTK);
+  //      offscreen.SaveVTK(outputPathVTK);
 
         std::cout << "file export done\n";
         }
@@ -81,16 +79,6 @@ int main(int argc, char** argv)
         } while(!stop && result);
     });
 
-/*    char c = 0;
-    do
-    {
-        cin.get(c);
-        std::cout << "read character " << c << '\n';
-    }while(c!= 25 && c!= 'x');
-
-    stop = true;
-    std::cout << "terminating...\n";
-*/
     t.join();
     model.gpu.synchronize();
     screenshot_thread.join();

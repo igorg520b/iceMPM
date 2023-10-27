@@ -11,27 +11,10 @@ set(CMAKE_AUTORCC ON)
 
 option(GUI_VERSION_BUILD "Build the Qt version" ON)
 
-find_package(VTK 9.1 HINTS "C:\\libraries\\vtk-build\\lib\\cmake\\vtk-9.1" REQUIRED COMPONENTS
-  CommonColor
-  CommonCore
-  FiltersSources
-  FiltersGeometry
-  InteractionStyle
-  RenderingContextOpenGL2
-  RenderingCore
-  RenderingFreeType
-  RenderingGL2PSOpenGL2
-  RenderingOpenGL2
-  IOGeometry
-  RenderingAnnotation
-  RenderingLabel
-  IOImage
-  ViewsQt
-)
+if(GUI_VERSION_BUILD)
+endif()
 
-find_package(Qt5 COMPONENTS Widgets REQUIRED)
 
-add_compile_definitions(QT_NO_KEYWORDS)
 
 
 # Functions that implement the model, but not IO
@@ -51,8 +34,8 @@ add_library(MPM_GPU_shared SHARED
     simulation/gpu_implementation2.h
     simulation/gpu_implementation2.cu
 
-    simulation/vtkoffscreen.h
-    simulation/vtkoffscreen.cpp
+#    simulation/vtkoffscreen.h
+#    simulation/vtkoffscreen.cpp
     simulation/snapshotwriter.h
     simulation/snapshotwriter.cpp
 
@@ -69,9 +52,6 @@ target_include_directories(MPM_GPU_shared PRIVATE simulation libraries/thinks/po
 #    target_compile_options(NACC_cpu PRIVATE -fopenmp -Wno-stringop-overflow -Wno-invalid-offsetof)
 #    target_link_libraries(NACC_cpu PRIVATE gomp)
 #endif()
-
-# VTK
-target_link_libraries(MPM_GPU_shared PRIVATE ${VTK_LIBRARIES})
 
 # spdlog
 if (WIN32)
@@ -92,9 +72,9 @@ set_target_properties(MPM_GPU_shared PROPERTIES CUDA_ARCHITECTURES "75")
 set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.3")
 
 set_target_properties(MPM_GPU_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
-set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
-find_package(CUDA REQUIRED)
-include_directories(${CUDA_INCLUDE_DIRS})
+# set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
+#find_package(CUDA REQUIRED)
+include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
 # HDF5
 if(WIN32)
@@ -110,27 +90,40 @@ else()
     target_include_directories(MPM_GPU_shared PRIVATE ${HDF5_INCLUDE_DIRS})
 endif()
 
-vtk_module_autoinit(
-  TARGETS MPM_GPU_shared
-  MODULES ${VTK_LIBRARIES}
-)
-
 
 # CLI version
 add_executable(cm
     cli/main.cpp
 )
 target_include_directories(cm PRIVATE simulation libraries/thinks/poisson_disk_sampling/)
-target_link_libraries(cm PRIVATE MPM_GPU_shared Eigen3::Eigen ${VTK_LIBRARIES})
-vtk_module_autoinit(
-  TARGETS cm
-  MODULES ${VTK_LIBRARIES}
-)
+target_link_libraries(cm PRIVATE MPM_GPU_shared Eigen3::Eigen)
 
 
 
 # Qt GUI executable
 if(GUI_VERSION_BUILD)
+    find_package(VTK 9.1 HINTS "C:\\libraries\\vtk-build\\lib\\cmake\\vtk-9.1" REQUIRED COMPONENTS
+      CommonColor
+      CommonCore
+      FiltersSources
+      FiltersGeometry
+      InteractionStyle
+      RenderingContextOpenGL2
+      RenderingCore
+      RenderingFreeType
+      RenderingGL2PSOpenGL2
+      RenderingOpenGL2
+      IOGeometry
+      RenderingAnnotation
+      RenderingLabel
+      IOImage
+      ViewsQt
+    )
+    find_package(Qt5 COMPONENTS Widgets REQUIRED)
+    add_compile_definitions(QT_NO_KEYWORDS)
+
+
+
 add_executable(iceMPM_GUI
     gui/main.cpp
 

@@ -193,9 +193,8 @@ MainWindow::MainWindow(QWidget *parent)
     connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
 
     representation.model = &model;
-    offscreen.model = &model;
     representation.SynchronizeTopology();
-    offscreen.SynchronizeTopology();
+
     pbrowser->setActiveObject(params);
     updateGUI();
 }
@@ -367,7 +366,7 @@ void MainWindow::screenshot_triggered()
     int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
     QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
             QString::number(screenshot_number).rightJustified(5, '0') + ".png";
-    /*
+
 
     renderWindow->DoubleBufferOff();
     renderWindow->Render();
@@ -382,12 +381,8 @@ void MainWindow::screenshot_triggered()
     writerPNG->SetFileName(outputPath.toUtf8().constData());
     writerPNG->Write();
     renderWindow->DoubleBufferOn();
-*/
 
-    offscreen.SynchronizeValues();
-    outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/_" +
-            QString::number(screenshot_number).rightJustified(5, '0') + ".png";
-    offscreen.SaveScreenshot(outputPath.toStdString());
+
 }
 
 

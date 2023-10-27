@@ -36,12 +36,25 @@ void icy::SimParams::Reset()
     YoungsModulus = 5.e8;
     NACC_beta = 0.7;
     NACC_xi = 1.5;
+    NACC_alpha = std::log(1. - 5.e-3);
+    PointsWanted = 50'000;
+    GridX = 128;
+    GridY = 55;
+    ParticleViewSize = 2.5f;
+#endif
+
+    /*
+    InitialTimeStep = 3.e-5;
+    YoungsModulus = 5.e8;
+    NACC_beta = 0.7;
+    NACC_xi = 1.5;
     NACC_alpha = std::log(1. - 5.e-5);
     PointsWanted = 35'000;
     GridX = 128;
     GridY = 55;
     ParticleViewSize = 2.5f;
-#endif
+
+*/
 
     NACC_friction_angle = 35;
     ComputeCamClayParams();
