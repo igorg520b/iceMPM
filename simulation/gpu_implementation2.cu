@@ -72,11 +72,17 @@ void GPU_Implementation2::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
         if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     }
 
-    err = cudaMemcpyToSymbol(device_grid_arrays, grid_arrays, sizeof(void*)*nGridArrays);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol device_grid_arrays");
-
     err = cudaMemcpyToSymbol(device_pts_arrays, pts_arrays, sizeof(void*)*nPtsArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays memcpytosymbol device_pts_arrays");
+
+    err = cudaMemcpyToSymbol(device_grid_arrays, grid_arrays, sizeof(void*)*nGridArrays);
+    if(err != cudaSuccess)
+    {
+        std::cout << "nGridNodes " << nGridNodes << std::endl;
+        std::cout << "error code " << err << std::endl;
+        throw std::runtime_error("cuda_allocate_arrays memcpytosymbol device_grid_arrays");
+    }
+
 
     std::cout << "cuda_allocate_arrays done\n";
 }

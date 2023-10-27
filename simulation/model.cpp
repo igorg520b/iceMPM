@@ -13,9 +13,9 @@ bool icy::Model::Step()
     do
     {
         indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
-        gpu.cuda_reset_grid(grid.size());
+        gpu.cuda_reset_grid(prms.GridSize);
         gpu.cuda_p2g(points.size());
-        gpu.cuda_update_nodes(grid.size(),indenter_x, indenter_y);
+        gpu.cuda_update_nodes(prms.GridSize,indenter_x, indenter_y);
         gpu.cuda_g2p(points.size());
         count_unupdated_steps++;
         simulation_time += prms.InitialTimeStep;
@@ -97,17 +97,16 @@ void icy::Model::Reset()
         p.Bp.setZero();
         p.NACC_alpha_p = prms.NACC_alpha;
     }
-    grid.resize(prms.GridX*prms.GridY);
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
-    double MemAllocGrid = (double)sizeof(real)*gpu.nGridArrays*grid.size()/(1024*1024);
+    double MemAllocGrid = (double)sizeof(real)*gpu.nGridArrays*prms.GridSize/(1024*1024);
     double MemAllocPoints = (double)sizeof(real)*gpu.nPtsArrays*points.size()/(1024*1024);
     double MemAllocTotal = MemAllocGrid + MemAllocPoints;
     spdlog::info("memory use: grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  MemAllocGrid, MemAllocPoints, MemAllocTotal);
 
-    gpu.cuda_allocate_arrays(grid.size(), points.size());
+    gpu.cuda_allocate_arrays(prms.GridSize, points.size());
     gpu.transfer_ponts_to_device(points);
 
     Prepare();

@@ -2,7 +2,6 @@
 #define SNAPSHOTWRITER_H
 
 #include <string>
-#include <H5Cpp.h>
 
 
 namespace icy {class SnapshotWriter; class Model;}

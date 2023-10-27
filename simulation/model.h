@@ -44,7 +44,6 @@ public:
     real indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
-    std::vector<GridNode> grid;
 
     std::mutex hostside_data_update_mutex; // locks "points" and "grid" vectors
     std::mutex processing_current_cycle_data; // locked until the current cycle results' are copied to host and processed

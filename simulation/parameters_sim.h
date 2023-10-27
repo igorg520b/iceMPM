@@ -35,7 +35,7 @@ public:
     real NACC_xi, NACC_alpha, NACC_beta, NACC_M_sq;
     real NACC_friction_angle;
 
-    int GridX, GridY;
+    int GridX, GridY, GridSize;
     real cellsize, cellsize_inv, Dp_inv;
 
     int UpdateEveryNthStep; // run N steps without update

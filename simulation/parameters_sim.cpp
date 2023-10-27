@@ -56,6 +56,7 @@ void icy::SimParams::Reset()
 
 */
 
+    GridSize = GridX*GridY;
     NACC_friction_angle = 35;
     ComputeCamClayParams();
 
@@ -137,5 +138,6 @@ void icy::SimParams::ParseFile(std::string fileName, std::string &outputDirector
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;
 
+    GridSize = GridX*GridY;
     std::cout << "loaded parameters file " << fileName << '\n';
 }

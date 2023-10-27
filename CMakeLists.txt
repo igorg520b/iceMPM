@@ -15,8 +15,6 @@ if(GUI_VERSION_BUILD)
 endif()
 
 
-
-
 # Functions that implement the model, but not IO
 
 add_library(MPM_GPU_shared SHARED
@@ -68,8 +66,8 @@ find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
 target_link_libraries(MPM_GPU_shared PRIVATE Eigen3::Eigen)
 
 #CUDA
-set_target_properties(MPM_GPU_shared PROPERTIES CUDA_ARCHITECTURES "75")
-set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda-12.3")
+set_target_properties(MPM_GPU_shared PROPERTIES CUDA_ARCHITECTURES "61")
+set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
 
 set_target_properties(MPM_GPU_shared PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 # set(CMAKE_CUDA_FLAGS "${CMAKE_CUDA_FLAGS} -Xcudafe --diag_suppress=esa_on_defaulted_function_ignored -use_fast_maths")
