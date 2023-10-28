@@ -4,19 +4,19 @@
 
 bool icy::Model::Step()
 {
-    spdlog::info("step {} started", prms.SimulationStep);
     real simulation_time = prms.SimulationTime;
+    std::cout << '\n';
+    spdlog::info("step {} ({}) started; sim_time {}", prms.SimulationStep, prms.SimulationStep/prms.UpdateEveryNthStep, simulation_time);
 
     int count_unupdated_steps = 0;
-
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventTimingStart);
     do
     {
         indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
-        gpu.cuda_reset_grid(prms.GridSize);
-        gpu.cuda_p2g(points.size());
-        gpu.cuda_update_nodes(prms.GridSize,indenter_x, indenter_y);
-        gpu.cuda_g2p(points.size());
+        gpu.cuda_reset_grid();
+        gpu.cuda_p2g();
+        gpu.cuda_update_nodes(indenter_x, indenter_y);
+        gpu.cuda_g2p();
         count_unupdated_steps++;
         simulation_time += prms.InitialTimeStep;
     } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
@@ -31,14 +31,13 @@ bool icy::Model::Step()
     }
 
     processing_current_cycle_data.lock();   // if locked, previous results are not yet processed by the host
-    gpu.backup_point_positions(points.size());  // make a copy of nodal positions on the device
-    cudaEventRecord(gpu.eventCycleComplete);
-
-    gpu.cuda_transfer_from_device(points);
-    cudaEventRecord(gpu.eventDataCopiedToHost);
-
     prms.SimulationTime = simulation_time;
     prms.SimulationStep += count_unupdated_steps;
+    gpu.backup_point_positions();  // make a copy of nodal positions on the device
+    cudaEventRecord(gpu.eventCycleComplete);
+
+    gpu.cuda_transfer_from_device();
+    cudaEventRecord(gpu.eventDataCopiedToHost);
 
     if(prms.SimulationTime >= prms.SimulationEndTime || gpu.error_code) return false;
     return true;
@@ -63,6 +62,7 @@ void icy::Model::Reset()
 {
     // this should be called after prms are set as desired (either via GUI or CLI)
     spdlog::info("icy::Model::Reset()");
+    gpu.initialize();
 
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
@@ -100,24 +100,23 @@ void icy::Model::Reset()
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
-    double MemAllocGrid = (double)sizeof(real)*gpu.nGridArrays*prms.GridSize/(1024*1024);
-    double MemAllocPoints = (double)sizeof(real)*gpu.nPtsArrays*points.size()/(1024*1024);
+    double MemAllocGrid = (double)sizeof(real)*icy::SimParams::nGridArrays*prms.GridSize/(1024*1024);
+    double MemAllocPoints = (double)sizeof(real)*icy::SimParams::nPtsArrays*points.size()/(1024*1024);
     double MemAllocTotal = MemAllocGrid + MemAllocPoints;
     spdlog::info("memory use: grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  MemAllocGrid, MemAllocPoints, MemAllocTotal);
 
-    gpu.cuda_allocate_arrays(prms.GridSize, points.size());
-    gpu.transfer_ponts_to_device(points);
-
+    gpu.cuda_allocate_arrays();
     Prepare();
+    gpu.transfer_ponts_to_device(points);
     spdlog::info("icy::Model::Reset() done");
 }
 
 void icy::Model::Prepare()
 {
     spdlog::info("icy::Model::Prepare()");
-    gpu.cuda_update_constants(prms);
     gpu.error_code = 0;
     abortRequested = false;
+    gpu.cuda_update_constants();
 }
 

@@ -24,6 +24,10 @@ struct icy::SimParams
 {
 public:
     constexpr static double pi = 3.14159265358979323846;
+    constexpr static int nGridArrays = 3, nPtsArrays = 16;
+
+    real *grid_arrays[nGridArrays];      // pointers to gpu-allocated arrays for simulation
+    real *pts_arrays[nPtsArrays];
 
     real InitialTimeStep, SimulationEndTime;
     real Gravity, Density, PoissonsRatio, YoungsModulus;

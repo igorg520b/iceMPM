@@ -4,25 +4,32 @@
 #include <QCommandLineParser>
 #include <iostream>
 
-#include "point.h"
-#include "gridnode.h"
-
-#include <omp.h>
-
 
 int main(int argc, char *argv[])
 {
-    std::cout << "num threads " << omp_get_max_threads() << '\n';
-#pragma omp parallel
-    { std::cout << "thread " <<  omp_get_thread_num() << '\n'; }
-    std::cout << std::endl;
-
-
     QApplication a(argc, argv);
     QApplication::setApplicationName("iceMPM");
-    QApplication::setApplicationVersion("1.0");
+    QApplication::setApplicationVersion("1.1");
 
+    QCommandLineParser parser;
+    parser.setApplicationDescription("MPM simulation of ice with GUI");
+    parser.addHelpOption();
+    parser.addVersionOption();
+    parser.addPositionalArgument("parameters", QCoreApplication::translate("main", "JSON parameter file"));
+
+    parser.process(a);
+
+    const QStringList args = parser.positionalArguments();
     MainWindow w;
+    /*
+    if(args.size() == 1)
+    {
+        QString parameters_file = args[0];
+        std::string dummy;
+        w.model.prms.ParseFile(parameters_file.toStdString(), dummy);
+    }
+    */
+
     w.resize(1400,900);
 //    w.show();
     w.showMaximized();

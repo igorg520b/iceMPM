@@ -66,6 +66,7 @@ public:
     ~MainWindow();
     void closeEvent( QCloseEvent* event ) override;
     //void showEvent( QShowEvent* event ) override;
+    icy::Model model;
 
 private Q_SLOTS:
     void quit_triggered();
@@ -88,7 +89,6 @@ private:
     void updateGUI();   // when simulation is started/stopped or when a step is advanced
     void updateActorText();
     BackgroundWorker *worker;
-    icy::Model model;
     icy::VisualRepresentation representation;
     icy::SnapshotWriter snapshot;
     ParamsWrapper *params;

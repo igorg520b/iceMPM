@@ -5,7 +5,7 @@
 "NACC_beta":0.7,
 "NACC_xi":1.5,
 "NACC_alpha_exp": 0.99995,
-"PointsWanted":35000,
+"PointsWanted":55000,
 "GridX":128,
 "GridY":55,
 "ParticleViewSize":2.5,

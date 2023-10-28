@@ -7,20 +7,17 @@
 #include <chrono>
 
 #include <cxxopts.hpp>
+#include <spdlog/spdlog.h>
 
 #include "model.h"
-
+#include "snapshotwriter.h"
 
 std::atomic<bool> stop = false;
-std::string screenshot_directory = "cm_screenshots";
-std::thread screenshot_thread;
+std::string snapshot_directory = "cm_snapshots";
+std::thread snapshot_thread;
 
 icy::Model model;
-
-void simulation_loop()
-{
-
-}
+icy::SnapshotWriter snapshot;
 
 
 int main(int argc, char** argv)
@@ -35,40 +32,33 @@ int main(int argc, char** argv)
 
     auto option_parse_result = options.parse(argc, argv);
 
-    if (option_parse_result.count("file"))
+    if(option_parse_result.count("file"))
     {
         std::string params_file = option_parse_result["file"].as<std::string>();
-        model.prms.ParseFile(params_file, screenshot_directory);
+        model.prms.ParseFile(params_file, snapshot_directory);
     }
 
     // initialize the model
     model.Reset();
-//    offscreen.model = &model;
-//    offscreen.SynchronizeTopology();
+    snapshot.model = &model;
 
     // what to do once the data is available
     model.gpu.transfer_completion_callback = [&](){
-        if(screenshot_thread.joinable()) screenshot_thread.join();
-        screenshot_thread = std::thread([&](){
-        int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
-        std::string outputPath = screenshot_directory + "/" + std::to_string(screenshot_number) + ".png";
-        std::cout << "saving " << screenshot_number << "\n";
-        model.UnlockCycleMutex();
-        if(stop) { std::cout << "screenshot aborted\n"; return; }
-        model.FinalizeDataTransfer();
-//        offscreen.SynchronizeValues();
-        //offscreen.SaveScreenshot(outputPath);
-
-        std::string outputPathVTK = screenshot_directory + "/" + std::to_string(screenshot_number) + ".vtk";
-  //      offscreen.SaveVTK(outputPathVTK);
-
-        std::cout << "file export done\n";
-        }
-        );
+        if(snapshot_thread.joinable()) snapshot_thread.join();
+        snapshot_thread = std::thread([&](){
+            int snapshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
+            if(stop) { std::cout << "screenshot aborted\n"; return; }
+            spdlog::info("completion callback {}", snapshot_number);
+            model.FinalizeDataTransfer();
+            std::string outputPath = snapshot_directory + "/" + std::to_string(snapshot_number) + ".h5";
+            snapshot.SaveSnapshot(outputPath);
+            model.UnlockCycleMutex();
+            spdlog::info("callback {} done", snapshot_number);
+        });
     };
 
     // ensure that the folder exists
-    std::filesystem::path outputFolder(screenshot_directory);
+    std::filesystem::path outputFolder(snapshot_directory);
     std::filesystem::create_directory(outputFolder);
 
     std::thread t([&](){
@@ -81,7 +71,7 @@ int main(int argc, char** argv)
 
     t.join();
     model.gpu.synchronize();
-    screenshot_thread.join();
+    snapshot_thread.join();
 
     std::cout << "cm done\n";
 
