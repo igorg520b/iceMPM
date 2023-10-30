@@ -51,7 +51,7 @@ int main(int argc, char** argv)
             spdlog::info("completion callback {}", snapshot_number);
             model.FinalizeDataTransfer();
             std::string outputPath = snapshot_directory + "/" + std::to_string(snapshot_number) + ".h5";
-            snapshot.SaveSnapshot(outputPath);
+            // snapshot.SaveSnapshot(outputPath);
             model.UnlockCycleMutex();
             spdlog::info("callback {} done", snapshot_number);
         });
