@@ -1,7 +1,7 @@
 #include "gpu_implementation2.h"
 #include "parameters_sim.h"
 #include "point.h"
-#include "gridnode.h"
+//#include "gridnode.h"
 #include <stdio.h>
 #include <iostream>
 #include <vector>
@@ -163,7 +163,6 @@ void GPU_Implementation2::transfer_ponts_to_device(const std::vector<icy::Point>
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 }
 
-
 void GPU_Implementation2::backup_point_positions()
 {
     const int nPoints = prms->PointCountActual;
@@ -175,7 +174,6 @@ void GPU_Implementation2::backup_point_positions()
     err = cudaMemcpyAsync(prms->pts_arrays[15], prms->pts_arrays[12], sizeof(real)*nPoints, cudaMemcpyDeviceToDevice, streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("backup_point_positions");
 }
-
 
 void GPU_Implementation2::cuda_transfer_from_device()
 {
@@ -215,13 +213,11 @@ void GPU_Implementation2::transfer_ponts_to_host_finalize(std::vector<icy::Point
 {
     int n = points.size();
     real* tmp1 = (real*)tmp_transfer_buffer;
-    real* tmp2 = (real*)tmp_transfer_buffer + n;
-    real* tmp3 = (real*)tmp_transfer_buffer + n*2;
     for(int k=0;k<n;k++)
     {
         points[k].pos[0] = tmp1[k];
-        points[k].pos[1] = tmp2[k];
-        points[k].NACC_alpha_p = tmp3[k];
+        points[k].pos[1] = tmp1[k+n];
+        points[k].NACC_alpha_p = tmp1[k+2*n];
     }
 }
 
@@ -252,22 +248,6 @@ void GPU_Implementation2::cuda_p2g()
     }
 }
 
-
-void GPU_Implementation2::cuda_g2p()
-{
-    const int nPoints = prms->PointCountActual;
-    cudaError_t err;
-    int blocksPerGrid = (nPoints + threadsPerBlock - 1) / threadsPerBlock;
-    v2_kernel_g2p<<<blocksPerGrid, threadsPerBlock, 0, streamCompute>>>();
-    err = cudaGetLastError();
-    if(err != cudaSuccess)
-    {
-        std::cout << "cuda_g2p error " << err << '\n';
-        throw std::runtime_error("cuda_g2p");
-    }
-}
-
-
 void GPU_Implementation2::cuda_update_nodes(real indenter_x, real indenter_y)
 {
     const int nGridNodes = prms->GridSize;
@@ -282,7 +262,19 @@ void GPU_Implementation2::cuda_update_nodes(real indenter_x, real indenter_y)
     }
 }
 
-
+void GPU_Implementation2::cuda_g2p()
+{
+    const int nPoints = prms->PointCountActual;
+    cudaError_t err;
+    int blocksPerGrid = (nPoints + threadsPerBlock - 1) / threadsPerBlock;
+    v2_kernel_g2p<<<blocksPerGrid, threadsPerBlock, 0, streamCompute>>>();
+    err = cudaGetLastError();
+    if(err != cudaSuccess)
+    {
+        std::cout << "cuda_g2p error " << err << '\n';
+        throw std::runtime_error("cuda_g2p");
+    }
+}
 
 
 
@@ -323,9 +315,12 @@ __global__ void v2_kernel_p2g()
 
     Matrix2r Re = polar_decomp_R(p.Fe);
     real Je = p.Fe.determinant();
-    Matrix2r dFe = 2.*mu*(p.Fe - Re)* p.Fe.transpose() +
-            lambda * (Je - 1.) * Je * Matrix2r::Identity();
-    Matrix2r stress = - (dt * vol) * (Dinv * dFe);
+    Matrix2r &F = p.Fe;
+//    Matrix2r PFt = 2.*mu*(p.Fe - Re)* p.Fe.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
+    Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();
+
+
+    Matrix2r stress = -(dt*vol*Dinv) * PFt;
     Matrix2r affine = stress + particle_mass * p.Bp;
 
     constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
@@ -339,10 +334,9 @@ __global__ void v2_kernel_p2g()
     Vector2r v1(fx[0]-1.,fx[1]-1.);
     Vector2r v2(fx[0]-.5,fx[1]-.5);
 
-    Vector2r w[3];
-    w[0] << .5*v0[0]*v0[0],  .5*v0[1]*v0[1];
-    w[1] << .75-v1[0]*v1[0], .75-v1[1]*v1[1];
-    w[2] << .5*v2[0]*v2[0],  .5*v2[1]*v2[1];
+    real w[3][2] = {{.5*v0[0]*v0[0],  .5*v0[1]*v0[1]},
+                    {.75-v1[0]*v1[0], .75-v1[1]*v1[1]},
+                    {.5*v2[0]*v2[0],  .5*v2[1]*v2[1]}};
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
@@ -369,12 +363,14 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     const int &nGridNodes = gprms.GridSize;
     if(idx >= nGridNodes) return;
 
-    icy::GridNode gn;
-    gn.mass = gprms.grid_arrays[0][idx];
-    if(gn.mass == 0) return;
+//    icy::GridNode gn;
 
-    gn.velocity[0] = gprms.grid_arrays[1][idx];
-    gn.velocity[1] = gprms.grid_arrays[2][idx];
+
+    real mass = gprms.grid_arrays[0][idx];
+    if(mass == 0) return;
+
+    Vector2r velocity;
+    velocity << gprms.grid_arrays[1][idx], gprms.grid_arrays[2][idx];
 
     const real &gravity = gprms.Gravity;
     const real &indRsq = gprms.IndRSq;
@@ -388,9 +384,10 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     const Vector2r vco(ind_velocity,0);  // velocity of the collision object (indenter)
     const Vector2r indCenter(indenter_x, indenter_y);
 
-    gn.velocity /= gn.mass;
-    gn.velocity[1] -= dt*gravity;
-    if(gn.velocity.norm() > cellsize/dt) gn.velocity = gn.velocity.normalized()*cellsize/dt;
+    velocity /= mass;
+    velocity[1] -= dt*gravity;
+    real vmax = 0.5*cellsize/dt;
+    if(velocity.norm() > vmax) velocity = velocity/velocity.norm()*vmax;
 
     int idx_x = idx % gridX;
     int idx_y = idx / gridX;
@@ -401,31 +398,25 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     if(n.squaredNorm() < indRsq)
     {
         // grid node is inside the indenter
-        Vector2r vrel = gn.velocity - vco;
+        Vector2r vrel = velocity - vco;
         n.normalize();
         real vn = vrel.dot(n);   // normal component of the velocity
         if(vn < 0)
         {
             Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
-            gn.velocity = vco + vt + ice_friction_coeff*vn*vt.normalized();
+            velocity = vco + vt + ice_friction_coeff*vn*vt.normalized();
         }
     }
 
     // attached bottom layer
-    if(idx_y <= 3) gn.velocity.setZero();
-    else if(idx_y >= gridY-4 && gn.velocity[1]>0) gn.velocity[1] = 0;
-    if(idx_x <= 3 && gn.velocity.x()<0) gn.velocity[0] = 0;
-    else if(idx_x >= gridX-5) gn.velocity[0] = 0;
-
-    if(gn.velocity.norm() > gprms.cellsize/gprms.InitialTimeStep)
-    {
-        gn.velocity.normalize();
-        gn.velocity *= gprms.cellsize/gprms.InitialTimeStep;
-    }
+    if(idx_y <= 3) velocity.setZero();
+    else if(idx_y >= gridY-4 && velocity[1]>0) velocity[1] = 0;
+    if(idx_x <= 3 && velocity.x()<0) velocity[0] = 0;
+    else if(idx_x >= gridX-5) velocity[0] = 0;
 
     // write the updated grid velocity back to memory
-    gprms.grid_arrays[1][idx] = gn.velocity[0];
-    gprms.grid_arrays[2][idx] = gn.velocity[1];
+    gprms.grid_arrays[1][idx] = velocity[0];
+    gprms.grid_arrays[2][idx] = velocity[1];
 }
 
 __global__ void v2_kernel_g2p()

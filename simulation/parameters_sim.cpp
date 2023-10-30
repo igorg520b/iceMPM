@@ -20,14 +20,14 @@ void icy::SimParams::ComputeCamClayParams()
 
 void icy::SimParams::Reset()
 {
-//#define PARAMS2
+#define PARAMS2
 #ifdef PARAMS2
     InitialTimeStep = 8.e-6;
     YoungsModulus = 5.e8;
     NACC_beta = 0.7;
     NACC_xi = 1.5;
-    NACC_alpha = std::log(1.-1.e-5);
-    PointsWanted = 1'000'000;
+    NACC_alpha = std::log(1.-1.e-3);
+    PointsWanted = 2'000'000;
     GridX = 512;
     GridY = 220;
     ParticleViewSize = 1.0f;
