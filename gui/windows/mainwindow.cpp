@@ -143,14 +143,14 @@ MainWindow::MainWindow(QWidget *parent)
         }
 
         qLastDirectory = QDir::currentPath();
-        var = settings.value("lastFile");
-        if(!var.isNull())
-        {
-            qLastFileName = var.toString();
-            QFileInfo fiLastFile(qLastFileName);
-            qLastDirectory = fiLastFile.path();
-            if(fiLastFile.exists()) OpenFile(qLastFileName);
-        }
+//        var = settings.value("lastFile");
+//        if(!var.isNull())
+//        {
+//            qLastFileName = var.toString();
+//            QFileInfo fiLastFile(qLastFileName);
+//            qLastDirectory = fiLastFile.path();
+//            if(fiLastFile.exists()) OpenFile(qLastFileName);
+//        }
 
         comboBox_visualizations->setCurrentIndex(settings.value("vis_option").toInt());
 
@@ -183,7 +183,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     connect(ui->action_quit, &QAction::triggered, this, &MainWindow::quit_triggered);
     connect(ui->action_camera_reset, &QAction::triggered, this, &MainWindow::cameraReset_triggered);
-    connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::open_triggered);
+    connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::open_snapshot_triggered);
     connect(ui->actionCreate_Video, &QAction::triggered, this, &MainWindow::createVideo_triggered);
     connect(qdsbLimitLow,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
     connect(qdsbLimitHigh,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
@@ -271,35 +271,25 @@ void MainWindow::sliderValueChanged(int val)
     GoToStep(val);
 }
 
-void MainWindow::open_triggered()
+void MainWindow::open_snapshot_triggered()
 {
     qDebug() << "void MainWindow::open_triggered()";
-/*    qLastFileName = QFileDialog::getOpenFileName(this, "Open Binary Export", qLastDirectory, "Bin Files (*.bin)");
-    QFileInfo fi(qLastFileName);
-    qLastDirectory = fi.path();
-    OpenFile(qLastFileName);
-    */
+    QString qFileName = QFileDialog::getOpenFileName(this, "Open Simulation Snapshot", qLastDirectory, "HDF5 Files (*.h5)");
+    OpenFile(qFileName);
 }
 
 void MainWindow::OpenFile(QString fileName)
 {
+    snapshot.ReadSnapshot(fileName.toStdString());
+    representation.SynchronizeTopology();
+    updateGUI();
+
     /*
-    QFileInfo fi(fileName);
-    qBaseFileName = fi.baseName();
-    if(qBaseFileName.isEmpty()) return;
-
-    this->setWindowTitle(fileName);
-    mesh.LoadFromBin(fileName.toStdString());
-    meshRepresentation.SynchronizeTopology();
-    GoToStep(1);
-
     slider1->blockSignals(true);
     slider1->setRange(1, mesh.nFrames);
     slider1->setValue(1);
     slider1->blockSignals(false);
-
 */
-    renderWindow->Render();
 }
 
 void MainWindow::createVideo_triggered()
@@ -384,9 +374,9 @@ void MainWindow::screenshot_triggered()
     renderWindow->DoubleBufferOn();
 
     //
-    QString outputPathSnapshot = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
-                         QString::number(screenshot_number).rightJustified(5, '0') + ".h5";
-    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
+//    QString outputPathSnapshot = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
+//                         QString::number(screenshot_number).rightJustified(5, '0') + ".h5";
+//    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
 }
 
 

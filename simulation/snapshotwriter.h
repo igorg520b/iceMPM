@@ -13,6 +13,7 @@ public:
     SnapshotWriter();
     icy::Model *model;
     void SaveSnapshot(std::string fileName);
+    void ReadSnapshot(std::string fileName);
 };
 
 #endif // SNAPSHOTWRITER_H

@@ -21,7 +21,7 @@
      <x>0</x>
      <y>0</y>
      <width>710</width>
-     <height>26</height>
+     <height>27</height>
     </rect>
    </property>
    <widget class="QMenu" name="menuFile">
@@ -106,7 +106,7 @@
      <normaloff>:/gui/icons/open-file-folder-svgrepo-com.svg</normaloff>:/gui/icons/open-file-folder-svgrepo-com.svg</iconset>
    </property>
    <property name="text">
-    <string>Open...</string>
+    <string>Open Snapshot...</string>
    </property>
    <property name="shortcut">
     <string>Ctrl+O</string>

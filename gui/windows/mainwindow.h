@@ -75,12 +75,12 @@ private Q_SLOTS:
     void simulation_data_ready();
 
     void simulation_start_pause(bool checked);
+    void cameraReset_triggered();
+    void open_snapshot_triggered();
+
 
     void sliderValueChanged(int val);
     void comboboxIndexChanged_visualizations(int index);
-
-    void cameraReset_triggered();
-    void open_triggered();
     void createVideo_triggered();
     void screenshot_triggered();
     void limits_changed(double val);
