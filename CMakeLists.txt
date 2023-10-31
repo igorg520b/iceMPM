@@ -127,8 +127,8 @@ if(GUI_VERSION_BUILD)
 
         simulation/givens.cuh
         simulation/helper_math.cuh
-        simulation/gpu_implementation2.h
-        simulation/gpu_implementation2.cu
+        simulation/gpu_implementation3_sand.h
+        simulation/gpu_implementation3_sand.cu
 
         simulation/snapshotwriter.h
         simulation/snapshotwriter.cpp

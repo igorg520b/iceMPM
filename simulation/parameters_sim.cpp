@@ -20,7 +20,7 @@ void icy::SimParams::ComputeCamClayParams()
 
 void icy::SimParams::Reset()
 {
-#define PARAMS2
+//#define PARAMS2
 #ifdef PARAMS2
     InitialTimeStep = 8.e-6;
     YoungsModulus = 5.e8;
@@ -76,7 +76,7 @@ void icy::SimParams::Reset()
     IndDiameter = 0.324;
     IndRSq = IndDiameter*IndDiameter/4.;
     IndVelocity = 0.2;
-    IndDepth = 0.101;
+    IndDepth = 0.4;//0.101;
 
     BlockHeight = 1.0;
     BlockLength = 2.5;
@@ -87,6 +87,8 @@ void icy::SimParams::Reset()
 
     SimulationStep = 0;
     SimulationTime = 0;
+
+
     std::cout << "SimParams Reset() done\n";
 }
 

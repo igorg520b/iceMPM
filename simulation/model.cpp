@@ -96,6 +96,19 @@ void icy::Model::Reset()
         //p.Fp.setIdentity();
         p.Bp.setZero();
         p.NACC_alpha_p = prms.NACC_alpha;
+
+
+
+        p.Fp.setIdentity();
+        p.q = 0;
+        constexpr double PI = 3.1415927;
+        constexpr double H0 = 35 * PI / 180.0f;
+        constexpr double H1 = 9 * PI / 180.0f;
+        constexpr double H2 = 0.2f;
+        constexpr double H3 = 10 * PI / 180.0f;
+
+        double phi = H0 + (H1 *p.q - H3)*exp(-H2 * p.q);
+        p.alpha = sqrt(2.0 / 3.0) * (2.0 * sin(phi)) / (3.0 - sin(phi));
     }
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;

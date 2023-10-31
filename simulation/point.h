@@ -14,6 +14,10 @@ struct icy::Point
     Matrix2r Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
     real NACC_alpha_p;
 
+    double q, alpha; // Drucker Prager hardening paremeters
+    Matrix2r Fp;
+
+
     static real wc(Vector2r dx);
     static Vector2r gradwc(Vector2r dx);
     static real wq(Vector2r dx);
