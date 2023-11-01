@@ -22,14 +22,14 @@ void icy::SimParams::Reset()
 {
 //#define PARAMS2
 #ifdef PARAMS2
-    InitialTimeStep = 8.e-6;
+    InitialTimeStep = 3.e-6;
     YoungsModulus = 5.e8;
     NACC_beta = 0.7;
     NACC_xi = 1.5;
     NACC_alpha = std::log(1.-1.e-3);
     PointsWanted = 2'000'000;
-    GridX = 512;
-    GridY = 220;
+    GridX = 1024;
+    GridY = 440;
     ParticleViewSize = 1.0f;
 #else
     InitialTimeStep = 3.e-5;
@@ -76,7 +76,7 @@ void icy::SimParams::Reset()
     IndDiameter = 0.324;
     IndRSq = IndDiameter*IndDiameter/4.;
     IndVelocity = 0.2;
-    IndDepth = 0.4;//0.101;
+    IndDepth = 0.2;//0.101;
 
     BlockHeight = 1.0;
     BlockLength = 2.5;

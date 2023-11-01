@@ -55,7 +55,8 @@ public:
 
     void *tmp_transfer_buffer = nullptr; // nPoints*sizeof(real)
 private:
-    constexpr static int threadsPerBlock = 512;
+    constexpr static int threadsPerBlock1 = 512;
+    constexpr static int threadsPerBlock2 = 32;
 
     cudaStream_t streamCompute, streamTransfer;
     bool initialized = false;

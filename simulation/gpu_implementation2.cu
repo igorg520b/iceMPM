@@ -231,8 +231,6 @@ void GPU_Implementation2::cuda_reset_grid()
     }
 }
 
-
-
 void GPU_Implementation2::cuda_p2g()
 {
     const int nPoints = prms->PointCountActual;
@@ -318,7 +316,6 @@ __global__ void v2_kernel_p2g()
     Matrix2r &F = p.Fe;
 //    Matrix2r PFt = 2.*mu*(p.Fe - Re)* p.Fe.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
     Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();
-
 
     Matrix2r stress = -(dt*vol*Dinv) * PFt;
     Matrix2r affine = stress + particle_mass * p.Bp;
