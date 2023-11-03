@@ -30,18 +30,18 @@ public:
     // index of the corresponding array in SoA
     constexpr static size_t posx = 0;
     constexpr static size_t posy = 1;
-    constexpr static size_t velx = 2;
-    constexpr static size_t vely = 3;
-    constexpr static size_t Bp00 = 4;
-    constexpr static size_t Bp01 = 5;
-    constexpr static size_t Bp10 = 6;
-    constexpr static size_t Bp11 = 7;
-    constexpr static size_t Fe00 = 8;
-    constexpr static size_t Fe01 = 9;
-    constexpr static size_t Fe10 = 10;
-    constexpr static size_t Fe11 = 11;
-    constexpr static size_t idx_NACCAlphaP = 12;
-    constexpr static size_t idx_q = 13;
+    constexpr static size_t idx_q = 2;
+    constexpr static size_t idx_NACCAlphaP = 3;
+    constexpr static size_t velx = 4;
+    constexpr static size_t vely = 5;
+    constexpr static size_t Fe00 = 6;
+    constexpr static size_t Fe01 = 7;
+    constexpr static size_t Fe10 = 8;
+    constexpr static size_t Fe11 = 9;
+    constexpr static size_t Bp00 = 10;
+    constexpr static size_t Bp01 = 11;
+    constexpr static size_t Bp10 = 12;
+    constexpr static size_t Bp11 = 13;
 
     real *grid_array;      // device-side grid data
     real *pts_array;

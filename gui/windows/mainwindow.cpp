@@ -399,7 +399,7 @@ void MainWindow::save_binary_data()
     int snapshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
     QString outputPathSnapshot = QDir::currentPath()+ "/"+outputDirectory.c_str() + "/" +
                          QString::number(snapshot_number).rightJustified(5, '0') + ".h5";
-    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
+    snapshot.SaveSnapshot(outputPathSnapshot.toStdString(),snapshot_number % 100 == 0);
 }
 
 

@@ -10,9 +10,8 @@ namespace icy {class SnapshotWriter; class Model;}
 class icy::SnapshotWriter
 {
 public:
-    SnapshotWriter();
     icy::Model *model;
-    void SaveSnapshot(std::string fileName);
+    void SaveSnapshot(std::string fileName, bool fullData);
     void ReadSnapshot(std::string fileName);
 };
 

@@ -4,18 +4,10 @@
 #include <H5Cpp.h>
 
 
-icy::SnapshotWriter::SnapshotWriter()
-{
 
-}
-
-void icy::SnapshotWriter::SaveSnapshot(std::string fileName)
+void icy::SnapshotWriter::SaveSnapshot(std::string fileName, bool fullData)
 {
     spdlog::info("writing snapshot {}",fileName);
-    hsize_t nPts = model->prms.nPtsPitch/sizeof(real);
-
-//    H5::IntType datatype_int(H5::PredType::NATIVE_INT);
-//    H5::FloatType datatype_double(H5::PredType::NATIVE_DOUBLE);
 
     H5::H5File file(fileName, H5F_ACC_TRUNC);
 
@@ -24,15 +16,21 @@ void icy::SnapshotWriter::SaveSnapshot(std::string fileName)
     H5::DataSet dataset_params = file.createDataSet("Params", H5::PredType::NATIVE_B8, dataspace_params);
     dataset_params.write(&model->prms, H5::PredType::NATIVE_B8);
 
-    hsize_t dims_points[2] = {nPts*icy::SimParams::nPtsArrays,1};
-    H5::DataSpace dataspace_points(2, dims_points);
-    H5::DSetCreatPropList cparms_points;
-    hsize_t chunk_dims[2] = {64000, 1};
-    cparms_points.setChunk(2, chunk_dims);
-    cparms_points.setDeflate(9);
-    H5::DataSet dataset_points = file.createDataSet("Points", H5::PredType::NATIVE_DOUBLE,
-                                                    dataspace_points, cparms_points);
+    constexpr int fullDataArrays = 10;
+    constexpr int abridgedDataArrays = 3;
+    hsize_t nPtsPitched = model->prms.nPtsPitch/sizeof(real);
+    hsize_t dims_points = fullData ? nPtsPitched*fullDataArrays : nPtsPitched*abridgedDataArrays;
+    int full_data = fullData ? 1 : 0;
+
+    H5::DataSpace dataspace_points(1, &dims_points);
+    H5::DataSet dataset_points = file.createDataSet("Points", H5::PredType::NATIVE_DOUBLE, dataspace_points);
     dataset_points.write(model->gpu.tmp_transfer_buffer, H5::PredType::NATIVE_DOUBLE);
+
+    hsize_t att_dim = 1;
+    H5::DataSpace att_dspace(1, &att_dim);
+    H5::Attribute att = dataset_points.createAttribute("full_data", H5::PredType::NATIVE_INT,att_dspace);
+    att.write(H5::PredType::NATIVE_INT, &full_data);
+
 
     file.close();
     spdlog::info("SaveSnapshot done {}", fileName);
