@@ -16,7 +16,7 @@
 #include "point.h"
 #include "gridnode.h"
 #include "poisson_disk_sampling.h"
-#include "gpu_implementation2.h"
+#include "gpu_implementation3_sand.h"
 
 #include <Eigen/Core>
 #include <Eigen/SVD>
@@ -39,7 +39,7 @@ public:
     void UnlockCycleMutex();
 
     icy::SimParams prms;
-    GPU_Implementation2 gpu;
+    GPU_Implementation3 gpu;
     float compute_time_per_cycle;
     real indenter_x, indenter_x_initial, indenter_y;
 

@@ -12,7 +12,7 @@ icy::SnapshotWriter::SnapshotWriter()
 void icy::SnapshotWriter::SaveSnapshot(std::string fileName)
 {
     spdlog::info("writing snapshot {}",fileName);
-    hsize_t nPts = model->prms.PointCountActual;
+    hsize_t nPts = model->prms.nPtsPitch/sizeof(real);
 
 //    H5::IntType datatype_int(H5::PredType::NATIVE_INT);
 //    H5::FloatType datatype_double(H5::PredType::NATIVE_DOUBLE);

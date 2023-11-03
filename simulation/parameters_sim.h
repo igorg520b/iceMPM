@@ -24,10 +24,30 @@ struct icy::SimParams
 {
 public:
     constexpr static double pi = 3.14159265358979323846;
-    constexpr static int nGridArrays = 3, nPtsArrays = 17;
+    constexpr static int dim = 2;
+    constexpr static int nGridArrays = 3, nPtsArrays = 14;
 
-    real *grid_arrays[nGridArrays];      // pointers to gpu-allocated arrays for simulation
-    real *pts_arrays[nPtsArrays];
+    // index of the corresponding array in SoA
+    constexpr static size_t posx = 0;
+    constexpr static size_t posy = 1;
+    constexpr static size_t velx = 2;
+    constexpr static size_t vely = 3;
+    constexpr static size_t Bp00 = 4;
+    constexpr static size_t Bp01 = 5;
+    constexpr static size_t Bp10 = 6;
+    constexpr static size_t Bp11 = 7;
+    constexpr static size_t Fe00 = 8;
+    constexpr static size_t Fe01 = 9;
+    constexpr static size_t Fe10 = 10;
+    constexpr static size_t Fe11 = 11;
+    constexpr static size_t idx_NACCAlphaP = 12;
+    constexpr static size_t idx_q = 13;
+
+    real *grid_array;      // device-side grid data
+    real *pts_array;
+    size_t nPtsPitch, nGridPitch; // in bytes (!), for coalesced access on the device
+    int PointsWanted, nPts;
+    int GridX, GridY;
 
     real InitialTimeStep, SimulationEndTime;
     real Gravity, Density, PoissonsRatio, YoungsModulus;
@@ -39,19 +59,19 @@ public:
     real NACC_xi, NACC_alpha, NACC_beta, NACC_M_sq;
     real NACC_friction_angle;
 
-    int GridX, GridY, GridSize;
     real cellsize, cellsize_inv, Dp_inv;
 
     int UpdateEveryNthStep; // run N steps without update
 
     real IndDiameter, IndRSq, IndVelocity, IndDepth;
-    int PointsWanted, PointCountActual;
     real BlockHeight, BlockLength;
 
     real ParticleVolume, ParticleMass, ParticleViewSize;
 
     int SimulationStep;
     real SimulationTime;
+
+    double H0, H1, H2, H3;
 
     void Reset();
     void ParseFile(std::string fileName, std::string &outputDirectory);

@@ -9,7 +9,6 @@ void icy::SimParams::ComputeLame()
 
 void icy::SimParams::ComputeCamClayParams()
 {
-    constexpr int dim = 2;
     real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
     real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
     real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
@@ -20,9 +19,12 @@ void icy::SimParams::ComputeCamClayParams()
 
 void icy::SimParams::Reset()
 {
+    grid_array = nullptr;
+    pts_array = nullptr;
+
 //#define PARAMS2
 #ifdef PARAMS2
-    InitialTimeStep = 3.e-6;
+    InitialTimeStep = 4.e-6;
     YoungsModulus = 5.e8;
     NACC_beta = 0.7;
     NACC_xi = 1.5;
@@ -43,22 +45,7 @@ void icy::SimParams::Reset()
     ParticleViewSize = 2.5f;
 #endif
 
-    /*
-    InitialTimeStep = 3.e-5;
-    YoungsModulus = 5.e8;
-    NACC_beta = 0.7;
-    NACC_xi = 1.5;
-    NACC_alpha = std::log(1. - 5.e-5);
-    PointsWanted = 35'000;
-    GridX = 128;
-    GridY = 55;
-    ParticleViewSize = 2.5f;
-
-*/
-
-    GridSize = GridX*GridY;
     NACC_friction_angle = 35;
-    ComputeCamClayParams();
 
     SimulationEndTime = 12;
     UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
@@ -68,27 +55,37 @@ void icy::SimParams::Reset()
     Dp_inv = 4./(cellsize*cellsize);
 
     PoissonsRatio = 0.3;
-    ComputeLame();
     Gravity = 9.81;
     Density = 980;
-    IceFrictionCoefficient = 0;//0.03;
+    IceFrictionCoefficient = 0.03;
 
     IndDiameter = 0.324;
     IndRSq = IndDiameter*IndDiameter/4.;
     IndVelocity = 0.2;
-    IndDepth = 0.2;//0.101;
+    IndDepth = 0.25;//0.101;
 
     BlockHeight = 1.0;
     BlockLength = 2.5;
 
+    SimulationStep = 0;
+    SimulationTime = 0;
+
+    // Snow
     XiSnow = 10.;
     THT_C_snow = 2.0e-2;				// Critical compression
     THT_S_snow = 6.0e-3;				// Critical stretch
 
-    SimulationStep = 0;
-    SimulationTime = 0;
+    // Drucker-Prager
+    // H0 > H3 >=0;
+    // H1, H2 >=0
 
+    H0 = 44 * pi / 180.0f;
+    H1 = 5 * pi / 180.0f;
+    H2 = 0.2f;
+    H3 = 10 * pi / 180.0f;
 
+    ComputeCamClayParams();
+    ComputeLame();
     std::cout << "SimParams Reset() done\n";
 }
 
@@ -140,6 +137,5 @@ void icy::SimParams::ParseFile(std::string fileName, std::string &outputDirector
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;
 
-    GridSize = GridX*GridY;
     std::cout << "loaded parameters file " << fileName << '\n';
 }
