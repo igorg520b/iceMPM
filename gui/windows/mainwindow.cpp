@@ -17,9 +17,9 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     params = new ParamsWrapper(&model.prms);
-    model.Reset();
     worker = new BackgroundWorker(&model);
     snapshot.model = &model;
+    model.gpu.initialize();
 
     // VTK
     qt_vtk_widget = new QVTKOpenGLNativeWidget();
@@ -142,23 +142,23 @@ MainWindow::MainWindow(QWidget *parent)
             camera->Modified();
         }
 
-        qLastDirectory = QDir::currentPath();
-//        var = settings.value("lastFile");
-//        if(!var.isNull())
-//        {
-//            qLastFileName = var.toString();
-//            QFileInfo fiLastFile(qLastFileName);
-//            qLastDirectory = fiLastFile.path();
-//            if(fiLastFile.exists()) OpenFile(qLastFileName);
-//        }
+        var = settings.value("lastParameterFile");
+        if(!var.isNull())
+        {
+            qLastParameterFile = var.toString();
+            this->outputDirectory = model.prms.ParseFile(qLastParameterFile.toStdString());
+            model.Reset();
+        }
 
         comboBox_visualizations->setCurrentIndex(settings.value("vis_option").toInt());
 
         var = settings.value("take_screenshots");
-        if(!var.isNull())
-        {
-            ui->actionTake_Screenshots->setChecked(var.toBool());
-        }
+        if(!var.isNull()) ui->actionTake_Screenshots->setChecked(var.toBool());
+
+        var = settings.value("save_binary_data");
+        if(!var.isNull()) ui->actionSave_Binary_Data->setChecked(var.toBool());
+
+
 
         var = settings.value("splitter_size_0");
         if(!var.isNull())
@@ -172,8 +172,6 @@ MainWindow::MainWindow(QWidget *parent)
     {
         cameraReset_triggered();
     }
-    QDir pngDir(QDir::currentPath()+ screenshot_directory.c_str());
-    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ screenshot_directory.c_str());
 
     windowToImageFilter->SetInput(renderWindow);
     windowToImageFilter->SetScale(1); // image quality
@@ -189,6 +187,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(qdsbLimitHigh,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
+    connect(ui->actionLoad_Parameters, &QAction::triggered, this, &MainWindow::load_parameter_triggered);
 
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
     connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
@@ -230,8 +229,9 @@ void MainWindow::quit_triggered()
     settings.setValue("camData", arr);
     settings.setValue("vis_option", comboBox_visualizations->currentIndex());
 
-    if(!qLastFileName.isEmpty()) settings.setValue("lastFile", qLastFileName);
+    if(!qLastParameterFile.isEmpty()) settings.setValue("lastParameterFile", qLastParameterFile);
     settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
+    settings.setValue("save_binary_data", ui->actionSave_Binary_Data->isChecked());
 
     QList<int> szs = splitter->sizes();
     settings.setValue("splitter_size_0", szs[0]);
@@ -273,8 +273,8 @@ void MainWindow::sliderValueChanged(int val)
 
 void MainWindow::open_snapshot_triggered()
 {
-    qDebug() << "void MainWindow::open_triggered()";
-    QString qFileName = QFileDialog::getOpenFileName(this, "Open Simulation Snapshot", qLastDirectory, "HDF5 Files (*.h5)");
+    QString qFileName = QFileDialog::getOpenFileName(this, "Open Simulation Snapshot", QDir::currentPath(), "HDF5 Files (*.h5)");
+    if(qFileName.isNull())return;
     OpenFile(qFileName);
 }
 
@@ -291,6 +291,20 @@ void MainWindow::OpenFile(QString fileName)
     slider1->blockSignals(false);
 */
 }
+
+void MainWindow::load_parameter_triggered()
+{
+    QString qFileName = QFileDialog::getOpenFileName(this, "Load Parameters", QDir::currentPath(), "JSON Files (*.json)");
+    if(qFileName.isNull())return;
+    this->outputDirectory = model.prms.ParseFile(qFileName.toStdString());
+    this->qLastParameterFile = qFileName;
+    model.Reset();
+    representation.SynchronizeTopology();
+    if(ui->actionSave_Binary_Data->isChecked() && model.prms.SimulationStep == 0) save_binary_data();
+    updateGUI();
+}
+
+
 
 void MainWindow::createVideo_triggered()
 {
@@ -355,9 +369,11 @@ void MainWindow::screenshot_triggered()
 {
     if(model.prms.SimulationStep % model.prms.UpdateEveryNthStep) return;
     int screenshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
-    QString outputPath = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
+    QString outputPath = QDir::currentPath()+ "/" + screenshot_directory.c_str() + "/" +
             QString::number(screenshot_number).rightJustified(5, '0') + ".png";
 
+    QDir pngDir(QDir::currentPath()+ "/"+ screenshot_directory.c_str());
+    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ "/"+ screenshot_directory.c_str());
 
     renderWindow->DoubleBufferOff();
     renderWindow->Render();
@@ -373,10 +389,17 @@ void MainWindow::screenshot_triggered()
     writerPNG->Write();
     renderWindow->DoubleBufferOn();
 
-    //
-//    QString outputPathSnapshot = QDir::currentPath()+ screenshot_directory.c_str() + "/" +
-//                         QString::number(screenshot_number).rightJustified(5, '0') + ".h5";
-//    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
+}
+
+void MainWindow::save_binary_data()
+{
+    QDir pngDir(QDir::currentPath()+ "/"+ outputDirectory.c_str());
+    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ "/"+ outputDirectory.c_str());
+
+    int snapshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
+    QString outputPathSnapshot = QDir::currentPath()+ "/"+outputDirectory.c_str() + "/" +
+                         QString::number(snapshot_number).rightJustified(5, '0') + ".h5";
+    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
 }
 
 
@@ -385,6 +408,7 @@ void MainWindow::simulation_data_ready()
     model.FinalizeDataTransfer();
     updateGUI();
     if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
+    if(worker->running && ui->actionSave_Binary_Data->isChecked()) save_binary_data();
     model.UnlockCycleMutex();
 }
 

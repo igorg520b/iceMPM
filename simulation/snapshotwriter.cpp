@@ -18,11 +18,16 @@ void icy::SnapshotWriter::SaveSnapshot(std::string fileName)
 //    H5::FloatType datatype_double(H5::PredType::NATIVE_DOUBLE);
 
     H5::H5File file(fileName, H5F_ACC_TRUNC);
-    hsize_t dims_points[2] = {nPts*3,1};
-    H5::DataSpace dataspace_points(2, dims_points);
 
+    hsize_t dims_params[1] = {sizeof(icy::SimParams)};
+    H5::DataSpace dataspace_params(1,dims_params);
+    H5::DataSet dataset_params = file.createDataSet("Params", H5::PredType::NATIVE_B8, dataspace_params);
+    dataset_params.write(&model->prms, H5::PredType::NATIVE_B8);
+
+    hsize_t dims_points[2] = {nPts*icy::SimParams::nPtsArrays,1};
+    H5::DataSpace dataspace_points(2, dims_points);
     H5::DSetCreatPropList cparms_points;
-    hsize_t chunk_dims[2] = {30000, 1};
+    hsize_t chunk_dims[2] = {64000, 1};
     cparms_points.setChunk(2, chunk_dims);
     cparms_points.setDeflate(9);
     H5::DataSet dataset_points = file.createDataSet("Points", H5::PredType::NATIVE_DOUBLE,

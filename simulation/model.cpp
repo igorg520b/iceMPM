@@ -59,7 +59,6 @@ void icy::Model::Reset()
 {
     // this should be called after prms are set as desired (either via GUI or CLI)
     spdlog::info("icy::Model::Reset()");
-    gpu.initialize();
 
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
@@ -93,22 +92,20 @@ void icy::Model::Reset()
         //p.Fp.setIdentity();
         p.Bp.setZero();
         p.NACC_alpha_p = prms.NACC_alpha;
-
         p.q = 0;
     }
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
     gpu.cuda_allocate_arrays();
-    Prepare();
     gpu.transfer_ponts_to_device(points);
+    Prepare();
     spdlog::info("icy::Model::Reset() done");
 }
 
 void icy::Model::Prepare()
 {
     spdlog::info("icy::Model::Prepare()");
-    gpu.error_code = 0;
     abortRequested = false;
     gpu.cuda_update_constants();
 }

@@ -64,39 +64,40 @@ void GPU_Implementation3::cuda_update_constants()
 
 void GPU_Implementation3::cuda_allocate_arrays()
 {
+    if(!initialized) initialize();
     size_t nGridNodes = prms->GridX*prms->GridY;
     size_t nPoints = prms->nPts;
     cudaError_t err;
 
     // device memory for grid
     cudaFree(prms->grid_array);
+    cudaFree(prms->pts_array);
+    cudaFreeHost(tmp_transfer_buffer);
+
     err = cudaMallocPitch (&prms->grid_array, &prms->nGridPitch, sizeof(real)*nGridNodes, icy::SimParams::nGridArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     spdlog::info("Grid: requested {}B, pitched width is {} B", sizeof(real)*nGridNodes, prms->nGridPitch);
 
     // device memory for points
-    cudaFree(prms->pts_array);
     err = cudaMallocPitch (&prms->pts_array, &prms->nPtsPitch, sizeof(real)*nPoints, icy::SimParams::nPtsArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     spdlog::info("Points: requested {} B, pitched width is {} B", sizeof(real)*nPoints, prms->nPtsPitch);
     spdlog::info("cuda_allocate_arrays done");
 
     // pinned host memory
-    cudaFreeHost(tmp_transfer_buffer);
     err = cudaMallocHost(&tmp_transfer_buffer, prms->nPtsPitch*icy::SimParams::nPtsArrays);
     if(err!=cudaSuccess) throw std::runtime_error("GPU_Implementation3::Prepare(int nPoints)");
 
-    double MemAllocGrid = prms->nGridPitch*icy::SimParams::nGridArrays/(1024*1024);
-    double MemAllocPoints = prms->nPtsPitch*icy::SimParams::nPtsArrays/(1024*1024);
+    double MemAllocGrid = (double)prms->nGridPitch*icy::SimParams::nGridArrays/(1024*1024);
+    double MemAllocPoints = (double)prms->nPtsPitch*icy::SimParams::nPtsArrays/(1024*1024);
     double MemAllocTotal = MemAllocGrid + MemAllocPoints;
     spdlog::info("memory use: grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  MemAllocGrid, MemAllocPoints, MemAllocTotal);
-
+    error_code = 0;
 }
 
 void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point> &points)
 {
-    cudaError_t err;
     int n = prms->nPtsPitch/sizeof(real);
 
     for(int i=0;i<prms->nPts;i++)
@@ -117,7 +118,8 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::idx_q] = points[i].q;
     }
 
-    // transfer point positions
+    // transfer point data to device
+    cudaError_t err;
     err = cudaMemcpy(prms->pts_array, tmp_transfer_buffer, prms->nPtsPitch*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 }
@@ -653,6 +655,7 @@ void GPU_Implementation3::test()
 
 void GPU_Implementation3::synchronize()
 {
+    if(!initialized) return;
     cudaDeviceSynchronize();
 }
 

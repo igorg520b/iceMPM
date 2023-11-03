@@ -77,7 +77,7 @@ private Q_SLOTS:
     void simulation_start_pause(bool checked);
     void cameraReset_triggered();
     void open_snapshot_triggered();
-
+    void load_parameter_triggered();
 
     void sliderValueChanged(int val);
     void comboboxIndexChanged_visualizations(int index);
@@ -88,6 +88,7 @@ private Q_SLOTS:
 private:
     void updateGUI();   // when simulation is started/stopped or when a step is advanced
     void updateActorText();
+    void save_binary_data();
     BackgroundWorker *worker;
     icy::VisualRepresentation representation;
     icy::SnapshotWriter snapshot;
@@ -115,8 +116,9 @@ private:
     // other
     void OpenFile(QString fileName);
     void GoToStep(int step);
-    QString qLastFileName, qBaseFileName, qLastDirectory;
-    const std::string screenshot_directory = "/screenshots";
+    QString qLastParameterFile;
+    std::string outputDirectory = "tmp_output";
+    const std::string screenshot_directory = "screenshots";
     bool replayMode = false;
     int replayFrame;
 

@@ -1,20 +1,5 @@
 #include "parameters_sim.h"
 
-void icy::SimParams::ComputeLame()
-{
-    lambda = YoungsModulus*PoissonsRatio/((1+PoissonsRatio)*(1-2*PoissonsRatio));
-    mu = YoungsModulus/(2*(1+PoissonsRatio));
-    kappa = mu*2./3. + lambda;
-}
-
-void icy::SimParams::ComputeCamClayParams()
-{
-    real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
-    real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
-    real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
-    std::cout << "SimParams: NACC M is " << NACC_M << '\n';
-    NACC_M_sq = NACC_M*NACC_M;
-}
 
 
 void icy::SimParams::Reset()
@@ -22,18 +7,6 @@ void icy::SimParams::Reset()
     grid_array = nullptr;
     pts_array = nullptr;
 
-//#define PARAMS2
-#ifdef PARAMS2
-    InitialTimeStep = 4.e-6;
-    YoungsModulus = 5.e8;
-    NACC_beta = 0.7;
-    NACC_xi = 1.5;
-    NACC_alpha = std::log(1.-1.e-3);
-    PointsWanted = 2'000'000;
-    GridX = 1024;
-    GridY = 440;
-    ParticleViewSize = 1.0f;
-#else
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
     NACC_beta = 0.7;
@@ -43,16 +16,9 @@ void icy::SimParams::Reset()
     GridX = 128;
     GridY = 55;
     ParticleViewSize = 2.5f;
-#endif
 
     NACC_friction_angle = 35;
-
     SimulationEndTime = 12;
-    UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
-
-    cellsize = (real)3.33/(GridX);
-    cellsize_inv = 1./cellsize;
-    Dp_inv = 4./(cellsize*cellsize);
 
     PoissonsRatio = 0.3;
     Gravity = 9.81;
@@ -60,7 +26,6 @@ void icy::SimParams::Reset()
     IceFrictionCoefficient = 0.03;
 
     IndDiameter = 0.324;
-    IndRSq = IndDiameter*IndDiameter/4.;
     IndVelocity = 0.2;
     IndDepth = 0.25;//0.101;
 
@@ -86,11 +51,12 @@ void icy::SimParams::Reset()
 
     ComputeCamClayParams();
     ComputeLame();
+    ComputeHelperVariables();
     std::cout << "SimParams Reset() done\n";
 }
 
 
-void icy::SimParams::ParseFile(std::string fileName, std::string &outputDirectory)
+std::string icy::SimParams::ParseFile(std::string fileName)
 {
     if(!std::filesystem::exists(fileName)) throw std::runtime_error("configuration file is not found");
     std::ifstream fileStream(fileName);
@@ -103,6 +69,7 @@ void icy::SimParams::ParseFile(std::string fileName, std::string &outputDirector
     doc.Parse(strConfigFile.data());
     if(!doc.IsObject()) throw std::runtime_error("configuration file is not JSON");
 
+    std::string outputDirectory = "output";
     if(doc.HasMember("OutputDirectory")) outputDirectory = doc["OutputDirectory"].GetString();
     if(doc.HasMember("InitialTimeStep")) InitialTimeStep = doc["InitialTimeStep"].GetDouble();
     if(doc.HasMember("YoungsModulus")) YoungsModulus = doc["YoungsModulus"].GetDouble();
@@ -130,12 +97,33 @@ void icy::SimParams::ParseFile(std::string fileName, std::string &outputDirector
 
     ComputeCamClayParams();
     ComputeLame();
+    ComputeHelperVariables();
 
+    std::cout << "loaded parameters file " << fileName << '\n';
+    return outputDirectory;
+}
+
+void icy::SimParams::ComputeLame()
+{
+    lambda = YoungsModulus*PoissonsRatio/((1+PoissonsRatio)*(1-2*PoissonsRatio));
+    mu = YoungsModulus/(2*(1+PoissonsRatio));
+    kappa = mu*2./3. + lambda;
+}
+
+void icy::SimParams::ComputeCamClayParams()
+{
+    real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
+    real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
+    real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
+    std::cout << "SimParams: NACC M is " << NACC_M << '\n';
+    NACC_M_sq = NACC_M*NACC_M;
+}
+
+void icy::SimParams::ComputeHelperVariables()
+{
     UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
     cellsize = (real)3.33/(GridX);
     cellsize_inv = 1./cellsize;
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;
-
-    std::cout << "loaded parameters file " << fileName << '\n';
 }

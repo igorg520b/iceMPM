@@ -74,10 +74,11 @@ public:
     double H0, H1, H2, H3;
 
     void Reset();
-    void ParseFile(std::string fileName, std::string &outputDirectory);
+    std::string ParseFile(std::string fileName);
 
     void ComputeLame();
     void ComputeCamClayParams();
+    void ComputeHelperVariables();
 };
 
 #endif
