@@ -62,11 +62,11 @@ void GPU_Implementation3::cuda_update_constants()
     std::cout << "CUDA constants copied to device\n";
 }
 
-void GPU_Implementation3::cuda_allocate_arrays()
+void GPU_Implementation3::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
 {
     if(!initialized) initialize();
-    size_t nGridNodes = prms->GridX*prms->GridY;
-    size_t nPoints = prms->nPts;
+//    size_t nGridNodes = prms->GridX*prms->GridY;
+//    size_t nPoints = prms->nPts;
     cudaError_t err;
 
     // device memory for grid
@@ -153,6 +153,7 @@ void CUDART_CB GPU_Implementation3::callback_transfer_from_device_completion(cud
 void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point> &points)
 {
     int n = prms->nPtsPitch/sizeof(real);
+    if(points.size() != prms->nPts) points.resize(prms->nPts);
     for(int i=0;i<prms->nPts;i++)
     {
         points[i].pos[0] = tmp_transfer_buffer[i + n*icy::SimParams::posx];

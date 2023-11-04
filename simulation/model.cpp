@@ -73,14 +73,13 @@ void icy::Model::Reset()
     const std::array<real, 2>kXMax{5.0*h+block_length, 2.0*h+block_height};
     spdlog::info("starting thinks::PoissonDiskSampling");
     std::vector<std::array<real, 2>> prresult = thinks::PoissonDiskSampling(kRadius, kXMin, kXMax);
-    const size_t nPoints = prresult.size();
-    points.resize(nPoints);
-    prms.nPts = nPoints;
-    spdlog::info("finished thinks::PoissonDiskSampling; {} ", nPoints);
+    spdlog::info("finished thinks::PoissonDiskSampling; {} ", prms.nPts);
+    prms.nPts = prresult.size();
+    points.resize(prms.nPts);
 
-    prms.ParticleVolume = block_length*block_height/nPoints;
+    prms.ParticleVolume = block_length*block_height/prms.nPts;
     prms.ParticleMass = prms.ParticleVolume*prms.Density;
-    for(int k = 0; k<nPoints; k++)
+    for(int k = 0; k<prms.nPts; k++)
     {
         Point &p = points[k];
         p.pos[0] = prresult[k][0];
@@ -97,7 +96,7 @@ void icy::Model::Reset()
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
 
-    gpu.cuda_allocate_arrays();
+    gpu.cuda_allocate_arrays(prms.GridX*prms.GridY, prms.nPts);
     gpu.transfer_ponts_to_device(points);
     Prepare();
     spdlog::info("icy::Model::Reset() done");

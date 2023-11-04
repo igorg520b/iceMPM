@@ -283,6 +283,8 @@ void MainWindow::OpenFile(QString fileName)
     snapshot.ReadSnapshot(fileName.toStdString());
     representation.SynchronizeTopology();
     updateGUI();
+    pbrowser->setActiveObject(params);
+
 
     /*
     slider1->blockSignals(true);

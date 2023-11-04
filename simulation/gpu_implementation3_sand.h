@@ -39,7 +39,7 @@ public:
     void test();
     void synchronize(); // call before terminating the main thread
     void cuda_update_constants();
-    void cuda_allocate_arrays();
+    void cuda_allocate_arrays(size_t nGridNodes, size_t nPoints);
     void cuda_reset_grid();
     void transfer_ponts_to_device(const std::vector<icy::Point> &points);
     void cuda_p2g();
