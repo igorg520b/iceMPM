@@ -15,7 +15,10 @@ struct icy::Point
     real NACC_alpha_p;
 
     double q; // Drucker Prager hardening paremeter
+    double Jp; // for snow
+    Vector2r pos_initial; // for resetting
 
+    void Reset(real alpha);
 
     static real wc(Vector2r dx);
     static Vector2r gradwc(Vector2r dx);

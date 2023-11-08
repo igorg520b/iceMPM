@@ -24,7 +24,9 @@ __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r 
 
 __device__ void NACCUpdateDeformationGradient(icy::Point &p);
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p);
+__device__ void SnowUpdateDeformationGradient(icy::Point &p);
 
+__device__ double clamp(double x, double a, double b);
 
 // Naive GPU Implementation with memory coalescing
 

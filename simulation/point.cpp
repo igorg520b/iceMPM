@@ -5,6 +5,17 @@
 #include <Eigen/Core>
 
 
+void icy::Point::Reset(real alpha)
+{
+    pos = pos_initial;
+    Fe.setIdentity();
+    velocity.setZero();
+    Bp.setZero();
+    NACC_alpha_p = alpha;
+    q = 0;
+    Jp = 1;
+}
+
 
 Matrix2r icy::Point::NACCConstitutiveModel(const real &mu,
                                       const real &lambda,

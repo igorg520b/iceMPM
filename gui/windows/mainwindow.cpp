@@ -188,6 +188,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
     connect(ui->actionLoad_Parameters, &QAction::triggered, this, &MainWindow::load_parameter_triggered);
+    connect(ui->actionReset, &QAction::triggered, this, &MainWindow::simulation_reset_triggered);
 
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
     connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
@@ -200,7 +201,7 @@ MainWindow::MainWindow(QWidget *parent)
 }
 
 
-void MainWindow::closeEvent( QCloseEvent* event )
+void MainWindow::closeEvent(QCloseEvent* event)
 {
     quit_triggered();
     event->accept();
@@ -278,6 +279,14 @@ void MainWindow::open_snapshot_triggered()
     OpenFile(qFileName);
 }
 
+void MainWindow::simulation_reset_triggered()
+{
+    model.ResetToStep0();
+    representation.SynchronizeTopology();
+    updateGUI();
+    renderWindow->Render();
+}
+
 void MainWindow::OpenFile(QString fileName)
 {
     snapshot.ReadSnapshot(fileName.toStdString());
@@ -302,7 +311,8 @@ void MainWindow::load_parameter_triggered()
     this->qLastParameterFile = qFileName;
     model.Reset();
     representation.SynchronizeTopology();
-    if(ui->actionSave_Binary_Data->isChecked() && model.prms.SimulationStep == 0) save_binary_data();
+//    if(ui->actionSave_Binary_Data->isChecked() && model.prms.SimulationStep == 0) save_binary_data();
+    pbrowser->setActiveObject(params);
     updateGUI();
 }
 

@@ -124,6 +124,7 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
+    const real &alpha0 = model->prms.NACC_alpha;
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->hostside_data_update_mutex.lock();
@@ -133,18 +134,20 @@ void icy::VisualRepresentation::SynchronizeValues()
         const icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
-//        visualized_values->SetValue((vtkIdType)i, p.NACC_alpha_p);
-        visualized_values->SetValue((vtkIdType)i, p.q);
+        double val = p.NACC_alpha_p < alpha0 ? alpha0-0.02 : p.NACC_alpha_p;
+//        double val = p.Jp;
+        visualized_values->SetValue((vtkIdType)i, val);
     }
 
     model->hostside_data_update_mutex.unlock();
 
     float minmax[2];
     visualized_values->GetValueRange(minmax);
-//    const float &alpha0 = model->prms.NACC_alpha;
-    const float &alpha0 = 0;
-    float epsilon = 1.5;
-    lutMPM->SetTableRange(alpha0-epsilon/2, alpha0+epsilon/2);
+    float epsilon = 2e-2;
+    float centerVal = alpha0;//1;
+//    const float &alpha0 = 0;
+//    float epsilon = 1.5;
+    lutMPM->SetTableRange(centerVal-epsilon/2, centerVal+epsilon/2);
 
     points->Modified();
     visualized_values->Modified();

@@ -16,6 +16,7 @@ void icy::SimParams::Reset()
     GridX = 128;
     GridY = 55;
     ParticleViewSize = 2.5f;
+    GridXDimension = 3.33;
 
     NACC_friction_angle = 35;
     SimulationEndTime = 12;
@@ -31,23 +32,25 @@ void icy::SimParams::Reset()
 
     BlockHeight = 1.0;
     BlockLength = 2.5;
+    HoldBlockOnTheRight = 0;
 
     SimulationStep = 0;
     SimulationTime = 0;
 
     // Snow
     XiSnow = 10.;
-    THT_C_snow = 2.0e-2;				// Critical compression
-    THT_S_snow = 6.0e-3;				// Critical stretch
+    THT_C_snow = 2.0e-3;				// Critical compression
+    THT_S_snow = 6.0e-4;				// Critical stretch
 
     // Drucker-Prager
     // H0 > H3 >=0;
     // H1, H2 >=0
+    H0 = 54 * pi / 180.0f;
+    H1 = 30 * pi / 180.0f;
+    H2 = 0.1f;
+    H3 = 40 * pi / 180.0f;
 
-    H0 = 44 * pi / 180.0f;
-    H1 = 5 * pi / 180.0f;
-    H2 = 0.2f;
-    H3 = 10 * pi / 180.0f;
+    SandYM = 5e7;
 
     ComputeCamClayParams();
     ComputeLame();
@@ -77,8 +80,10 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
     if(doc.HasMember("NACC_alpha_exp")) NACC_alpha = std::log(doc["NACC_alpha_exp"].GetDouble());
     if(doc.HasMember("PointsWanted")) PointsWanted = doc["PointsWanted"].GetDouble();
-    if(doc.HasMember("GridX")) GridX = doc["GridX"].GetDouble();
-    if(doc.HasMember("GridY")) GridY = doc["GridY"].GetDouble();
+    if(doc.HasMember("GridX")) GridX = doc["GridX"].GetInt();
+    if(doc.HasMember("GridY")) GridY = doc["GridY"].GetInt();
+    if(doc.HasMember("GridXDimension")) GridXDimension = doc["GridXDimension"].GetDouble();
+    if(doc.HasMember("HoldBlockOnTheRight")) HoldBlockOnTheRight = doc["HoldBlockOnTheRight"].GetInt();
     if(doc.HasMember("ParticleViewSize")) ParticleViewSize = doc["ParticleViewSize"].GetDouble();
     if(doc.HasMember("NACC_friction_angle")) NACC_friction_angle = doc["NACC_friction_angle"].GetDouble();
     if(doc.HasMember("SimulationEndTime")) SimulationEndTime = doc["SimulationEndTime"].GetDouble();
@@ -95,11 +100,19 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("THT_C_snow")) THT_C_snow = doc["THT_C_snow"].GetDouble();
     if(doc.HasMember("THT_S_snow")) THT_S_snow = doc["THT_S_snow"].GetDouble();
 
+    if(doc.HasMember("H0")) H0 = doc["H0"].GetDouble() * pi/180.0;
+    if(doc.HasMember("H1")) H1 = doc["H1"].GetDouble() * pi/180.0;
+    if(doc.HasMember("H2")) H2 = doc["H2"].GetDouble();
+    if(doc.HasMember("H3")) H3 = doc["H3"].GetDouble() * pi/180.0;
+
+
     ComputeCamClayParams();
     ComputeLame();
     ComputeHelperVariables();
 
     std::cout << "loaded parameters file " << fileName << '\n';
+    std::cout << "GridXDimension " << GridXDimension << '\n';
+    std::cout << "cellsize " << cellsize << '\n';
     return outputDirectory;
 }
 
@@ -122,7 +135,7 @@ void icy::SimParams::ComputeCamClayParams()
 void icy::SimParams::ComputeHelperVariables()
 {
     UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
-    cellsize = (real)3.33/(GridX);
+    cellsize = GridXDimension/GridX;
     cellsize_inv = 1./cellsize;
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;

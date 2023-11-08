@@ -31,6 +31,7 @@ class icy::Model
 public:
     Model(){prms.Reset(); gpu.prms = &prms;};
     void Reset();
+    void ResetToStep0();
     void Prepare();        // invoked once, at simulation start
     bool Step();           // either invoked by Worker or via GUI
     void RequestAbort() {abortRequested = true;}   // asynchronous stop

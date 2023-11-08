@@ -116,6 +116,7 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::Fe11] = points[i].Fe(1,1);
         tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP] = points[i].NACC_alpha_p;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_q] = points[i].q;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp;
     }
 
     // transfer point data to device
@@ -170,6 +171,7 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].Fe(1,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe11];
         points[i].NACC_alpha_p = tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP];
         points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q];
+        points[i].Jp = tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp];
     }
 }
 
@@ -238,8 +240,8 @@ __global__ void v2_kernel_p2g()
     const real &h = gprms.cellsize;
     const real &h_inv = gprms.cellsize_inv;
     const real &Dinv = gprms.Dp_inv;
-    const real &lambda = gprms.lambda;
-    const real &mu = gprms.mu;
+    real lambda = gprms.lambda;
+    real mu = gprms.mu;
     const int &gridX = gprms.GridX;
     const int &gridY = gprms.GridY;
     const real &particle_mass = gprms.ParticleMass;
@@ -259,13 +261,27 @@ __global__ void v2_kernel_p2g()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitch + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitch + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
+    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
 
-    Matrix2r Re = polar_decomp_R(p.Fe);
+    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitch + pt_idx];
+
+//    real exp1 = exp(gprms.XiSnow*(1.0 - p.Jp));
+//    lambda*= exp1;
+//    mu*= exp1;
+
+    if(p.NACC_alpha_p < gprms.NACC_alpha)
+    {
+        lambda = gprms.SandYM*gprms.PoissonsRatio/((1+gprms.PoissonsRatio)*(1-2*gprms.PoissonsRatio));
+        mu = gprms.SandYM/(2*(1+gprms.PoissonsRatio));
+    }
     real Je = p.Fe.determinant();
     Matrix2r &F = p.Fe;
-//    Matrix2r PFt = 2.*mu*(p.Fe - Re)* p.Fe.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
     Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();     // Neo-Hookean; Sifakis
-/*    Matrix2r U, V, Sigma;
+//    Matrix2r Re = polar_decomp_R(p.Fe);
+//    Matrix2r PFt = 2.*mu*(p.Fe - Re)* p.Fe.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
+/*
+    // Klar's version
+    Matrix2r U, V, Sigma;
     svd2x2(F, U, Sigma, V);
     Matrix2r lnSigma,invSigma;
     lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
@@ -283,9 +299,9 @@ __global__ void v2_kernel_p2g()
     Vector2r base_coord(i0,j0);
     Vector2r fx = p.pos*h_inv - base_coord;
 
-    Vector2r v0(1.5-fx[0],1.5-fx[1]);
-    Vector2r v1(fx[0]-1.,fx[1]-1.);
-    Vector2r v2(fx[0]-.5,fx[1]-.5);
+    real v0[2] {1.5-fx[0], 1.5-fx[1]};
+    real v1[2] {fx[0]-1.,  fx[1]-1.};
+    real v2[2] {fx[0]-.5,  fx[1]-.5};
 
     real w[3][2] = {{.5*v0[0]*v0[0],  .5*v0[1]*v0[1]},
                     {.75-v1[0]*v1[0], .75-v1[1]*v1[1]},
@@ -365,6 +381,12 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     else if(idx_y >= gridY-4 && velocity[1]>0) velocity[1] = 0;
     if(idx_x <= 3 && velocity.x()<0) velocity[0] = 0;
     else if(idx_x >= gridX-5) velocity[0] = 0;
+    if(gprms.HoldBlockOnTheRight)
+    {
+        int blocksGridX = gprms.BlockLength*gprms.cellsize_inv+5-2;
+        if(idx_x >= blocksGridX) velocity.setZero();
+    }
+
 
     // write the updated grid velocity back to memory
     gprms.grid_array[1*nGridPitch + idx] = velocity[0];
@@ -390,8 +412,10 @@ __global__ void v2_kernel_g2p()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitched + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
-//    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
+    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
     p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
+    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
+
     p.velocity.setZero();
     p.Bp.setZero();
 
@@ -402,9 +426,9 @@ __global__ void v2_kernel_g2p()
     Vector2r base_coord(i0,j0);
     Vector2r fx = p.pos*h_inv - base_coord;
 
-    Vector2r v0(1.5-fx[0],1.5-fx[1]);
-    Vector2r v1(fx[0]-1.,fx[1]-1.);
-    Vector2r v2(fx[0]-.5,fx[1]-.5);
+    real v0[2] {1.5-fx[0], 1.5-fx[1]};
+    real v1[2] {fx[0]-1.,  fx[1]-1.};
+    real v2[2] {fx[0]-.5,  fx[1]-.5};
 
     real w[3][2] = {{.5*v0[0]*v0[0],  .5*v0[1]*v0[1]},
                     {.75-v1[0]*v1[0], .75-v1[1]*v1[1]},
@@ -427,8 +451,10 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-//    NACCUpdateDeformationGradient(p);
-    DruckerPragerUpdateDeformationGradient(p);
+    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
+    else DruckerPragerUpdateDeformationGradient(p);
+
+//    SnowUpdateDeformationGradient(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];
@@ -442,9 +468,63 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe01*nPtsPitched + pt_idx] = p.Fe(0,1);
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
-//    gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
+    gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
     gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
+    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
 }
+
+//===========================================================================
+
+// clamp x to range [a, b]
+__device__ double clamp(double x, double a, double b)
+{
+    return max(a, min(b, x));
+}
+
+__device__ void SnowUpdateDeformationGradient(icy::Point &p)
+{
+    const Matrix2r &gradV = p.Bp;
+    //    constexpr real magic_epsilon = 1.e-15;
+    const real &mu = gprms.mu;
+    const real &lambda = gprms.lambda;
+    const real &dt = gprms.InitialTimeStep;
+    const real &THT_C_snow = gprms.THT_C_snow;
+    const real &THT_S_snow = gprms.THT_S_snow;
+
+    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
+
+    Matrix2r U, V, Sigma, SigmaClamped;
+    svd2x2(FeTr, U, Sigma, V);
+    SigmaClamped.setZero();
+    SigmaClamped(0,0) = clamp(Sigma(0,0), 1.0 - THT_C_snow, 1.0 + THT_S_snow);
+    SigmaClamped(1,1) = clamp(Sigma(1,1), 1.0 - THT_C_snow, 1.0 + THT_S_snow);
+    p.Fe = U*SigmaClamped*V.transpose();
+
+    p.Jp *= (V*SigmaClamped.inverse()*Sigma*V.transpose()).determinant();
+
+
+    /*
+    FeTr.svd(&U, &Eps, &V);
+
+    Vector2f T = Eps.clamp(1 - THT_C_snow, 1 + THT_S_snow);		// Projection
+
+    Fe = U.diag_product(T) * V.transpose();
+
+    Fp = V.diag_product_inv(T).diag_product(Eps) * V.transpose() * FpTr;
+
+    Je = Fe.det();
+    Jp = Fp.det();
+
+    // Hardening
+    double exp = std::exp(KSI_snow*(1.0 - Jp));
+    lam = LAM_snow * exp;
+    mu = MU_snow * exp;
+*/
+
+
+}
+
+//===========================================================================
 
 
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p)

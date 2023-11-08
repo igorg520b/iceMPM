@@ -82,25 +82,45 @@ void icy::Model::Reset()
     for(int k = 0; k<prms.nPts; k++)
     {
         Point &p = points[k];
+        p.Reset(prms.NACC_alpha);
         p.pos[0] = prresult[k][0];
         p.pos[1] = prresult[k][1];
-        p.Fe.setIdentity();
-        p.velocity.setZero();
-//        p.velocity.x() = 1.f + (p.pos.y()-1.5)/2;
-//        p.velocity.y() = 2.f + (-p.pos.x()-1.5)/2;
-        //p.Fp.setIdentity();
-        p.Bp.setZero();
-        p.NACC_alpha_p = prms.NACC_alpha;
-        p.q = 0;
+        p.pos_initial = p.pos;
     }
     indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
+    indenter_x = indenter_x_initial = 4*h - prms.IndDiameter/2;
 
     gpu.cuda_allocate_arrays(prms.GridX*prms.GridY, prms.nPts);
     gpu.transfer_ponts_to_device(points);
     Prepare();
     spdlog::info("icy::Model::Reset() done");
 }
+
+void icy::Model::ResetToStep0()
+{
+    spdlog::info("ResetToStep0()");
+
+    prms.SimulationStep = 0;
+    prms.SimulationTime = 0;
+    compute_time_per_cycle = 0;
+
+    const real &block_length = prms.BlockLength;
+    const real &block_height = prms.BlockHeight;
+    const real &h = prms.cellsize;
+
+    for(int k = 0; k<points.size(); k++)
+    {
+        Point &p = points[k];
+        p.Reset(prms.NACC_alpha);
+    }
+    indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
+    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
+    gpu.transfer_ponts_to_device(points);
+    gpu.cuda_update_constants();
+    Prepare();
+    spdlog::info("ResetToStep0() done");
+}
+
 
 void icy::Model::Prepare()
 {

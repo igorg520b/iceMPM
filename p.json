@@ -1,13 +1,15 @@
 {
-"OutputDirectory":"cm_output1",
+"OutputDirectory":"cm_output0",
 "InitialTimeStep":3.0e-5,
-"YoungsModulus":5.0e8,
-"NACC_beta":0.7,
-"NACC_xi":1.5,
-"NACC_alpha_exp": 0.995,
 "PointsWanted":50000,
 "GridX":128,
 "GridY":55,
+
+"YoungsModulus":5.0e8,
+"NACC_beta":0.3,
+"NACC_xi":3.5,
+"NACC_alpha_exp": 0.993,
+
 "ParticleViewSize":2.5,
 "NACC_friction_angle": 35,
 "SimulationEndTime":12,
@@ -21,8 +23,12 @@
 "BlockHeight":1.0,
 "BlockLength":2.5,
 "XiSnow":10,
-"THT_C_snow":2.0e-2,
-"THT_S_snow":6.0e-3
+"THT_C_snow":2.0e-3,
+"THT_S_snow":6.0e-4,
+"H0":34,
+"H1":5,
+"H2":0.2,
+"H3":10
 }
 
 
