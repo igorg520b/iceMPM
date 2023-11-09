@@ -42,7 +42,7 @@ public:
 
     icy::Model *model;
 
-    double limit_low = 0, limit_high = 1e7; // limits for color scale
+    double value_range = 0.01;
 
     enum VisOpt { none, velocity, stress_mises, stress_maxP, stress_minP};
     Q_ENUM(VisOpt)

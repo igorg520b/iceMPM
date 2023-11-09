@@ -225,9 +225,46 @@ void GPU_Implementation3::cuda_g2p()
     }
 }
 
+// ==============================  Functions that compute Kirchhoff stress via Strain Energy Density ========
+
+__device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, const Matrix2r &F)
+{
+    // Kirchhoff stress as per Wolper (2019)
+    real Je = F.determinant();
+    Matrix2r b = F*F.transpose();
+    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + Je*kappa*(Je-1/Je)*Matrix2r::Identity();
+    return PFt;
+}
+
+__device__ Matrix2r KirchhoffStress_Klar(const double mu, const double lambda, const Matrix2r &F)
+{
+    Matrix2r U, V, Sigma;
+    svd2x2(F, U, Sigma, V);
+    Matrix2r lnSigma,invSigma;
+    lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
+    invSigma = Sigma.inverse();
+    Matrix2r PFt = U*(2*mu*invSigma*lnSigma + lambda*lnSigma.trace()*invSigma)*V.transpose()*F.transpose();
+    return PFt;
+}
+
+__device__ Matrix2r KirchhoffStress_Sifakis(const double mu, const double lambda, const Matrix2r &F)
+{
+    real Je = F.determinant();
+    Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();     // Neo-Hookean; Sifakis
+    return PFt;
+}
+
+
+__device__ Matrix2r KirchhoffStress_Stomakhin(const double mu, const double lambda, const Matrix2r &F)
+{
+    Matrix2r Re = polar_decomp_R(F);
+    real Je = F.determinant();
+    Matrix2r PFt = 2.*mu*(F - Re)* F.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
+    return PFt;
+}
+
 
 // ==============================  kernels  ====================================
-
 
 __global__ void v2_kernel_p2g()
 {
@@ -242,6 +279,7 @@ __global__ void v2_kernel_p2g()
     const real &Dinv = gprms.Dp_inv;
     real lambda = gprms.lambda;
     real mu = gprms.mu;
+    real &kappa = gprms.kappa;
     const int &gridX = gprms.GridX;
     const int &gridY = gprms.GridY;
     const real &particle_mass = gprms.ParticleMass;
@@ -263,31 +301,25 @@ __global__ void v2_kernel_p2g()
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
     p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
 
-    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitch + pt_idx];
+//    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitch + pt_idx];
 
+    // for snow
 //    real exp1 = exp(gprms.XiSnow*(1.0 - p.Jp));
 //    lambda*= exp1;
 //    mu*= exp1;
 
-    if(p.NACC_alpha_p < gprms.NACC_alpha)
-    {
-        lambda = gprms.SandYM*gprms.PoissonsRatio/((1+gprms.PoissonsRatio)*(1-2*gprms.PoissonsRatio));
-        mu = gprms.SandYM/(2*(1+gprms.PoissonsRatio));
-    }
-    real Je = p.Fe.determinant();
-    Matrix2r &F = p.Fe;
-    Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();     // Neo-Hookean; Sifakis
-//    Matrix2r Re = polar_decomp_R(p.Fe);
-//    Matrix2r PFt = 2.*mu*(p.Fe - Re)* p.Fe.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
-/*
-    // Klar's version
-    Matrix2r U, V, Sigma;
-    svd2x2(F, U, Sigma, V);
-    Matrix2r lnSigma,invSigma;
-    lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
-    invSigma = Sigma.inverse();
-    Matrix2r PFt = U*(2*mu*invSigma*lnSigma + lambda*lnSigma.trace()*invSigma)*V.transpose()*F.transpose();
-*/
+//    if(p.NACC_alpha_p < gprms.NACC_alpha)
+//    {
+//        lambda = gprms.SandYM*gprms.PoissonsRatio/((1+gprms.PoissonsRatio)*(1-2*gprms.PoissonsRatio));
+//        mu = gprms.SandYM/(2*(1+gprms.PoissonsRatio));
+//   }
+
+
+
+    Matrix2r PFt = KirchhoffStress_Wolper(gprms.kappa, gprms.mu, p.Fe);
+//    Matrix2r PFt = KirchhoffStress_Klar(gprms.mu, gprms.lambda, p.Fe);
+//    Matrix2r PFt = KirchhoffStress_Sifakis(gprms.mu, gprms.lambda, p.Fe);
+//    Matrix2r PFt = KirchhoffStress_Stomakhin(gprms.mu, gprms.lambda, p.Fe);
 
     Matrix2r subterm1 = -(dt*vol*Dinv) * PFt;
     Matrix2r subterm2 = subterm1 + particle_mass * p.Bp;
@@ -381,10 +413,17 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     else if(idx_y >= gridY-4 && velocity[1]>0) velocity[1] = 0;
     if(idx_x <= 3 && velocity.x()<0) velocity[0] = 0;
     else if(idx_x >= gridX-5) velocity[0] = 0;
-    if(gprms.HoldBlockOnTheRight)
+    if(gprms.HoldBlockOnTheRight==1)
     {
         int blocksGridX = gprms.BlockLength*gprms.cellsize_inv+5-2;
         if(idx_x >= blocksGridX) velocity.setZero();
+    }
+    else if(gprms.HoldBlockOnTheRight==2)
+    {
+        int blocksGridX = gprms.BlockLength*gprms.cellsize_inv+5-2;
+        int blocksGridY = gprms.BlockHeight/2*gprms.cellsize_inv+2;
+        if(idx_x >= blocksGridX && idx_x <= blocksGridX + 2 && idx_y < blocksGridY) velocity.setZero();
+        if(idx_x <= 7 && idx_x > 4 && idx_y < blocksGridY) velocity.setZero();
     }
 
 
@@ -413,8 +452,8 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
     p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
-    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
-    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
+//    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
+//    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -451,9 +490,9 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
-    else DruckerPragerUpdateDeformationGradient(p);
-
+    NACCUpdateDeformationGradient(p);
+//    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
+//    else DruckerPragerUpdateDeformationGradient(p);
 //    SnowUpdateDeformationGradient(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
@@ -469,8 +508,8 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
     gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
-    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
-    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
+//    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
+//    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
 }
 
 //===========================================================================
@@ -622,7 +661,7 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p)
     real p_trial = -psi_kappa_partial_J * Je_tr;
 
     // line 9 (case 1)
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.norm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(p_trial > p0)
     {
         real Je_new = sqrt(-2.*p0 / kappa + 1.);

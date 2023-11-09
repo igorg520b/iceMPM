@@ -26,6 +26,12 @@ __device__ void NACCUpdateDeformationGradient(icy::Point &p);
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p);
 __device__ void SnowUpdateDeformationGradient(icy::Point &p);
 
+__device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, const Matrix2r &F);
+__device__ Matrix2r KirchhoffStress_Klar(const double mu, const double lambda, const Matrix2r &F);
+__device__ Matrix2r KirchhoffStress_Sifakis(const double mu, const double lambda, const Matrix2r &F);
+__device__ Matrix2r KirchhoffStress_Stomakhin(const double mu, const double lambda, const Matrix2r &F);
+
+
 __device__ double clamp(double x, double a, double b);
 
 // Naive GPU Implementation with memory coalescing

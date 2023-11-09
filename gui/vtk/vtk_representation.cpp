@@ -94,7 +94,7 @@ void icy::VisualRepresentation::SynchronizeTopology()
     points_polydata->GetPointData()->SetActiveScalars("visualized_values");
     points_mapper->ScalarVisibilityOn();
     points_mapper->SetColorModeToMapScalars();
-    float eps = 1.e-3;
+    float eps = value_range;
     lutMPM->SetTableRange(1.f-eps, 1.f+eps);
 
     SynchronizeValues();
@@ -141,13 +141,12 @@ void icy::VisualRepresentation::SynchronizeValues()
 
     model->hostside_data_update_mutex.unlock();
 
-    float minmax[2];
-    visualized_values->GetValueRange(minmax);
-    float epsilon = 2e-2;
-    float centerVal = alpha0;//1;
+//    float minmax[2];
+//    visualized_values->GetValueRange(minmax);
+    double centerVal = alpha0;//1;
 //    const float &alpha0 = 0;
-//    float epsilon = 1.5;
-    lutMPM->SetTableRange(centerVal-epsilon/2, centerVal+epsilon/2);
+    double range = std::pow(10,value_range);
+    lutMPM->SetTableRange(centerVal-range, centerVal+range);
 
     points->Modified();
     visualized_values->Modified();

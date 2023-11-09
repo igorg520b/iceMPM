@@ -101,7 +101,7 @@ private:
     QLabel *labelStepCount;
     QComboBox *comboBox_visualizations;
     QSlider *slider1;
-    QDoubleSpinBox *qdsbLimitLow, *qdsbLimitHigh;   // high and low limits for value scale
+    QDoubleSpinBox *qdsbValRange;   // high and low limits for value scale
 
     ObjectPropertyBrowser *pbrowser;    // to show simulation settings/properties
     QSplitter *splitter;

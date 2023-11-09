@@ -84,6 +84,12 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double nacc_p0 READ getNaccP0 NOTIFY propertyChanged)
     double getNaccP0() { return prms->kappa*sinh(prms->NACC_xi*(-prms->NACC_alpha))/1e6;}
 
+    Q_PROPERTY(double nacc_angle READ getNaccAngle WRITE setNaccAngle NOTIFY propertyChanged)
+    double getNaccAngle() {return prms->NACC_friction_angle;}
+    void setNaccAngle(double val) {prms->NACC_friction_angle=val; prms->ComputeCamClayParams();}
+
+
+
     Q_PROPERTY(double nacc_p0_beta READ getNaccP0beta NOTIFY propertyChanged)
     double getNaccP0beta() { return prms->kappa*sinh(prms->NACC_xi*(-prms->NACC_alpha))*prms->NACC_beta/1e6;}
 

@@ -57,14 +57,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->toolBar->addWidget(comboBox_visualizations);
 
     // double spin box
-    qdsbLimitLow = new QDoubleSpinBox();
-    qdsbLimitHigh = new QDoubleSpinBox();
-    qdsbLimitLow->setRange(-1e10, 1e10);
-    qdsbLimitHigh->setRange(-1e10, 1e10);
-    qdsbLimitLow->setValue(0);
-    qdsbLimitHigh->setValue(1e7);
-    ui->toolBar->addWidget(qdsbLimitLow);
-    ui->toolBar->addWidget(qdsbLimitHigh);
+    qdsbValRange = new QDoubleSpinBox();
+    qdsbValRange->setRange(-10, 10);
+    qdsbValRange->setValue(-2);
+    qdsbValRange->setDecimals(0);
+    ui->toolBar->addWidget(qdsbValRange);
 
     // slider
     ui->toolBar->addSeparator();
@@ -158,14 +155,20 @@ MainWindow::MainWindow(QWidget *parent)
         var = settings.value("save_binary_data");
         if(!var.isNull()) ui->actionSave_Binary_Data->setChecked(var.toBool());
 
-
-
         var = settings.value("splitter_size_0");
         if(!var.isNull())
         {
             int sz1 = var.toInt();
             int sz2 = settings.value("splitter_size_1").toInt();
             splitter->setSizes(QList<int>({sz1, sz2}));
+        }
+
+        var = settings.value("value_range");
+        if(!var.isNull())
+        {
+            double val = var.toDouble();
+            representation.value_range = val;
+            qdsbValRange->setValue(val);
         }
     }
     else
@@ -183,12 +186,12 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->action_camera_reset, &QAction::triggered, this, &MainWindow::cameraReset_triggered);
     connect(ui->actionOpen, &QAction::triggered, this, &MainWindow::open_snapshot_triggered);
     connect(ui->actionCreate_Video, &QAction::triggered, this, &MainWindow::createVideo_triggered);
-    connect(qdsbLimitLow,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
-    connect(qdsbLimitHigh,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
     connect(ui->actionScreenshot, &QAction::triggered, this, &MainWindow::screenshot_triggered);
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
     connect(ui->actionLoad_Parameters, &QAction::triggered, this, &MainWindow::load_parameter_triggered);
     connect(ui->actionReset, &QAction::triggered, this, &MainWindow::simulation_reset_triggered);
+
+    connect(qdsbValRange,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
 
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
     connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
@@ -233,6 +236,7 @@ void MainWindow::quit_triggered()
     if(!qLastParameterFile.isEmpty()) settings.setValue("lastParameterFile", qLastParameterFile);
     settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
     settings.setValue("save_binary_data", ui->actionSave_Binary_Data->isChecked());
+    settings.setValue("value_range", representation.value_range);
 
     QList<int> szs = splitter->sizes();
     settings.setValue("splitter_size_0", szs[0]);
@@ -364,14 +368,12 @@ void MainWindow::GoToStep(int step)
     */
 }
 
-void MainWindow::limits_changed(double val)
+void MainWindow::limits_changed(double val_)
 {
-    /*
-    meshRepresentation.limit_low = qdsbLimitLow->value();
-    meshRepresentation.limit_high = qdsbLimitHigh->value();
-    meshRepresentation.SynchronizeValues();
+    double val = qdsbValRange->value();
+    representation.value_range = val;
+    representation.SynchronizeValues();
     renderWindow->Render();
-    */
 }
 
 
