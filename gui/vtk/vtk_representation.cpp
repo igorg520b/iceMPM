@@ -94,8 +94,6 @@ void icy::VisualRepresentation::SynchronizeTopology()
     points_polydata->GetPointData()->SetActiveScalars("visualized_values");
     points_mapper->ScalarVisibilityOn();
     points_mapper->SetColorModeToMapScalars();
-    float eps = value_range;
-    lutMPM->SetTableRange(1.f-eps, 1.f+eps);
 
     SynchronizeValues();
 

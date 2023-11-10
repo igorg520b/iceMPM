@@ -60,7 +60,8 @@ MainWindow::MainWindow(QWidget *parent)
     qdsbValRange = new QDoubleSpinBox();
     qdsbValRange->setRange(-10, 10);
     qdsbValRange->setValue(-2);
-    qdsbValRange->setDecimals(0);
+    qdsbValRange->setDecimals(1);
+    qdsbValRange->setSingleStep(0.5);
     ui->toolBar->addWidget(qdsbValRange);
 
     // slider

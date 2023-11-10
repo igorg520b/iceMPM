@@ -23,9 +23,11 @@ __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4]);
 __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r &mV);
 
 __device__ void NACCUpdateDeformationGradient(icy::Point &p);
+__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p);
 __device__ void SnowUpdateDeformationGradient(icy::Point &p);
 
+__device__ Matrix2r dev(Matrix2r A);
 __device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, const Matrix2r &F);
 __device__ Matrix2r KirchhoffStress_Klar(const double mu, const double lambda, const Matrix2r &F);
 __device__ Matrix2r KirchhoffStress_Sifakis(const double mu, const double lambda, const Matrix2r &F);
@@ -57,7 +59,7 @@ public:
     void cuda_transfer_from_device();
     void transfer_ponts_to_host_finalize(std::vector<icy::Point> &points);
 
-    cudaEvent_t eventP2GStart, eventP2GStop, eventUpdGridStart, eventUpdGridStop, eventG2PStart, eventG2PStop;
+    cudaEvent_t eventP2GStart, eventUpdGridStart, eventG2PStart, eventG2PStop, eventTransferStart, eventTransferStop;
     cudaEvent_t eventCycleStart, eventCycleStop;
 
     real *tmp_transfer_buffer = nullptr; // buffer in page-locked memory for transferring the data between device and host

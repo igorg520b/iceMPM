@@ -33,14 +33,13 @@ void GPU_Implementation3::initialize()
 
     err = cudaEventCreate(&eventP2GStart);
     if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
-
-    cudaEventCreate(&eventP2GStop);
     cudaEventCreate(&eventUpdGridStart);
-    cudaEventCreate(&eventUpdGridStop);
     cudaEventCreate(&eventG2PStart);
     cudaEventCreate(&eventG2PStop);
     cudaEventCreate(&eventCycleStart);
     cudaEventCreate(&eventCycleStop);
+    cudaEventCreate(&eventTransferStart);
+    cudaEventCreate(&eventTransferStop);
 
     err = cudaStreamCreate(&streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
@@ -277,9 +276,8 @@ __global__ void v2_kernel_p2g()
     const real &h = gprms.cellsize;
     const real &h_inv = gprms.cellsize_inv;
     const real &Dinv = gprms.Dp_inv;
-    real lambda = gprms.lambda;
-    real mu = gprms.mu;
-    real &kappa = gprms.kappa;
+//    real lambda = gprms.lambda;
+//    real mu = gprms.mu;
     const int &gridX = gprms.GridX;
     const int &gridY = gprms.GridY;
     const real &particle_mass = gprms.ParticleMass;
@@ -490,7 +488,7 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    NACCUpdateDeformationGradient(p);
+    NACCUpdateDeformationGradient_Alt(p);
 //    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
 //    else DruckerPragerUpdateDeformationGradient(p);
 //    SnowUpdateDeformationGradient(p);
@@ -514,6 +512,181 @@ __global__ void v2_kernel_g2p()
 
 //===========================================================================
 
+__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
+{
+    const Matrix2r &gradV = p.Bp;
+    constexpr real magic_epsilon = 1.e-5;
+    constexpr int d = 2; // dimensions
+    real &alpha = p.NACC_alpha_p;
+    const real &mu = gprms.mu;
+    const real &kappa = gprms.kappa;
+    const real &beta = gprms.NACC_beta;
+    const real &M_sq = gprms.NACC_M_sq;
+    const real &xi = gprms.NACC_xi;
+    const real &dt = gprms.InitialTimeStep;
+
+    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
+    Matrix2r U, V, Sigma;
+    svd2x2(FeTr, U, Sigma, V);
+
+    // line 4
+    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
+
+    // line 5
+    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
+
+    // line 6
+    Matrix2r SigmaSquared = Sigma*Sigma;
+    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
+
+    // line 7
+    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
+
+    // line 8
+    real p_trial = -psi_kappa_prime * Je_tr;
+
+    // line 9 (case 1)
+    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    if(p_trial > p0)
+    {
+        real Je_new = sqrt(-2.*p0 / kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
+        if(alpha > gprms.NACC_alpha) alpha += log(Je_tr / Je_new);
+    }
+
+    // line 14 (case 2)
+    else if(p_trial < -beta*p0)
+    {
+        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
+        alpha += log(Je_tr / Je_new);
+    }
+
+    // line 19 (case 3)
+    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+    {
+        real p_c = (1.-beta)*p0/2.;  // line 23
+        real q_tr = sqrt(3.-d/2.)*s_hat_tr.norm();   // line 24
+        Vector2r direction(p_c-p_trial, -q_tr);  // line 25
+        direction.normalize();
+        real C = M_sq*(p_c-beta*p0)*(p_c-p0);
+        real B = M_sq*direction[0]*(2.*p_c-p0+beta*p0);
+        real A = M_sq*direction[0]*direction[0]+(1.+2.*beta)*direction[1]*direction[1];  // line 30
+        real l1 = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+        real l2 = (-B-sqrt(B*B-4.*A*C))/(2.*A);
+        real p1 = p_c + l1*direction[0];
+        real p2 = p_c + l2*direction[0];
+        real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
+        real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
+        if(Je_x > magic_epsilon && alpha > gprms.NACC_alpha) alpha += log(Je_tr / Je_x);
+
+        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
+        //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+        Matrix2r Sigma_new;
+        Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
+        p.Fe = U*Sigma_new*V.transpose();
+    }
+    else
+    {
+        p.Fe = FeTr;
+    }
+}
+
+
+__device__ Matrix2r dev(Matrix2r A)
+{
+    return A - A.trace()/2*Matrix2r::Identity();
+}
+
+
+
+__device__ void NACCUpdateDeformationGradient(icy::Point &p)
+{
+    const Matrix2r &gradV = p.Bp;
+    constexpr real magic_epsilon = 1.e-5;
+    constexpr int d = 2; // dimensions
+    real &alpha = p.NACC_alpha_p;
+    const real &mu = gprms.mu;
+    const real &kappa = gprms.kappa;
+    const real &beta = gprms.NACC_beta;
+    const real &M_sq = gprms.NACC_M_sq;
+    const real &xi = gprms.NACC_xi;
+    const real &dt = gprms.InitialTimeStep;
+
+    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
+    Matrix2r U, V, Sigma;
+    svd2x2(FeTr, U, Sigma, V);
+
+    // line 4
+    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
+
+    // line 5
+    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
+
+    // line 6
+    Matrix2r SigmaSquared = Sigma*Sigma;
+    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
+
+    // line 7
+    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
+
+    // line 8
+    real p_trial = -psi_kappa_prime * Je_tr;
+
+    // line 9 (case 1)
+    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    if(p_trial > p0)
+    {
+        real Je_new = sqrt(-2.*p0 / kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
+        if(true) alpha += log(Je_tr / Je_new);
+    }
+
+    // line 14 (case 2)
+    else if(p_trial < -beta*p0)
+    {
+        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
+        if(true) alpha += log(Je_tr / Je_new);
+    }
+
+    // line 19 (case 3)
+    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+    {
+        real p_c = (1.-beta)*p0/2.;  // line 23
+        real q_tr = sqrt(3.-d/2.)*s_hat_tr.norm();   // line 24
+        Vector2r direction(p_c-p_trial, -q_tr);  // line 25
+        direction.normalize();
+        real C = M_sq*(p_c-beta*p0)*(p_c-p0);
+        real B = M_sq*direction[0]*(2.*p_c-p0+beta*p0);
+        real A = M_sq*direction[0]*direction[0]+(1.+2.*beta)*direction[1]*direction[1];  // line 30
+        real l1 = (-B+sqrt(B*B-4.*A*C))/(2.*A);
+        real l2 = (-B-sqrt(B*B-4.*A*C))/(2.*A);
+        real p1 = p_c + l1*direction[0];
+        real p2 = p_c + l2*direction[0];
+        real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
+        real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
+        if(Je_x > magic_epsilon) alpha += log(Je_tr / Je_x);
+
+        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
+//        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+        Matrix2r Sigma_new;
+        Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
+        p.Fe = U*Sigma_new*V.transpose();
+    }
+    else
+    {
+        p.Fe = FeTr;
+    }
+}
+
+
 // clamp x to range [a, b]
 __device__ double clamp(double x, double a, double b)
 {
@@ -523,9 +696,6 @@ __device__ double clamp(double x, double a, double b)
 __device__ void SnowUpdateDeformationGradient(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
-    //    constexpr real magic_epsilon = 1.e-15;
-    const real &mu = gprms.mu;
-    const real &lambda = gprms.lambda;
     const real &dt = gprms.InitialTimeStep;
     const real &THT_C_snow = gprms.THT_C_snow;
     const real &THT_S_snow = gprms.THT_S_snow;
@@ -539,37 +709,15 @@ __device__ void SnowUpdateDeformationGradient(icy::Point &p)
     SigmaClamped(1,1) = clamp(Sigma(1,1), 1.0 - THT_C_snow, 1.0 + THT_S_snow);
     p.Fe = U*SigmaClamped*V.transpose();
 
-    p.Jp *= (V*SigmaClamped.inverse()*Sigma*V.transpose()).determinant();
-
-
-    /*
-    FeTr.svd(&U, &Eps, &V);
-
-    Vector2f T = Eps.clamp(1 - THT_C_snow, 1 + THT_S_snow);		// Projection
-
-    Fe = U.diag_product(T) * V.transpose();
-
-    Fp = V.diag_product_inv(T).diag_product(Eps) * V.transpose() * FpTr;
-
-    Je = Fe.det();
-    Jp = Fp.det();
-
-    // Hardening
-    double exp = std::exp(KSI_snow*(1.0 - Jp));
-    lam = LAM_snow * exp;
-    mu = MU_snow * exp;
-*/
-
-
+    p.Jp *= (1/SigmaClamped.determinant())*Sigma.determinant();
+//    p.Jp *= (V*SigmaClamped.inverse()*Sigma*V.transpose()).determinant();
 }
-
-//===========================================================================
 
 
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
-//    constexpr real magic_epsilon = 1.e-15;
+    //    constexpr real magic_epsilon = 1.e-15;
     const real &mu = gprms.mu;
     const real &lambda = gprms.lambda;
     const real &dt = gprms.InitialTimeStep;
@@ -590,9 +738,9 @@ __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p)
     double dq = 0;
     Matrix2r lnSigma, e_c;
     lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
-    e_c = lnSigma - lnSigma.trace()/2.0 * Matrix2r::Identity();   // deviatoric part
+    e_c = dev(lnSigma);  // deviatoric part
 
-//    if(e_c.norm() < magic_epsilon || lnSigma.trace()>0)
+    //    if(e_c.norm() < magic_epsilon || lnSigma.trace()>0)
     if(e_c.norm() ==0 || lnSigma.trace()>0)
     {
         // Projection to the tip of the cone
@@ -623,99 +771,6 @@ __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p)
 }
 
 //===========================================================================
-
-
-__device__ void NACCUpdateDeformationGradient(icy::Point &p)
-{
-    const Matrix2r &FModifier = p.Bp;
-    constexpr real magic_epsilon = 1.e-5;
-    constexpr int d = 2; // dimensions
-    real &alpha = p.NACC_alpha_p;
-    const real &mu = gprms.mu;
-    const real &kappa = gprms.kappa;
-    const real &beta = gprms.NACC_beta;
-    const real &M_sq = gprms.NACC_M_sq;
-    const real &xi = gprms.NACC_xi;
-    const real &dt = gprms.InitialTimeStep;
-
-    Matrix2r FeTr = (Matrix2r::Identity() + dt * FModifier) * p.Fe;
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
-
-    // line 4
-    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
-
-    // line 5
-    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-
-    // line 6
-    Matrix2r SigmaSquared = Sigma*Sigma;
-    Matrix2r SigmaSquaredDev = SigmaSquared - SigmaSquared.trace()/2.*Matrix2r::Identity();
-    real J_power_neg_2_d_mulmu = mu * pow(Je_tr, -2. / (real)d);///< J^(-2/dim) * mu
-    Matrix2r s_hat_tr = J_power_neg_2_d_mulmu * SigmaSquaredDev;
-
-    // line 7
-    real psi_kappa_partial_J = (kappa/2.) * (Je_tr - 1./Je_tr);
-
-    // line 8
-    real p_trial = -psi_kappa_partial_J * Je_tr;
-
-    // line 9 (case 1)
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(p_trial > p0)
-    {
-        real Je_new = sqrt(-2.*p0 / kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        if(true) alpha += log(Je_tr / Je_new);
-    }
-
-    // line 14 (case 2)
-    else if(p_trial < -beta*p0)
-    {
-        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        if(true) alpha += log(Je_tr / Je_new);
-    }
-
-    // line 19 (case 3)
-    else if(y >= magic_epsilon*10)
-    {
-        if(true && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
-        {
-            real p_c = (1.-beta)*p0/2.;  // line 23
-            real q_tr = sqrt(3.-d/2.)*s_hat_tr.norm();   // line 24
-            Vector2r direction(p_c-p_trial, -q_tr);  // line 25
-            direction.normalize();
-            real C = M_sq*(p_c-beta*p0)*(p_c-p0);
-            real B = M_sq*direction[0]*(2.*p_c-p0+beta*p0);
-            real A = M_sq*direction[0]*direction[0]+(1.+2.*beta)*direction[1]*direction[1];  // line 30
-            real l1 = (-B+sqrt(B*B-4.*A*C))/(2.*A);
-            real l2 = (-B-sqrt(B*B-4.*A*C))/(2.*A);
-            real p1 = p_c + l1*direction[0];
-            real p2 = p_c + l2*direction[0];
-            real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
-            real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
-            if(Je_x > magic_epsilon*10) alpha += log(Je_tr / Je_x);
-        }
-
-        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
-        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() +
-                               Matrix2r::Identity()*SigmaSquared.trace()/(real)d;
-        Matrix2r Sigma_new;
-        Sigma_new << sqrt(B_hat_E_new(0,0)), 0,
-            0, sqrt(B_hat_E_new(1,1));
-        p.Fe = U*Sigma_new*V.transpose();
-    }
-    else
-    {
-        p.Fe = FeTr;
-    }
-    //p.visualized_value = alpha;
-}
-
-
 
 //===========================================================================
 

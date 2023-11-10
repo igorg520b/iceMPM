@@ -41,7 +41,7 @@ public:
 
     icy::SimParams prms;
     GPU_Implementation3 gpu;
-    float compute_time_per_cycle;
+    float compute_time_per_cycle, time_p2g, time_update_nodes, time_g2p, time_transfer;
     real indenter_x, indenter_x_initial, indenter_y;
 
     std::vector<Point> points;
