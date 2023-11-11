@@ -451,7 +451,7 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
     p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
 //    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
-//    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
+    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -507,30 +507,33 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
     gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
 //    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
-//    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
+    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
 }
 
 //===========================================================================
+
 
 __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
     constexpr real magic_epsilon = 1.e-5;
     constexpr int d = 2; // dimensions
-    real &alpha = p.NACC_alpha_p;
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
     const real &beta = gprms.NACC_beta;
-    const real &M_sq = gprms.NACC_M_sq;
+    real M_sq = gprms.NACC_M_sq;
     const real &xi = gprms.NACC_xi;
     const real &dt = gprms.InitialTimeStep;
+
+    real exp1 = p.Jp < 1 ? 1 : exp(xi*(1.0 - p.Jp));
+
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     Matrix2r U, V, Sigma;
     svd2x2(FeTr, U, Sigma, V);
 
     // line 4
-    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
+    real p0 = gprms.IceCompressiveStrength*exp1;
 
     // line 5
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
@@ -552,7 +555,7 @@ __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
         real Je_new = sqrt(-2.*p0 / kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
-        if(alpha > gprms.NACC_alpha) alpha += log(Je_tr / Je_new);
+        p.Jp *= (Je_tr / Je_new);
     }
 
     // line 14 (case 2)
@@ -561,7 +564,7 @@ __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
         real Je_new = sqrt(2.*beta*p0/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
-        alpha += log(Je_tr / Je_new);
+        p.Jp *= (Je_tr / Je_new);
     }
 
     // line 19 (case 3)
@@ -580,7 +583,7 @@ __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
         real p2 = p_c + l2*direction[0];
         real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
         real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
-        if(Je_x > magic_epsilon && alpha > gprms.NACC_alpha) alpha += log(Je_tr / Je_x);
+        if(Je_x > magic_epsilon) p.Jp *= (Je_tr / Je_x);
 
         real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
         //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);

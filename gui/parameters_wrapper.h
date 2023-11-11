@@ -77,21 +77,17 @@ class ParamsWrapper : public QObject
     double getNaccXi() {return prms->NACC_xi;}
     void setNaccXi(double val) {prms->NACC_xi = val;}
 
-    Q_PROPERTY(double nacc_a_exp READ getNaccAlphaExp WRITE setNaccAlphaExp NOTIFY propertyChanged)
-    double getNaccAlphaExp() {return exp(prms->NACC_alpha);}
-    void setNaccAlphaExp(double val) {prms->NACC_alpha = log(val);}
+    Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)
+    double getIce_CompressiveStr() {return prms->IceCompressiveStrength;}
+    void setIce_CompressiveStr(double val) {prms->IceCompressiveStrength = val; prms->ComputeCamClayParams2();}
 
-    Q_PROPERTY(double nacc_p0 READ getNaccP0 NOTIFY propertyChanged)
-    double getNaccP0() { return prms->kappa*sinh(prms->NACC_xi*(-prms->NACC_alpha))/1e6;}
+    Q_PROPERTY(double ice_TensileStr READ getIce_TensileStr WRITE setIce_TensileStr NOTIFY propertyChanged)
+    double getIce_TensileStr() {return prms->IceTensileStrength;}
+    void setIce_TensileStr(double val) {prms->IceTensileStrength = val; prms->ComputeCamClayParams2();}
 
-    Q_PROPERTY(double nacc_angle READ getNaccAngle WRITE setNaccAngle NOTIFY propertyChanged)
-    double getNaccAngle() {return prms->NACC_friction_angle;}
-    void setNaccAngle(double val) {prms->NACC_friction_angle=val; prms->ComputeCamClayParams();}
-
-
-
-    Q_PROPERTY(double nacc_p0_beta READ getNaccP0beta NOTIFY propertyChanged)
-    double getNaccP0beta() { return prms->kappa*sinh(prms->NACC_xi*(-prms->NACC_alpha))*prms->NACC_beta/1e6;}
+    Q_PROPERTY(double ice_ShearStr READ getIce_ShearStr WRITE setIce_ShearStr NOTIFY propertyChanged)
+    double getIce_ShearStr() {return prms->IceShearStrength;}
+    void setIce_ShearStr(double val) {prms->IceShearStrength = val; prms->ComputeCamClayParams2();}
 
 
     Q_PROPERTY(double sand_H0 READ getH0 WRITE setH0 NOTIFY propertyChanged)

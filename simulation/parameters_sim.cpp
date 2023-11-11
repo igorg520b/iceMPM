@@ -9,16 +9,12 @@ void icy::SimParams::Reset()
 
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
-    NACC_beta = 0.7;
-    NACC_xi = 1.5;
-    NACC_alpha = std::log(1. - 5.e-3);
     PointsWanted = 50'000;
     GridX = 128;
     GridY = 55;
     ParticleViewSize = 2.5f;
     GridXDimension = 3.33;
 
-    NACC_friction_angle = 35;
     SimulationEndTime = 12;
 
     PoissonsRatio = 0.3;
@@ -52,12 +48,27 @@ void icy::SimParams::Reset()
 
     SandYM = 5e7;
 
-    ComputeCamClayParams();
+    NACC_xi = 10;
+    IceCompressiveStrength = 100e6;
+    IceTensileStrength = 1e6;
+    IceShearStrength = 0.5e6;
+
     ComputeLame();
+    ComputeCamClayParams2();
     ComputeHelperVariables();
     std::cout << "SimParams Reset() done\n";
 }
 
+void icy::SimParams::ComputeCamClayParams2()
+{
+    ComputeLame();
+    NACC_beta = IceTensileStrength/IceCompressiveStrength;
+    const real &q = IceShearStrength;
+    const real &p0 = IceCompressiveStrength;
+    const real &beta = NACC_beta;
+    real NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
+    this->NACC_M_sq = NACC_M*NACC_M;
+}
 
 std::string icy::SimParams::ParseFile(std::string fileName)
 {
@@ -76,16 +87,12 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("OutputDirectory")) outputDirectory = doc["OutputDirectory"].GetString();
     if(doc.HasMember("InitialTimeStep")) InitialTimeStep = doc["InitialTimeStep"].GetDouble();
     if(doc.HasMember("YoungsModulus")) YoungsModulus = doc["YoungsModulus"].GetDouble();
-    if(doc.HasMember("NACC_beta")) NACC_beta = doc["NACC_beta"].GetDouble();
-    if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
-    if(doc.HasMember("NACC_alpha_exp")) NACC_alpha = std::log(doc["NACC_alpha_exp"].GetDouble());
     if(doc.HasMember("PointsWanted")) PointsWanted = doc["PointsWanted"].GetDouble();
     if(doc.HasMember("GridX")) GridX = doc["GridX"].GetInt();
     if(doc.HasMember("GridY")) GridY = doc["GridY"].GetInt();
     if(doc.HasMember("GridXDimension")) GridXDimension = doc["GridXDimension"].GetDouble();
     if(doc.HasMember("HoldBlockOnTheRight")) HoldBlockOnTheRight = doc["HoldBlockOnTheRight"].GetInt();
     if(doc.HasMember("ParticleViewSize")) ParticleViewSize = doc["ParticleViewSize"].GetDouble();
-    if(doc.HasMember("NACC_friction_angle")) NACC_friction_angle = doc["NACC_friction_angle"].GetDouble();
     if(doc.HasMember("SimulationEndTime")) SimulationEndTime = doc["SimulationEndTime"].GetDouble();
     if(doc.HasMember("PoissonsRatio")) PoissonsRatio = doc["PoissonsRatio"].GetDouble();
     if(doc.HasMember("Gravity")) Gravity = doc["Gravity"].GetDouble();
@@ -105,8 +112,12 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("H2")) H2 = doc["H2"].GetDouble();
     if(doc.HasMember("H3")) H3 = doc["H3"].GetDouble() * pi/180.0;
 
+    if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
+    if(doc.HasMember("IceCompressiveStrength")) IceCompressiveStrength = doc["IceCompressiveStrength"].GetDouble();
+    if(doc.HasMember("IceTensileStrength")) IceTensileStrength = doc["IceTensileStrength"].GetDouble();
+    if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
 
-    ComputeCamClayParams();
+    ComputeCamClayParams2();
     ComputeLame();
     ComputeHelperVariables();
 
@@ -123,14 +134,7 @@ void icy::SimParams::ComputeLame()
     kappa = mu*2./3. + lambda;
 }
 
-void icy::SimParams::ComputeCamClayParams()
-{
-    real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
-    real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
-    real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
-    std::cout << "SimParams: NACC M is " << NACC_M << '\n';
-    NACC_M_sq = NACC_M*NACC_M;
-}
+
 
 void icy::SimParams::ComputeHelperVariables()
 {
@@ -140,3 +144,14 @@ void icy::SimParams::ComputeHelperVariables()
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;
 }
+
+/*
+void icy::SimParams::ComputeCamClayParams()
+{
+    real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
+    real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
+    real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
+    std::cout << "SimParams: NACC M is " << NACC_M << '\n';
+    NACC_M_sq = NACC_M*NACC_M;
+}
+*/

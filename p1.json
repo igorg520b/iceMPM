@@ -5,34 +5,8 @@
 "ParticleViewSize":3.5,
 "GridX":256,
 "GridY":110,
-"GridXDimension":3.1,
-"HoldBlockOnTheRight":2,
 
-"YoungsModulus":5.0e8,
-"NACC_beta":0.3,
-"NACC_xi":11,
-"NACC_alpha_exp": 0.991,
-"NACC_friction_angle": 30,
 
-"H0":14,
-"H1":2,
-"H2":0.1,
-"H3":5,
-
-"SimulationEndTime":12,
-"PoissonsRatio":0.3,
-"Gravity":9.81,
-"Density":980,
-"IceFrictionCoefficient":0.03,
-"IndDiameter":0.324,
-"IndVelocity":0.2,
-"IndDepth":0.101,
-"BlockHeight":1.0,
-"BlockLength":2.5,
-
-"XiSnow":5,
-"THT_C_snow":2.5e-2,
-"THT_S_snow":5.5e-3
 }
 
 

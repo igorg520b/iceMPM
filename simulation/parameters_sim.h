@@ -58,8 +58,9 @@ public:
     real IceFrictionCoefficient;
 
     real XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
-    real NACC_xi, NACC_alpha, NACC_beta, NACC_M_sq;
-    real NACC_friction_angle;
+    real NACC_xi, IceCompressiveStrength, IceTensileStrength, IceShearStrength;
+    real NACC_alpha, NACC_beta, NACC_M_sq;     // these are all computed
+
 
     real cellsize, cellsize_inv, Dp_inv;
 
@@ -82,7 +83,8 @@ public:
     std::string ParseFile(std::string fileName);
 
     void ComputeLame();
-    void ComputeCamClayParams();
+//    void ComputeCamClayParams();
+    void ComputeCamClayParams2();
     void ComputeHelperVariables();
 };
 

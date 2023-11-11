@@ -22,6 +22,7 @@ __device__ Matrix2r polar_decomp_R(const Matrix2r &val);
 __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4]);
 __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r &mV);
 
+
 __device__ void NACCUpdateDeformationGradient(icy::Point &p);
 __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p);
