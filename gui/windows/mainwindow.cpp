@@ -20,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
     worker = new BackgroundWorker(&model);
     snapshot.model = &model;
     model.gpu.initialize();
+    representation.model = &model;
 
     // VTK
     qt_vtk_widget = new QVTKOpenGLNativeWidget();
@@ -171,6 +172,12 @@ MainWindow::MainWindow(QWidget *parent)
             representation.value_range = val;
             qdsbValRange->setValue(val);
         }
+
+        var = settings.value("vis_option");
+        if(!var.isNull())
+        {
+            comboBox_visualizations->setCurrentIndex(var.toInt());
+        }
     }
     else
     {
@@ -197,9 +204,7 @@ MainWindow::MainWindow(QWidget *parent)
     connect(worker, SIGNAL(workerPaused()), SLOT(background_worker_paused()));
     connect(worker, SIGNAL(stepCompleted()), SLOT(simulation_data_ready()));
 
-    representation.model = &model;
     representation.SynchronizeTopology();
-
     pbrowser->setActiveObject(params);
     updateGUI();
 }
@@ -250,7 +255,7 @@ void MainWindow::quit_triggered()
 void MainWindow::comboboxIndexChanged_visualizations(int index)
 {
     representation.ChangeVisualizationOption(index);
-    scalarBar->SetVisibility(index != 0);
+//    scalarBar->SetVisibility(index != 0);
     renderWindow->Render();
 }
 

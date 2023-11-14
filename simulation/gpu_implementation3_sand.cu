@@ -186,8 +186,9 @@ void GPU_Implementation3::cuda_p2g()
     const int nPoints = prms->nPts;
     cudaError_t err;
 
-    int blocksPerGrid = (nPoints + threadsPerBlock2 - 1) / threadsPerBlock2;
-    v2_kernel_p2g<<<blocksPerGrid, threadsPerBlock2, 0, streamCompute>>>();
+    int tpb = prms->tpb_P2G;
+    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
+    v2_kernel_p2g<<<blocksPerGrid, tpb, 0, streamCompute>>>();
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -200,8 +201,9 @@ void GPU_Implementation3::cuda_update_nodes(real indenter_x, real indenter_y)
 {
     const int nGridNodes = prms->GridX*prms->GridY;
     cudaError_t err;
-    int blocksPerGrid = (nGridNodes + threadsPerBlock1 - 1) / threadsPerBlock1;
-    v2_kernel_update_nodes<<<blocksPerGrid, threadsPerBlock1, 0, streamCompute>>>(indenter_x, indenter_y);
+    int tpb = prms->tpb_Upd;
+    int blocksPerGrid = (nGridNodes + tpb - 1) / tpb;
+    v2_kernel_update_nodes<<<blocksPerGrid, tpb, 0, streamCompute>>>(indenter_x, indenter_y);
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -214,8 +216,9 @@ void GPU_Implementation3::cuda_g2p()
 {
     const int nPoints = prms->nPts;
     cudaError_t err;
-    int blocksPerGrid = (nPoints + threadsPerBlock2 - 1) / threadsPerBlock2;
-    v2_kernel_g2p<<<blocksPerGrid, threadsPerBlock2, 0, streamCompute>>>();
+    int tpb = prms->tpb_G2P;
+    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
+    v2_kernel_g2p<<<blocksPerGrid, tpb, 0, streamCompute>>>();
     err = cudaGetLastError();
     if(err != cudaSuccess)
     {
@@ -297,7 +300,7 @@ __global__ void v2_kernel_p2g()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitch + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitch + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
-    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
+//    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
 
 //    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitch + pt_idx];
 
@@ -346,8 +349,7 @@ __global__ void v2_kernel_p2g()
             real incM = Wip*particle_mass;
 
             int idx_gridnode = (i+i0) + (j+j0)*gridX;
-            if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=gridX || (j+j0)>=gridY || idx_gridnode < 0)
-                gpu_error_indicator = 1;
+            if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=gridX || (j+j0)>=gridY) gpu_error_indicator = 1;
 
             // Udpate mass, velocity and force
             atomicAdd(&gprms.grid_array[0*nGridPitch + idx_gridnode], incM);
@@ -488,7 +490,7 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    NACCUpdateDeformationGradient_Alt(p);
+    NACCUpdateDeformationGradient_q_hardening(p);
 //    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
 //    else DruckerPragerUpdateDeformationGradient(p);
 //    SnowUpdateDeformationGradient(p);
@@ -506,97 +508,14 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
     gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
-//    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
+    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
     gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
 }
 
 //===========================================================================
 
 
-__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
-{
-    const Matrix2r &gradV = p.Bp;
-    constexpr real magic_epsilon = 1.e-5;
-    constexpr int d = 2; // dimensions
-    const real &mu = gprms.mu;
-    const real &kappa = gprms.kappa;
-    const real &beta = gprms.NACC_beta;
-    real M_sq = gprms.NACC_M_sq;
-    const real &xi = gprms.NACC_xi;
-    const real &dt = gprms.InitialTimeStep;
 
-    real exp1 = p.Jp < 1 ? 1 : exp(xi*(1.0 - p.Jp));
-
-
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
-
-    // line 4
-    real p0 = gprms.IceCompressiveStrength*exp1;
-
-    // line 5
-    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-
-    // line 6
-    Matrix2r SigmaSquared = Sigma*Sigma;
-    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-
-    // line 7
-    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
-
-    // line 8
-    real p_trial = -psi_kappa_prime * Je_tr;
-
-    // line 9 (case 1)
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(p_trial > p0)
-    {
-        real Je_new = sqrt(-2.*p0 / kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        p.Jp *= (Je_tr / Je_new);
-    }
-
-    // line 14 (case 2)
-    else if(p_trial < -beta*p0)
-    {
-        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        p.Jp *= (Je_tr / Je_new);
-    }
-
-    // line 19 (case 3)
-    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
-    {
-        real p_c = (1.-beta)*p0/2.;  // line 23
-        real q_tr = sqrt(3.-d/2.)*s_hat_tr.norm();   // line 24
-        Vector2r direction(p_c-p_trial, -q_tr);  // line 25
-        direction.normalize();
-        real C = M_sq*(p_c-beta*p0)*(p_c-p0);
-        real B = M_sq*direction[0]*(2.*p_c-p0+beta*p0);
-        real A = M_sq*direction[0]*direction[0]+(1.+2.*beta)*direction[1]*direction[1];  // line 30
-        real l1 = (-B+sqrt(B*B-4.*A*C))/(2.*A);
-        real l2 = (-B-sqrt(B*B-4.*A*C))/(2.*A);
-        real p1 = p_c + l1*direction[0];
-        real p2 = p_c + l2*direction[0];
-        real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
-        real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
-        if(Je_x > magic_epsilon) p.Jp *= (Je_tr / Je_x);
-
-        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
-        //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r Sigma_new;
-        Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
-        p.Fe = U*Sigma_new*V.transpose();
-    }
-    else
-    {
-        p.Fe = FeTr;
-    }
-}
 
 
 __device__ Matrix2r dev(Matrix2r A)

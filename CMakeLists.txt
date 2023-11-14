@@ -25,7 +25,7 @@ else()
 endif()
 
 
-
+#[[
 
 # CLI version
 add_executable(cm
@@ -44,12 +44,13 @@ add_executable(cm
     simulation/helper_math.cuh
     simulation/gpu_implementation3_sand.h
     simulation/gpu_implementation3_sand.cu
+    simulation/constitutive_model.cu
 
     simulation/snapshotwriter.h
     simulation/snapshotwriter.cpp
 )
 
-set_target_properties(cm PROPERTIES CUDA_ARCHITECTURES "61;75")
+set_target_properties(cm PROPERTIES CUDA_ARCHITECTURES "89")
 set_target_properties(cm PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
 # spdlog
@@ -74,7 +75,7 @@ else()
 endif()
 
 
-
+#]]
 
 
 
@@ -129,12 +130,14 @@ if(GUI_VERSION_BUILD)
         simulation/helper_math.cuh
         simulation/gpu_implementation3_sand.h
         simulation/gpu_implementation3_sand.cu
+        simulation/constitutive_model.cu
+
 
         simulation/snapshotwriter.h
         simulation/snapshotwriter.cpp
     )
 
-    set_target_properties(iceMPM_GUI PROPERTIES CUDA_ARCHITECTURES "61;75")
+    set_target_properties(iceMPM_GUI PROPERTIES CUDA_ARCHITECTURES "89")
     set_target_properties(iceMPM_GUI PROPERTIES CUDA_SEPARABLE_COMPILATION ON CUDA_RESOLVE_DEVICE_SYMBOLS ON)
 
     target_include_directories(iceMPM_GUI PRIVATE gui gui/windows gui/vtk simulation libraries/thinks/poisson_disk_sampling/)

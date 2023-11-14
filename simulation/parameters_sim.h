@@ -13,8 +13,10 @@
 #include <rapidjson/writer.h>
 
 typedef double real;
+//typedef float real;
 typedef Eigen::Vector2<real> Vector2r;
 typedef Eigen::Matrix2<real> Matrix2r;
+
 
 // variables related to the formulation of the model
 
@@ -47,6 +49,10 @@ public:
     real *grid_array;      // device-side grid data
     real *pts_array;
     size_t nPtsPitch, nGridPitch; // in bytes (!), for coalesced access on the device
+
+    int tpb_P2G, tpb_Upd, tpb_G2P;  // threads per block for each operation
+
+
     int PointsWanted, nPts;
     int GridX, GridY;
     real GridXDimension;

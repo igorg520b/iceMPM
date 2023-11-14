@@ -44,7 +44,7 @@ public:
 
     double value_range = 0.01;
 
-    enum VisOpt { none, velocity, stress_mises, stress_maxP, stress_minP};
+    enum VisOpt { none, NACC_alpha, NACC_case };
     Q_ENUM(VisOpt)
 
     void SynchronizeValues();
@@ -59,7 +59,7 @@ public:
 private:
     VisOpt VisualizingVariable = VisOpt::none;
 
-    vtkNew<vtkLookupTable> hueLut_pastel;
+    vtkNew<vtkLookupTable> hueLut_pastel, hueLut_four;
 
     // indenter
     vtkNew<vtkRegularPolygonSource> indenterSource;

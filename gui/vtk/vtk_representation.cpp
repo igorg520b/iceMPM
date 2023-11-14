@@ -27,6 +27,13 @@ icy::VisualRepresentation::VisualRepresentation()
                               lutArrayMPMColors[i][1],
                               lutArrayMPMColors[i][2], 1.0);
 
+    hueLut_four->SetNumberOfColors(4);
+    hueLut_four->SetTableValue(0, 0.3, 0.3, 0.3);
+    hueLut_four->SetTableValue(1, 1.0, 0, 0);
+    hueLut_four->SetTableValue(2, 0, 1.0, 0);
+    hueLut_four->SetTableValue(3, 0, 0, 1.0);
+    hueLut_four->SetTableRange(0,3);
+
 
     indenterMapper->SetInputConnection(indenterSource->GetOutputPort());
     actor_indenter->SetMapper(indenterMapper);
@@ -126,24 +133,48 @@ void icy::VisualRepresentation::SynchronizeValues()
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->hostside_data_update_mutex.lock();
-#pragma omp parallel
+//#pragma omp parallel
     for(int i=0;i<model->points.size();i++)
     {
         const icy::Point &p = model->points[i];
         double x[3] {p.pos[0], p.pos[1], 0};
         points->SetPoint((vtkIdType)i, x);
-        double val = p.NACC_alpha_p < alpha0 ? alpha0-0.02 : p.NACC_alpha_p;
-//        double val = p.Jp;
-        visualized_values->SetValue((vtkIdType)i, val);
+      }
+
+    if(VisualizingVariable == 0)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, 0);
+    }
+    else if(VisualizingVariable == 1)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, exp(model->points[i].NACC_alpha_p));
+    }
+    else if(VisualizingVariable == 2)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].q);
     }
 
     model->hostside_data_update_mutex.unlock();
 
+    double centerVal = 0;
+    double range = std::pow(10,value_range);
+
+    if(VisualizingVariable == 2)
+    {
+        points_mapper->SetLookupTable(hueLut_four);
+    }
+    else
+    {
+        points_mapper->SetLookupTable(lutMPM);
+    }
+
+
+    if(VisualizingVariable == 1)
+    {
+        centerVal = exp(alpha0);
+    }
 //    float minmax[2];
 //    visualized_values->GetValueRange(minmax);
-    double centerVal = alpha0;//1;
-//    const float &alpha0 = 0;
-    double range = std::pow(10,value_range);
     lutMPM->SetTableRange(centerVal-range, centerVal+range);
 
     points->Modified();

@@ -24,6 +24,7 @@ __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r 
 
 
 __device__ void NACCUpdateDeformationGradient(icy::Point &p);
+__device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
 __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 __device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p);
 __device__ void SnowUpdateDeformationGradient(icy::Point &p);
@@ -66,8 +67,6 @@ public:
     real *tmp_transfer_buffer = nullptr; // buffer in page-locked memory for transferring the data between device and host
 
 private:
-    constexpr static int threadsPerBlock1 = 512;
-    constexpr static int threadsPerBlock2 = 32;
 
     cudaStream_t streamCompute;
     bool initialized = false;

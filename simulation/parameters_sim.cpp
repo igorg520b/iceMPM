@@ -7,6 +7,10 @@ void icy::SimParams::Reset()
     grid_array = nullptr;
     pts_array = nullptr;
 
+    tpb_P2G = 256;
+    tpb_Upd = 1024;
+    tpb_G2P = 256;
+
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
     PointsWanted = 50'000;
@@ -68,6 +72,8 @@ void icy::SimParams::ComputeCamClayParams2()
     const real &beta = NACC_beta;
     real NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
     this->NACC_M_sq = NACC_M*NACC_M;
+
+    this->NACC_alpha = std::log(0.991);
 }
 
 std::string icy::SimParams::ParseFile(std::string fileName)

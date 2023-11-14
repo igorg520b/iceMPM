@@ -13,6 +13,19 @@ class ParamsWrapper : public QObject
 
     icy::SimParams *prms;
 
+    Q_PROPERTY(int tpb_P2G READ get_tpb_P2G WRITE set_tpb_P2G NOTIFY propertyChanged)
+    int get_tpb_P2G() {return prms->tpb_P2G;}
+    void set_tpb_P2G(int val) { prms->tpb_P2G = val; }
+
+    Q_PROPERTY(int tpb_Upd READ get_tpb_Upd WRITE set_tpb_Upd NOTIFY propertyChanged)
+    int get_tpb_Upd() {return prms->tpb_Upd;}
+    void set_tpb_Upd(int val) { prms->tpb_Upd = val; }
+
+    Q_PROPERTY(int tpb_G2P READ get_tpb_G2P WRITE set_tpb_G2P NOTIFY propertyChanged)
+    int get_tpb_G2P() {return prms->tpb_G2P;}
+    void set_tpb_G2P(int val) { prms->tpb_G2P = val; }
+
+
     Q_PROPERTY(double in_TimeStep READ getTimeStep WRITE setTimeStep NOTIFY propertyChanged)
     double getTimeStep() {return prms->InitialTimeStep;}
     void setTimeStep(double val) { prms->InitialTimeStep = val; }

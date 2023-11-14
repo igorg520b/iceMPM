@@ -52,7 +52,7 @@ void icy::Point::NACCUpdateDeformationGradient(const real &dt,
     Vector2r Sigma = svd.singularValues();
 
     // line 4
-    real p0 = kappa * (magic_epsilon + std::sinh(xi * std::max(-alpha, 0.)));
+    real p0 = kappa * (magic_epsilon + std::sinh(xi * std::max(-alpha, (real)0)));
 
     // line 5
     real Je_tr = Sigma[0]*Sigma[1];    // this is for 2D
