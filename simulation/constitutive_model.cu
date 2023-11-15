@@ -21,7 +21,9 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     svd2x2(FeTr, U, Sigma, V);
 
     // line 4
-    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
+//    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
+    real p0 = kappa * sinh(-xi * (log(p.Jp)+gprms.NACC_alpha));
+    p0 = max(magic_epsilon, p0);
 
     // line 5
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
@@ -40,27 +42,28 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(p_trial > p0)
     {
-        p.q = 1;
+        if(p.q == 0) p.q = 1;
         real Je_new = sqrt(-2.*p0 / kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
         alpha += log(Je_tr / Je_new);
+        p.Jp *= Je_new/Je_tr;
     }
 
     // line 14 (case 2)
     else if(p_trial < -beta*p0)
     {
-        p.q = 2;
+        if(p.q == 0) p.q = 2;
         real Je_new = sqrt(2.*beta*p0/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
         alpha += log(Je_tr / Je_new);
+        p.Jp *= Je_new/Je_tr;
     }
 
     // line 19 (case 3)
     else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
     {
-        p.q = 3;
 
 
 
@@ -85,15 +88,24 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 
         real p_c = (1.-beta)*p0/2.;
 
-        if(p_trial >= p_c) alpha-=log(zeta_tr/zeta_n_1);
-        else alpha += log(zeta_tr/zeta_n_1);
+        if(p_trial > p_c)
+        {
+            alpha -= log(zeta_tr/zeta_n_1);
+            p.Jp *= zeta_tr/zeta_n_1;
+            if(p.q == 0) p.q = 3;
+        }
+        else
+        {
+            alpha += log(zeta_tr/zeta_n_1);
+            p.Jp *= zeta_n_1/zeta_tr;
+            if(p.q == 0) p.q = 4;
+        }
 
 
     }
     else
     {
         p.Fe = FeTr;
-        p.q = 0;
     }
 }
 

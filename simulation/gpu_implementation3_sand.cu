@@ -452,7 +452,7 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
     p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
-//    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
+    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
     p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
 
     p.velocity.setZero();

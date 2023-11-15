@@ -44,7 +44,7 @@ public:
 
     double value_range = 0.01;
 
-    enum VisOpt { none, NACC_alpha, NACC_case };
+    enum VisOpt { none, NACC_alpha, NACC_case, Jp };
     Q_ENUM(VisOpt)
 
     void SynchronizeValues();

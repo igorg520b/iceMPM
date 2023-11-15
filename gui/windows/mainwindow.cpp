@@ -31,10 +31,10 @@ MainWindow::MainWindow(QWidget *parent)
     renderWindow->GetInteractor()->SetInteractorStyle(rubberBand);
 
     // VTK - scalar bar
-//    renderer->AddActor(scalarBar);
+    renderer->AddActor(scalarBar);
     scalarBar->SetMaximumWidthInPixels(130);
     scalarBar->SetBarRatio(0.07);
-    scalarBar->SetMaximumHeightInPixels(300);
+    scalarBar->SetMaximumHeightInPixels(200);
     scalarBar->GetPositionCoordinate()->SetCoordinateSystemToNormalizedDisplay();
     scalarBar->GetPositionCoordinate()->SetValue(0.01,0.015, 0.0);
     scalarBar->SetLabelFormat("%.1e");
@@ -94,7 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
 // anything that includes the Model
 
 
-    scalarBar->SetLookupTable(representation.hueLut);
+    scalarBar->SetLookupTable(representation.lutMPM);
     renderer->AddActor(representation.actor_points);
     renderer->AddActor(representation.actor_grid);
     renderer->AddActor(representation.actor_indenter);

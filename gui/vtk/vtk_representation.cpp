@@ -27,12 +27,13 @@ icy::VisualRepresentation::VisualRepresentation()
                               lutArrayMPMColors[i][1],
                               lutArrayMPMColors[i][2], 1.0);
 
-    hueLut_four->SetNumberOfColors(4);
+    hueLut_four->SetNumberOfColors(5);
     hueLut_four->SetTableValue(0, 0.3, 0.3, 0.3);
     hueLut_four->SetTableValue(1, 1.0, 0, 0);
     hueLut_four->SetTableValue(2, 0, 1.0, 0);
     hueLut_four->SetTableValue(3, 0, 0, 1.0);
-    hueLut_four->SetTableRange(0,3);
+    hueLut_four->SetTableValue(4, 0, 0.5, 0.5);
+    hueLut_four->SetTableRange(0,4);
 
 
     indenterMapper->SetInputConnection(indenterSource->GetOutputPort());
@@ -77,10 +78,7 @@ icy::VisualRepresentation::VisualRepresentation()
 
 
     grid_mapper->SetInputData(structuredGrid);
-    grid_mapper->SetLookupTable(hueLut);
-
-//    mapper_structuredGrid->SetScalarRange(0, dataSize - 1);
-//    mapper_structuredGrid->ScalarVisibilityOn();
+//    grid_mapper->SetLookupTable(hueLut);
 
     actor_grid->SetMapper(grid_mapper);
     actor_grid->GetProperty()->SetEdgeVisibility(true);
@@ -141,38 +139,34 @@ void icy::VisualRepresentation::SynchronizeValues()
         points->SetPoint((vtkIdType)i, x);
       }
 
-    if(VisualizingVariable == 0)
+    double centerVal = 0;
+    double range = std::pow(10,value_range);
+    points_mapper->SetLookupTable(lutMPM);
+
+
+    if(VisualizingVariable == VisOpt::none)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, 0);
     }
-    else if(VisualizingVariable == 1)
+    else if(VisualizingVariable == VisOpt::NACC_alpha)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, exp(model->points[i].NACC_alpha_p));
+        centerVal = exp(alpha0);
     }
-    else if(VisualizingVariable == 2)
+    else if(VisualizingVariable == VisOpt::NACC_case)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].q);
+        points_mapper->SetLookupTable(hueLut_four);
+    }
+    else if(VisualizingVariable == VisOpt::Jp)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp-1);
+        centerVal = 0;
     }
 
     model->hostside_data_update_mutex.unlock();
 
-    double centerVal = 0;
-    double range = std::pow(10,value_range);
 
-    if(VisualizingVariable == 2)
-    {
-        points_mapper->SetLookupTable(hueLut_four);
-    }
-    else
-    {
-        points_mapper->SetLookupTable(lutMPM);
-    }
-
-
-    if(VisualizingVariable == 1)
-    {
-        centerVal = exp(alpha0);
-    }
 //    float minmax[2];
 //    visualized_values->GetValueRange(minmax);
     lutMPM->SetTableRange(centerVal-range, centerVal+range);
