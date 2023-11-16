@@ -6,11 +6,11 @@
 icy::VisualRepresentation::VisualRepresentation()
 {
     int nLut = sizeof lutArrayTemperatureAdj / sizeof lutArrayTemperatureAdj[0];
-    hueLut->SetNumberOfTableValues(nLut);
-    for ( int i=0; i<nLut; i++)
-        hueLut->SetTableValue(i, lutArrayTemperatureAdj[i][0],
-                              lutArrayTemperatureAdj[i][1],
-                              lutArrayTemperatureAdj[i][2], 1.0);
+//    hueLut->SetNumberOfTableValues(nLut);
+//    for ( int i=0; i<nLut; i++)
+//        hueLut->SetTableValue(i, lutArrayTemperatureAdj[i][0],
+//                              lutArrayTemperatureAdj[i][1],
+//                              lutArrayTemperatureAdj[i][2], 1.0);
 
     nLut = sizeof lutArrayPastel / sizeof lutArrayPastel[0];
     hueLut_pastel->SetNumberOfTableValues(nLut);
@@ -88,6 +88,20 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_grid->GetProperty()->SetInterpolationToFlat();
     actor_grid->PickableOff();
     actor_grid->GetProperty()->SetColor(0.95,0.95,0.95);
+
+    scalarBar->SetLookupTable(lutMPM);
+    scalarBar->SetMaximumWidthInPixels(130);
+    scalarBar->SetBarRatio(0.07);
+    scalarBar->SetMaximumHeightInPixels(200);
+    scalarBar->GetPositionCoordinate()->SetCoordinateSystemToNormalizedDisplay();
+    scalarBar->GetPositionCoordinate()->SetValue(0.01,0.015, 0.0);
+    scalarBar->SetLabelFormat("%.1e");
+    scalarBar->GetLabelTextProperty()->BoldOff();
+    scalarBar->GetLabelTextProperty()->ItalicOff();
+    scalarBar->GetLabelTextProperty()->ShadowOff();
+    scalarBar->GetLabelTextProperty()->SetColor(0.1,0.1,0.1);
+
+
 }
 
 
@@ -140,8 +154,9 @@ void icy::VisualRepresentation::SynchronizeValues()
       }
 
     double centerVal = 0;
-    double range = std::pow(10,value_range);
+    double range = std::pow(10,ranges[VisualizingVariable]);
     points_mapper->SetLookupTable(lutMPM);
+    scalarBar->SetLookupTable(lutMPM);
 
 
     if(VisualizingVariable == VisOpt::none)
@@ -157,11 +172,29 @@ void icy::VisualRepresentation::SynchronizeValues()
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].q);
         points_mapper->SetLookupTable(hueLut_four);
+        scalarBar->SetLookupTable(hueLut_four);
     }
     else if(VisualizingVariable == VisOpt::Jp)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp-1);
-        centerVal = 0;
+    }
+    else if(VisualizingVariable == VisOpt::p0)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p0);
+        points_mapper->SetLookupTable(hueLut);
+        scalarBar->SetLookupTable(hueLut);
+    }
+    else if(VisualizingVariable == VisOpt::p_tr)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p);
+        points_mapper->SetLookupTable(hueLut);
+        scalarBar->SetLookupTable(hueLut);
+    }
+    else if(VisualizingVariable == VisOpt::q_tr)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_q);
+        points_mapper->SetLookupTable(hueLut);
+        scalarBar->SetLookupTable(hueLut);
     }
 
     model->hostside_data_update_mutex.unlock();
@@ -170,6 +203,7 @@ void icy::VisualRepresentation::SynchronizeValues()
 //    float minmax[2];
 //    visualized_values->GetValueRange(minmax);
     lutMPM->SetTableRange(centerVal-range, centerVal+range);
+    hueLut->SetTableRange(centerVal-range, centerVal+range);
 
     points->Modified();
     visualized_values->Modified();

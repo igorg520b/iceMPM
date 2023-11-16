@@ -114,8 +114,9 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::Fe10] = points[i].Fe(1,0);
         tmp_transfer_buffer[i + n*icy::SimParams::Fe11] = points[i].Fe(1,1);
         tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP] = points[i].NACC_alpha_p;
-        tmp_transfer_buffer[i + n*icy::SimParams::idx_q] = points[i].q;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_q_snow] = points[i].q;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta] = points[i].zeta;
     }
 
     // transfer point data to device
@@ -169,8 +170,14 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].Fe(1,0) = tmp_transfer_buffer[i + n*icy::SimParams::Fe10];
         points[i].Fe(1,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe11];
         points[i].NACC_alpha_p = tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP];
-        points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q];
+        points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q_snow];
         points[i].Jp = tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp];
+        points[i].zeta = tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta];
+
+        points[i].visualize_p = tmp_transfer_buffer[i + n*icy::SimParams::idx_p];
+        points[i].visualize_p0 = tmp_transfer_buffer[i + n*icy::SimParams::idx_p0];
+        points[i].visualize_q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q];
+        points[i].visualize_psi = tmp_transfer_buffer[i + n*icy::SimParams::idx_psi];
     }
 }
 
@@ -322,8 +329,7 @@ __global__ void v2_kernel_p2g()
 //    Matrix2r PFt = KirchhoffStress_Sifakis(gprms.mu, gprms.lambda, p.Fe);
 //    Matrix2r PFt = KirchhoffStress_Stomakhin(gprms.mu, gprms.lambda, p.Fe);
 
-    Matrix2r subterm1 = -(dt*vol*Dinv) * PFt;
-    Matrix2r subterm2 = subterm1 + particle_mass * p.Bp;
+    Matrix2r subterm2 = particle_mass*p.Bp - (dt*vol*Dinv)*PFt;
 
     constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
     const int i0 = (int)(p.pos[0]*h_inv - offset);
@@ -452,8 +458,9 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
     p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
-    p.q = gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx];
+    p.q = gprms.pts_array[icy::SimParams::idx_q_snow*nPtsPitched + pt_idx];
     p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
+    p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -508,8 +515,15 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
     gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
-    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.q;
+    gprms.pts_array[icy::SimParams::idx_q_snow*nPtsPitched + pt_idx] = p.q;
     gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
+    gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx] = p.zeta;
+
+    // visualized variables
+    gprms.pts_array[icy::SimParams::idx_p*nPtsPitched + pt_idx] = p.visualize_p;
+    gprms.pts_array[icy::SimParams::idx_p0*nPtsPitched + pt_idx] = p.visualize_p0;
+    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
+    gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
 }
 
 //===========================================================================

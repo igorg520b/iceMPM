@@ -15,46 +15,13 @@ struct icy::Point
     real NACC_alpha_p;
 
     double q; // Drucker Prager hardening paremeter
-    double Jp; // for snow
+    double Jp; // track the change in det(Fp)
+    double zeta; // track shear accumulation
     Vector2r pos_initial; // for resetting
 
+    double visualize_p, visualize_q, visualize_p0, visualize_psi;
+
     void Reset(real alpha);
-
-    static real wc(Vector2r dx);
-    static Vector2r gradwc(Vector2r dx);
-    static real wq(Vector2r dx);
-    static Vector2r gradwq(Vector2r dx);
-/*
-    Eigen::Matrix2f SnowConstitutiveModel(const float &XiSnow,
-                                          const float &prmsMu,
-                                          const float &prmsLambda,
-                                          const float &particle_volume);
-    void SnowUpdateDeformationGradient(const float &dt,
-                                       const float &THT_C_snow,
-                                       const float &THT_S_snow,
-                                       const Eigen::Matrix2f &FModifier);
-*/
-
-    Matrix2r NACCConstitutiveModel(const real &prmsMu,
-                                          const real &prmsLambda,
-                                          const real &particle_volume) const;
-
-    void NACCUpdateDeformationGradient(const real &dt,
-                                       const Matrix2r &FModifier,
-                                       const icy::SimParams &prms);
-
-
-    Matrix2r ElasticConstitutiveModel(const real &prmsMu,
-                                          const real &prmsLambda,
-                                          const real &particle_volume) const;
-    void ElasticUpdateDeformationGradient(const real &dt, const Matrix2r &FModifier);
-
-    static Matrix2r polar_decomp_R(const Matrix2r &val);
-private:
-    static real wcs(real x);   // cubic spline
-    static real dwcs(real x);  // cubic spline derivative
-    static real wqs(real x);   // cubic spline
-    static real dwqs(real x);  // cubic spline derivative
 };
 
 

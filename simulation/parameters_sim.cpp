@@ -7,10 +7,6 @@ void icy::SimParams::Reset()
     grid_array = nullptr;
     pts_array = nullptr;
 
-    tpb_P2G = 256;
-    tpb_Upd = 1024;
-    tpb_G2P = 256;
-
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
     PointsWanted = 50'000;
@@ -56,6 +52,11 @@ void icy::SimParams::Reset()
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
+
+    tpb_P2G = 256;
+    tpb_Upd = 512;
+    tpb_G2P = 128;
+
 
     ComputeLame();
     ComputeCamClayParams2();

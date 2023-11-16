@@ -21,9 +21,19 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     svd2x2(FeTr, U, Sigma, V);
 
     // line 4
+//    real x = -xi*alpha;
+//    real p0 = kappa * (x+x*x*x/6);
+//    real x = log(p.Jp);
+//    real p0 = gprms.IceCompressiveStrength * pow(p.Jp,13);
+
+    real alpha2 = log(0.991) + log(1/p.Jp);
+    real p0 = kappa * sinh(-xi * alpha2);
+//    real p0 = kappa * sinh(xi * -log(p.Jp*0.991));
+//    real p0 = kappa * (exp(-xi * alpha)-1)/2;
 //    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
-    real p0 = kappa * sinh(-xi * (log(p.Jp)+gprms.NACC_alpha));
-    p0 = max(magic_epsilon, p0);
+//    real p0 = kappa * sinh(-xi * (log(p.Jp)+gprms.NACC_alpha));
+    p0 = max(magic_epsilon*kappa, p0);
+    p.visualize_p0 = p0;
 
     // line 5
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
@@ -37,6 +47,8 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 
     // line 8
     real p_trial = -psi_kappa_prime * Je_tr;
+    p.visualize_p = p_trial;
+    p.visualize_q = s_hat_tr.norm()*sqrt((6-d)/2.);
 
     // line 9 (case 1)
     real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);

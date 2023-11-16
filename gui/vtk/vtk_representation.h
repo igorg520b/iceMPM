@@ -25,6 +25,10 @@
 #include <vtkPoints.h>
 #include <vtkVertexGlyphFilter.h>
 #include <vtkStructuredGrid.h>
+#include <vtkScalarBarActor.h>
+#include <vtkTextProperty.h>
+
+
 
 #include <vtkRegularPolygonSource.h>
 #include <vtkCylinderSource.h>
@@ -42,10 +46,10 @@ public:
 
     icy::Model *model;
 
-    double value_range = 0.01;
-
-    enum VisOpt { none, NACC_alpha, NACC_case, Jp };
+    enum VisOpt { none, NACC_alpha, NACC_case, Jp ,p0, p_tr, q_tr };
     Q_ENUM(VisOpt)
+    VisOpt VisualizingVariable = VisOpt::none;
+    double ranges[10] = {};
 
     void SynchronizeValues();
     void SynchronizeTopology();
@@ -55,10 +59,10 @@ public:
     vtkNew<vtkActor> actor_points;
     vtkNew<vtkActor> actor_grid;
     vtkNew<vtkActor> actor_indenter;
+    vtkNew<vtkScalarBarActor> scalarBar;
+
 
 private:
-    VisOpt VisualizingVariable = VisOpt::none;
-
     vtkNew<vtkLookupTable> hueLut_pastel, hueLut_four;
 
     // indenter

@@ -33,7 +33,6 @@
 #include <vtkCamera.h>
 #include <vtkProperty.h>
 #include <vtkNew.h>
-#include <vtkScalarBarActor.h>
 #include <vtkTextProperty.h>
 #include <vtkTextActor.h>
 #include <vtkWindowToImageFilter.h>
@@ -110,7 +109,6 @@ private:
     vtkNew<vtkGenericOpenGLRenderWindow> renderWindow;
     QVTKOpenGLNativeWidget *qt_vtk_widget;
     vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkScalarBarActor> scalarBar;
     vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
     vtkNew<vtkTextActor> actorText;
 

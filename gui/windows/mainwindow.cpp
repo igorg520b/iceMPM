@@ -31,17 +31,7 @@ MainWindow::MainWindow(QWidget *parent)
     renderWindow->GetInteractor()->SetInteractorStyle(rubberBand);
 
     // VTK - scalar bar
-    renderer->AddActor(scalarBar);
-    scalarBar->SetMaximumWidthInPixels(130);
-    scalarBar->SetBarRatio(0.07);
-    scalarBar->SetMaximumHeightInPixels(200);
-    scalarBar->GetPositionCoordinate()->SetCoordinateSystemToNormalizedDisplay();
-    scalarBar->GetPositionCoordinate()->SetValue(0.01,0.015, 0.0);
-    scalarBar->SetLabelFormat("%.1e");
-    scalarBar->GetLabelTextProperty()->BoldOff();
-    scalarBar->GetLabelTextProperty()->ItalicOff();
-    scalarBar->GetLabelTextProperty()->ShadowOff();
-    scalarBar->GetLabelTextProperty()->SetColor(0.1,0.1,0.1);
+    renderer->AddActor(representation.scalarBar);
 
     // property browser
     pbrowser = new ObjectPropertyBrowser(this);
@@ -94,7 +84,6 @@ MainWindow::MainWindow(QWidget *parent)
 // anything that includes the Model
 
 
-    scalarBar->SetLookupTable(representation.lutMPM);
     renderer->AddActor(representation.actor_points);
     renderer->AddActor(representation.actor_grid);
     renderer->AddActor(representation.actor_indenter);
@@ -141,6 +130,16 @@ MainWindow::MainWindow(QWidget *parent)
             camera->Modified();
         }
 
+        var = settings.value("visualization_ranges");
+        if(!var.isNull())
+        {
+            double *vec = (double*)var.toByteArray().constData();
+            memcpy(representation.ranges, vec, sizeof(representation.ranges));
+            cout << "restored viz values: ";
+            for(int i=0; i<10; i++) cout << representation.ranges[i] << ", ";
+            cout << '\n';
+        }
+
         var = settings.value("lastParameterFile");
         if(!var.isNull())
         {
@@ -165,18 +164,11 @@ MainWindow::MainWindow(QWidget *parent)
             splitter->setSizes(QList<int>({sz1, sz2}));
         }
 
-        var = settings.value("value_range");
-        if(!var.isNull())
-        {
-            double val = var.toDouble();
-            representation.value_range = val;
-            qdsbValRange->setValue(val);
-        }
-
         var = settings.value("vis_option");
         if(!var.isNull())
         {
             comboBox_visualizations->setCurrentIndex(var.toInt());
+            qdsbValRange->setValue(representation.ranges[var.toInt()]);
         }
     }
     else
@@ -234,15 +226,17 @@ void MainWindow::quit_triggered()
     qDebug() << "cam focal pt " << data[3] << "," << data[4] << "," << data[5];
     qDebug() << "cam par scale " << data[6];
 
-
-    QByteArray arr((char*)&data[0], sizeof(double)*10);
+    QByteArray arr((char*)data, sizeof(data));
     settings.setValue("camData", arr);
+
+    QByteArray ranges((char*)representation.ranges, sizeof(representation.ranges));
+    settings.setValue("visualization_ranges", ranges);
+
     settings.setValue("vis_option", comboBox_visualizations->currentIndex());
 
     if(!qLastParameterFile.isEmpty()) settings.setValue("lastParameterFile", qLastParameterFile);
     settings.setValue("take_screenshots", ui->actionTake_Screenshots->isChecked());
     settings.setValue("save_binary_data", ui->actionSave_Binary_Data->isChecked());
-    settings.setValue("value_range", representation.value_range);
 
     QList<int> szs = splitter->sizes();
     settings.setValue("splitter_size_0", szs[0]);
@@ -256,6 +250,17 @@ void MainWindow::comboboxIndexChanged_visualizations(int index)
 {
     representation.ChangeVisualizationOption(index);
 //    scalarBar->SetVisibility(index != 0);
+//    renderWindow->Render();
+    qdsbValRange->setValue(representation.ranges[index]);
+}
+
+void MainWindow::limits_changed(double val_)
+{
+//    double val = qdsbValRange->value();
+//    representation.value_range = val;
+    int idx = (int)representation.VisualizingVariable;
+    representation.ranges[idx] = val_;
+    representation.SynchronizeValues();
     renderWindow->Render();
 }
 
@@ -374,13 +379,7 @@ void MainWindow::GoToStep(int step)
     */
 }
 
-void MainWindow::limits_changed(double val_)
-{
-    double val = qdsbValRange->value();
-    representation.value_range = val;
-    representation.SynchronizeValues();
-    renderWindow->Render();
-}
+
 
 
 
