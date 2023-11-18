@@ -70,8 +70,12 @@ public:
     real IceFrictionCoefficient;
 
     real XiSnow, THT_C_snow, THT_S_snow;   // hardening, critical compression, critical stretch
-    real NACC_xi, IceCompressiveStrength, IceTensileStrength, IceShearStrength;
-    real NACC_alpha, NACC_beta, NACC_M_sq;     // these are all computed
+    real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
+    real NACC_beta, NACC_M_sq;     // these are all computed
+    real NACC_max_strain;
+
+    // NACC - unused
+    real NACC_xi, NACC_alpha;
 
 
     real cellsize, cellsize_inv, Dp_inv;

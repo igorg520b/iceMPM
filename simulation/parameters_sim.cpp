@@ -49,6 +49,7 @@ void icy::SimParams::Reset()
     SandYM = 5e7;
 
     NACC_xi = 10;
+    NACC_max_strain = 0.01;
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
@@ -64,18 +65,6 @@ void icy::SimParams::Reset()
     std::cout << "SimParams Reset() done\n";
 }
 
-void icy::SimParams::ComputeCamClayParams2()
-{
-    ComputeLame();
-    NACC_beta = IceTensileStrength/IceCompressiveStrength;
-    const real &q = IceShearStrength;
-    const real &p0 = IceCompressiveStrength;
-    const real &beta = NACC_beta;
-    real NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
-    this->NACC_M_sq = NACC_M*NACC_M;
-
-    this->NACC_alpha = std::log(0.991);
-}
 
 std::string icy::SimParams::ParseFile(std::string fileName)
 {
@@ -110,19 +99,21 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("IndDepth")) IndDepth = doc["IndDepth"].GetDouble();
     if(doc.HasMember("BlockHeight")) BlockHeight = doc["BlockHeight"].GetDouble();
     if(doc.HasMember("BlockLength")) BlockLength = doc["BlockLength"].GetDouble();
+
+    if(doc.HasMember("IceCompressiveStrength")) IceCompressiveStrength = doc["IceCompressiveStrength"].GetDouble();
+    if(doc.HasMember("IceTensileStrength")) IceTensileStrength = doc["IceTensileStrength"].GetDouble();
+    if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
+    if(doc.HasMember("NACC_max_strain")) NACC_max_strain = doc["NACC_max_strain"].GetDouble();
+
+    // to be removed
+    if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
     if(doc.HasMember("XiSnow")) XiSnow = doc["XiSnow"].GetDouble();
     if(doc.HasMember("THT_C_snow")) THT_C_snow = doc["THT_C_snow"].GetDouble();
     if(doc.HasMember("THT_S_snow")) THT_S_snow = doc["THT_S_snow"].GetDouble();
-
     if(doc.HasMember("H0")) H0 = doc["H0"].GetDouble() * pi/180.0;
     if(doc.HasMember("H1")) H1 = doc["H1"].GetDouble() * pi/180.0;
     if(doc.HasMember("H2")) H2 = doc["H2"].GetDouble();
     if(doc.HasMember("H3")) H3 = doc["H3"].GetDouble() * pi/180.0;
-
-    if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
-    if(doc.HasMember("IceCompressiveStrength")) IceCompressiveStrength = doc["IceCompressiveStrength"].GetDouble();
-    if(doc.HasMember("IceTensileStrength")) IceTensileStrength = doc["IceTensileStrength"].GetDouble();
-    if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
 
     ComputeCamClayParams2();
     ComputeLame();
@@ -141,8 +132,6 @@ void icy::SimParams::ComputeLame()
     kappa = mu*2./3. + lambda;
 }
 
-
-
 void icy::SimParams::ComputeHelperVariables()
 {
     UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
@@ -152,13 +141,14 @@ void icy::SimParams::ComputeHelperVariables()
     IndRSq = IndDiameter*IndDiameter/4.;
 }
 
-/*
-void icy::SimParams::ComputeCamClayParams()
+void icy::SimParams::ComputeCamClayParams2()
 {
-    real sin_phi = std::sin(NACC_friction_angle / 180. * pi);
-    real mohr_columb_friction = std::sqrt(2./3.)*2. * sin_phi / (3. - sin_phi);
-    real NACC_M = mohr_columb_friction * (real)dim / std::sqrt(2. / (6. - dim));
-    std::cout << "SimParams: NACC M is " << NACC_M << '\n';
-    NACC_M_sq = NACC_M*NACC_M;
+    ComputeLame();
+    NACC_beta = IceTensileStrength/IceCompressiveStrength;
+    const real &beta = NACC_beta;
+    const real &q = IceShearStrength;
+    const real &p0 = IceCompressiveStrength;
+    real NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
+    this->NACC_M_sq = NACC_M*NACC_M;
+    this->NACC_alpha = std::log(0.991);
 }
-*/

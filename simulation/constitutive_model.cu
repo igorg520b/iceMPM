@@ -21,18 +21,19 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     svd2x2(FeTr, U, Sigma, V);
 
     // line 4
-//    real x = -xi*alpha;
-//    real p0 = kappa * (x+x*x*x/6);
-//    real x = log(p.Jp);
-//    real p0 = gprms.IceCompressiveStrength * pow(p.Jp,13);
 
-    real alpha2 = log(0.991) + log(1/p.Jp);
-    real p0 = kappa * sinh(-xi * alpha2);
-//    real p0 = kappa * sinh(xi * -log(p.Jp*0.991));
-//    real p0 = kappa * (exp(-xi * alpha)-1)/2;
+//    real x3 = pow(p.Jp,xi)/pow(0.991,xi);
+//    real p0 = kappa * (x3-1);
+//    real p0 = 1.7e9*(p.Jp-0.991);
+
+//    real p0 = gprms.IceCompressiveStrength * (pow(p.Jp,xi));
+
+
 //    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
-//    real p0 = kappa * sinh(-xi * (log(p.Jp)+gprms.NACC_alpha));
-    p0 = max(magic_epsilon*kappa, p0);
+    const real &ms = gprms.NACC_max_strain;
+    real p0 = gprms.IceCompressiveStrength/ms * (p.Jp - (1.-ms));
+//    if(p.Jp > 1) p0 = gprms.IceCompressiveStrength/ms * ((1 + (p.Jp-1)*10) - (1.-ms));
+    p0 = max(magic_epsilon, p0);
     p.visualize_p0 = p0;
 
     // line 5
@@ -54,7 +55,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(p_trial > p0)
     {
-        if(p.q == 0) p.q = 1;
+        p.q = 1;
         real Je_new = sqrt(-2.*p0 / kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
@@ -65,7 +66,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     // line 14 (case 2)
     else if(p_trial < -beta*p0)
     {
-        if(p.q == 0) p.q = 2;
+        p.q = 2;
         real Je_new = sqrt(2.*beta*p0/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
@@ -76,9 +77,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     // line 19 (case 3)
     else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
     {
-
-
-
+        // projection
         real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
         //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
         Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
@@ -99,21 +98,22 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
         real zeta_n_1 = sqrt((q_n_1*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
 
         real p_c = (1.-beta)*p0/2.;
-
+//        real coeff = 0.1;
+//        real p_c = coeff*p0 - (1.-coeff)*beta*p0;
         if(p_trial > p_c)
         {
-            alpha -= log(zeta_tr/zeta_n_1);
-            p.Jp *= zeta_tr/zeta_n_1;
-            if(p.q == 0) p.q = 3;
+            alpha -= log(zeta_tr/zeta_n_1);     // original version
+            p.Jp *= zeta_tr/zeta_n_1;           // original version
+//            alpha += log(zeta_tr/zeta_n_1);
+//            p.Jp *= zeta_n_1/zeta_tr;
+            p.q = 3;
         }
         else
         {
             alpha += log(zeta_tr/zeta_n_1);
             p.Jp *= zeta_n_1/zeta_tr;
-            if(p.q == 0) p.q = 4;
+            p.q = 4;
         }
-
-
     }
     else
     {

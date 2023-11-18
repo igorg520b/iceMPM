@@ -165,7 +165,7 @@ void icy::VisualRepresentation::SynchronizeValues()
     }
     else if(VisualizingVariable == VisOpt::NACC_alpha)
     {
-        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, exp(model->points[i].NACC_alpha_p));
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, exp(-model->points[i].NACC_alpha_p));
         centerVal = exp(alpha0);
     }
     else if(VisualizingVariable == VisOpt::NACC_case)
