@@ -73,6 +73,7 @@ public:
     real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
     real NACC_beta, NACC_M_sq;     // these are all computed
     real NACC_max_strain;
+    real NACC_magic_coeff;
 
     // NACC - unused
     real NACC_xi, NACC_alpha;

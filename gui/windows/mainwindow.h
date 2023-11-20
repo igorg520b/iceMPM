@@ -33,8 +33,7 @@
 #include <vtkCamera.h>
 #include <vtkProperty.h>
 #include <vtkNew.h>
-#include <vtkTextProperty.h>
-#include <vtkTextActor.h>
+
 #include <vtkWindowToImageFilter.h>
 #include <vtkPNGWriter.h>
 #include <vtkInteractorStyleRubberBand2D.h>
@@ -110,7 +109,6 @@ private:
     QVTKOpenGLNativeWidget *qt_vtk_widget;
     vtkNew<vtkRenderer> renderer;
     vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
-    vtkNew<vtkTextActor> actorText;
 
     // other
     void OpenFile(QString fileName);

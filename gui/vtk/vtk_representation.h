@@ -27,7 +27,7 @@
 #include <vtkStructuredGrid.h>
 #include <vtkScalarBarActor.h>
 #include <vtkTextProperty.h>
-
+#include <vtkTextActor.h>
 
 
 #include <vtkRegularPolygonSource.h>
@@ -61,6 +61,7 @@ public:
     vtkNew<vtkActor> actor_indenter;
     vtkNew<vtkScalarBarActor> scalarBar;
 
+    vtkNew<vtkTextActor> actorText;
 
 private:
     vtkNew<vtkLookupTable> hueLut_pastel, hueLut_four;

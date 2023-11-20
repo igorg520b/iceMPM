@@ -73,13 +73,11 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(QString b_Grid READ getGridDimensions NOTIFY propertyChanged)
     QString getGridDimensions() {return QString("%1 x %2").arg(prms->GridX).arg(prms->GridY);}
 
-    Q_PROPERTY(double nacc_beta READ getNaccBeta WRITE setNaccBeta NOTIFY propertyChanged)
+    Q_PROPERTY(double nacc_beta READ getNaccBeta NOTIFY propertyChanged)
     double getNaccBeta() {return prms->NACC_beta;}
-    void setNaccBeta(double val) {prms->NACC_beta = val;}
 
-//    Q_PROPERTY(double nacc_xi READ getNaccXi WRITE setNaccXi NOTIFY propertyChanged)
-//    double getNaccXi() {return prms->NACC_xi;}
-//    void setNaccXi(double val) {prms->NACC_xi = val;}
+    Q_PROPERTY(double nacc_pc READ getNaccPc NOTIFY propertyChanged)
+    double getNaccPc() {return (1 - prms->NACC_beta)*prms->IceCompressiveStrength/2.;}
 
     Q_PROPERTY(double nacc_max_strain READ getNaccMaxStrain WRITE setNaccMaxStrain NOTIFY propertyChanged)
     double getNaccMaxStrain() {return prms->NACC_max_strain;}
@@ -87,6 +85,10 @@ class ParamsWrapper : public QObject
 
     Q_PROPERTY(double nacc_M READ getNaccM NOTIFY propertyChanged)
     double getNaccM() {return sqrt(prms->NACC_M_sq);}
+
+    Q_PROPERTY(double nacc_magic_coeff READ getNaccMagicCoeff WRITE setNaccMagicCoeff NOTIFY propertyChanged)
+    double getNaccMagicCoeff() {return prms->NACC_magic_coeff;}
+    void setNaccMagicCoeff(double val) {prms->NACC_magic_coeff = val;}
 
 
     Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)

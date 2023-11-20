@@ -87,16 +87,7 @@ MainWindow::MainWindow(QWidget *parent)
     renderer->AddActor(representation.actor_points);
     renderer->AddActor(representation.actor_grid);
     renderer->AddActor(representation.actor_indenter);
-    renderer->AddActor(actorText);
-
-    // text
-    vtkTextProperty* txtprop = actorText->GetTextProperty();
-    txtprop->SetFontFamilyToArial();
-    txtprop->BoldOff();
-    txtprop->SetFontSize(14);
-    txtprop->ShadowOff();
-    txtprop->SetColor(0,0,0);
-    actorText->SetDisplayPosition(500, 30);
+    renderer->AddActor(representation.actorText);
 
     // populate combobox
     QMetaEnum qme = QMetaEnum::fromType<icy::VisualRepresentation::VisOpt>();
@@ -144,8 +135,13 @@ MainWindow::MainWindow(QWidget *parent)
         if(!var.isNull())
         {
             qLastParameterFile = var.toString();
-            this->outputDirectory = model.prms.ParseFile(qLastParameterFile.toStdString());
-            model.Reset();
+            QFile paramFile(qLastParameterFile);
+            if(paramFile.exists())
+            {
+                this->outputDirectory = model.prms.ParseFile(qLastParameterFile.toStdString());
+                this->setWindowTitle(qLastParameterFile);
+                model.Reset();
+            }
         }
 
         comboBox_visualizations->setCurrentIndex(settings.value("vis_option").toInt());
@@ -324,6 +320,7 @@ void MainWindow::load_parameter_triggered()
     if(qFileName.isNull())return;
     this->outputDirectory = model.prms.ParseFile(qFileName.toStdString());
     this->qLastParameterFile = qFileName;
+    this->setWindowTitle(qLastParameterFile);
     model.Reset();
     representation.SynchronizeTopology();
 //    if(ui->actionSave_Binary_Data->isChecked() && model.prms.SimulationStep == 0) save_binary_data();

@@ -101,7 +101,14 @@ icy::VisualRepresentation::VisualRepresentation()
     scalarBar->GetLabelTextProperty()->ShadowOff();
     scalarBar->GetLabelTextProperty()->SetColor(0.1,0.1,0.1);
 
-
+    // text
+    vtkTextProperty* txtprop = actorText->GetTextProperty();
+    txtprop->SetFontFamilyToArial();
+    txtprop->BoldOff();
+    txtprop->SetFontSize(14);
+    txtprop->ShadowOff();
+    txtprop->SetColor(0,0,0);
+    actorText->SetDisplayPosition(500, 30);
 }
 
 
