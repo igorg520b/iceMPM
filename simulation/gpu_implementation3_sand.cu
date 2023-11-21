@@ -31,15 +31,8 @@ void GPU_Implementation3::initialize()
     cudaGetDeviceProperties(&deviceProp, 0);
     spdlog::info("Compute capability {}.{}",deviceProp.major, deviceProp.minor);
 
-    err = cudaEventCreate(&eventP2GStart);
-    if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
-    cudaEventCreate(&eventUpdGridStart);
-    cudaEventCreate(&eventG2PStart);
-    cudaEventCreate(&eventG2PStop);
     cudaEventCreate(&eventCycleStart);
     cudaEventCreate(&eventCycleStop);
-    cudaEventCreate(&eventTransferStart);
-    cudaEventCreate(&eventTransferStop);
 
     err = cudaStreamCreate(&streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
@@ -113,8 +106,7 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::Fe01] = points[i].Fe(0,1);
         tmp_transfer_buffer[i + n*icy::SimParams::Fe10] = points[i].Fe(1,0);
         tmp_transfer_buffer[i + n*icy::SimParams::Fe11] = points[i].Fe(1,1);
-        tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP] = points[i].NACC_alpha_p;
-        tmp_transfer_buffer[i + n*icy::SimParams::idx_q_snow] = points[i].q;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_case] = points[i].q;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta] = points[i].zeta;
     }
@@ -169,8 +161,6 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].Fe(0,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe01];
         points[i].Fe(1,0) = tmp_transfer_buffer[i + n*icy::SimParams::Fe10];
         points[i].Fe(1,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe11];
-        points[i].NACC_alpha_p = tmp_transfer_buffer[i + n*icy::SimParams::idx_NACCAlphaP];
-        points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q_snow];
         points[i].Jp = tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp];
         points[i].zeta = tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta];
 
@@ -178,6 +168,7 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].visualize_p0 = tmp_transfer_buffer[i + n*icy::SimParams::idx_p0];
         points[i].visualize_q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q];
         points[i].visualize_psi = tmp_transfer_buffer[i + n*icy::SimParams::idx_psi];
+        points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_case];
     }
 }
 
@@ -245,32 +236,6 @@ __device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, 
     return PFt;
 }
 
-__device__ Matrix2r KirchhoffStress_Klar(const double mu, const double lambda, const Matrix2r &F)
-{
-    Matrix2r U, V, Sigma;
-    svd2x2(F, U, Sigma, V);
-    Matrix2r lnSigma,invSigma;
-    lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
-    invSigma = Sigma.inverse();
-    Matrix2r PFt = U*(2*mu*invSigma*lnSigma + lambda*lnSigma.trace()*invSigma)*V.transpose()*F.transpose();
-    return PFt;
-}
-
-__device__ Matrix2r KirchhoffStress_Sifakis(const double mu, const double lambda, const Matrix2r &F)
-{
-    real Je = F.determinant();
-    Matrix2r PFt = mu*F*F.transpose() + (-mu+lambda*log(Je))* Matrix2r::Identity();     // Neo-Hookean; Sifakis
-    return PFt;
-}
-
-
-__device__ Matrix2r KirchhoffStress_Stomakhin(const double mu, const double lambda, const Matrix2r &F)
-{
-    Matrix2r Re = polar_decomp_R(F);
-    real Je = F.determinant();
-    Matrix2r PFt = 2.*mu*(F - Re)* F.transpose() + lambda * (Je - 1.) * Je * Matrix2r::Identity();
-    return PFt;
-}
 
 
 // ==============================  kernels  ====================================
@@ -307,27 +272,8 @@ __global__ void v2_kernel_p2g()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitch + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitch + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
-//    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
-
-//    p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitch + pt_idx];
-
-    // for snow
-//    real exp1 = exp(gprms.XiSnow*(1.0 - p.Jp));
-//    lambda*= exp1;
-//    mu*= exp1;
-
-//    if(p.NACC_alpha_p < gprms.NACC_alpha)
-//    {
-//        lambda = gprms.SandYM*gprms.PoissonsRatio/((1+gprms.PoissonsRatio)*(1-2*gprms.PoissonsRatio));
-//        mu = gprms.SandYM/(2*(1+gprms.PoissonsRatio));
-//   }
-
-
 
     Matrix2r PFt = KirchhoffStress_Wolper(gprms.kappa, gprms.mu, p.Fe);
-//    Matrix2r PFt = KirchhoffStress_Klar(gprms.mu, gprms.lambda, p.Fe);
-//    Matrix2r PFt = KirchhoffStress_Sifakis(gprms.mu, gprms.lambda, p.Fe);
-//    Matrix2r PFt = KirchhoffStress_Stomakhin(gprms.mu, gprms.lambda, p.Fe);
 
     Matrix2r subterm2 = particle_mass*p.Bp - (dt*vol*Dinv)*PFt;
 
@@ -457,8 +403,8 @@ __global__ void v2_kernel_g2p()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitched + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
- //   p.NACC_alpha_p = gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx];
-    p.q = gprms.pts_array[icy::SimParams::idx_q_snow*nPtsPitched + pt_idx];
+
+    p.q = gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx];
     p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
     p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx];
 
@@ -498,9 +444,6 @@ __global__ void v2_kernel_g2p()
     p.pos += dt * p.velocity;
 
     NACCUpdateDeformationGradient_q_hardening(p);
-//    if(p.NACC_alpha_p >= gprms.NACC_alpha) NACCUpdateDeformationGradient(p);
-//    else DruckerPragerUpdateDeformationGradient(p);
-//    SnowUpdateDeformationGradient(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];
@@ -514,8 +457,7 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe01*nPtsPitched + pt_idx] = p.Fe(0,1);
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
-//    gprms.pts_array[icy::SimParams::idx_NACCAlphaP*nPtsPitched + pt_idx] = p.NACC_alpha_p;
-    gprms.pts_array[icy::SimParams::idx_q_snow*nPtsPitched + pt_idx] = p.q;
+
     gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
     gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx] = p.zeta;
 
@@ -524,6 +466,7 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::idx_p0*nPtsPitched + pt_idx] = p.visualize_p0;
     gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
     gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
+    gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx] = p.q;
 }
 
 //===========================================================================
@@ -539,89 +482,6 @@ __device__ Matrix2r dev(Matrix2r A)
 
 
 
-__device__ void NACCUpdateDeformationGradient(icy::Point &p)
-{
-    const Matrix2r &gradV = p.Bp;
-    constexpr real magic_epsilon = 1.e-5;
-    constexpr int d = 2; // dimensions
-    real &alpha = p.NACC_alpha_p;
-    const real &mu = gprms.mu;
-    const real &kappa = gprms.kappa;
-    const real &beta = gprms.NACC_beta;
-    const real &M_sq = gprms.NACC_M_sq;
-    const real &xi = gprms.NACC_xi;
-    const real &dt = gprms.InitialTimeStep;
-
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
-
-    // line 4
-    real p0 = kappa * (magic_epsilon + sinh(xi * max(-alpha, 0.)));
-
-    // line 5
-    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-
-    // line 6
-    Matrix2r SigmaSquared = Sigma*Sigma;
-    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-
-    // line 7
-    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
-
-    // line 8
-    real p_trial = -psi_kappa_prime * Je_tr;
-
-    // line 9 (case 1)
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(p_trial > p0)
-    {
-        real Je_new = sqrt(-2.*p0 / kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        if(true) alpha += log(Je_tr / Je_new);
-    }
-
-    // line 14 (case 2)
-    else if(p_trial < -beta*p0)
-    {
-        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        if(true) alpha += log(Je_tr / Je_new);
-    }
-
-    // line 19 (case 3)
-    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
-    {
-        real p_c = (1.-beta)*p0/2.;  // line 23
-        real q_tr = sqrt(3.-d/2.)*s_hat_tr.norm();   // line 24
-        Vector2r direction(p_c-p_trial, -q_tr);  // line 25
-        direction.normalize();
-        real C = M_sq*(p_c-beta*p0)*(p_c-p0);
-        real B = M_sq*direction[0]*(2.*p_c-p0+beta*p0);
-        real A = M_sq*direction[0]*direction[0]+(1.+2.*beta)*direction[1]*direction[1];  // line 30
-        real l1 = (-B+sqrt(B*B-4.*A*C))/(2.*A);
-        real l2 = (-B-sqrt(B*B-4.*A*C))/(2.*A);
-        real p1 = p_c + l1*direction[0];
-        real p2 = p_c + l2*direction[0];
-        real p_x = (p_trial-p_c)*(p1-p_c) > 0 ? p1 : p2;
-        real Je_x = sqrt(abs(-2.*p_x/kappa + 1.));
-        if(Je_x > magic_epsilon) alpha += log(Je_tr / Je_x);
-
-        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
-//        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r Sigma_new;
-        Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
-        p.Fe = U*Sigma_new*V.transpose();
-    }
-    else
-    {
-        p.Fe = FeTr;
-    }
-}
-
 
 // clamp x to range [a, b]
 __device__ double clamp(double x, double a, double b)
@@ -629,82 +489,6 @@ __device__ double clamp(double x, double a, double b)
     return max(a, min(b, x));
 }
 
-__device__ void SnowUpdateDeformationGradient(icy::Point &p)
-{
-    const Matrix2r &gradV = p.Bp;
-    const real &dt = gprms.InitialTimeStep;
-    const real &THT_C_snow = gprms.THT_C_snow;
-    const real &THT_S_snow = gprms.THT_S_snow;
-
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-
-    Matrix2r U, V, Sigma, SigmaClamped;
-    svd2x2(FeTr, U, Sigma, V);
-    SigmaClamped.setZero();
-    SigmaClamped(0,0) = clamp(Sigma(0,0), 1.0 - THT_C_snow, 1.0 + THT_S_snow);
-    SigmaClamped(1,1) = clamp(Sigma(1,1), 1.0 - THT_C_snow, 1.0 + THT_S_snow);
-    p.Fe = U*SigmaClamped*V.transpose();
-
-    p.Jp *= (1/SigmaClamped.determinant())*Sigma.determinant();
-//    p.Jp *= (V*SigmaClamped.inverse()*Sigma*V.transpose()).determinant();
-}
-
-
-__device__ void DruckerPragerUpdateDeformationGradient(icy::Point &p)
-{
-    const Matrix2r &gradV = p.Bp;
-    //    constexpr real magic_epsilon = 1.e-15;
-    const real &mu = gprms.mu;
-    const real &lambda = gprms.lambda;
-    const real &dt = gprms.InitialTimeStep;
-    const real &H0 = gprms.H0;
-    const real &H1 = gprms.H1;
-    const real &H2 = gprms.H2;
-    const real &H3 = gprms.H3;
-
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
-
-    Vector2r T;
-    Matrix2r Tmatrix; // from DrySand::Plasticity()
-
-    // Projection
-    double dq = 0;
-    Matrix2r lnSigma, e_c;
-    lnSigma << log(Sigma(0,0)),0,0,log(Sigma(1,1));
-    e_c = dev(lnSigma);  // deviatoric part
-
-    //    if(e_c.norm() < magic_epsilon || lnSigma.trace()>0)
-    if(e_c.norm() ==0 || lnSigma.trace()>0)
-    {
-        // Projection to the tip of the cone
-        Tmatrix.setIdentity();
-        dq = lnSigma.norm();
-    }
-    else
-    {
-        double phi = H0 + (H1 *p.q - H3)*exp(-H2 * p.q);
-        double alpha = sqrt(2.0 / 3.0) * (2.0 * sin(phi)) / (3.0 - sin(phi));
-        double dg = e_c.norm() + (lambda + mu) / mu * lnSigma.trace() * alpha;
-
-        if (dg <= 0)
-        {
-            Tmatrix = Sigma;
-            dq = 0;
-        }
-        else
-        {
-            Matrix2r Hm = lnSigma - e_c * (dg / e_c.norm());
-            Tmatrix << exp(Hm(0,0)), 0, 0, exp(Hm(1,1));
-            dq = dg;
-        }
-    }
-
-    p.Fe = U*Tmatrix*V.transpose();
-    p.q += dq; // hardening
-}
 
 //===========================================================================
 

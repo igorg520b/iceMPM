@@ -8,7 +8,6 @@
 
 #include "parameters_sim.h"
 #include "point.h"
-#include "gridnode.h"
 
 
 

@@ -5,13 +5,12 @@
 #include <Eigen/Core>
 
 
-void icy::Point::Reset(real alpha)
+void icy::Point::Reset()
 {
     pos = pos_initial;
     Fe.setIdentity();
     velocity.setZero();
     Bp.setZero();
-    NACC_alpha_p = alpha;
     q = 0;
     Jp = 1;
     zeta = 1;

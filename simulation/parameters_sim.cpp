@@ -33,32 +33,16 @@ void icy::SimParams::Reset()
     SimulationStep = 0;
     SimulationTime = 0;
 
-    // Snow
-    XiSnow = 10.;
-    THT_C_snow = 2.0e-3;				// Critical compression
-    THT_S_snow = 6.0e-4;				// Critical stretch
-
-    // Drucker-Prager
-    // H0 > H3 >=0;
-    // H1, H2 >=0
-    H0 = 54 * pi / 180.0f;
-    H1 = 30 * pi / 180.0f;
-    H2 = 0.1f;
-    H3 = 40 * pi / 180.0f;
-
-    SandYM = 5e7;
-
-    NACC_xi = 10;
     NACC_max_strain = 0.01;
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
-    NACC_magic_coeff = 0.5;
 
     tpb_P2G = 256;
     tpb_Upd = 512;
     tpb_G2P = 128;
 
+    indenter_x = indenter_x_initial = indenter_y = 0;
 
     ComputeLame();
     ComputeCamClayParams2();
@@ -106,16 +90,6 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
     if(doc.HasMember("NACC_max_strain")) NACC_max_strain = doc["NACC_max_strain"].GetDouble();
 
-    // to be removed
-    if(doc.HasMember("NACC_xi")) NACC_xi = doc["NACC_xi"].GetDouble();
-    if(doc.HasMember("XiSnow")) XiSnow = doc["XiSnow"].GetDouble();
-    if(doc.HasMember("THT_C_snow")) THT_C_snow = doc["THT_C_snow"].GetDouble();
-    if(doc.HasMember("THT_S_snow")) THT_S_snow = doc["THT_S_snow"].GetDouble();
-    if(doc.HasMember("H0")) H0 = doc["H0"].GetDouble() * pi/180.0;
-    if(doc.HasMember("H1")) H1 = doc["H1"].GetDouble() * pi/180.0;
-    if(doc.HasMember("H2")) H2 = doc["H2"].GetDouble();
-    if(doc.HasMember("H3")) H3 = doc["H3"].GetDouble() * pi/180.0;
-
     ComputeCamClayParams2();
     ComputeLame();
     ComputeHelperVariables();
@@ -151,5 +125,4 @@ void icy::SimParams::ComputeCamClayParams2()
     const real &p0 = IceCompressiveStrength;
     real NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
     this->NACC_M_sq = NACC_M*NACC_M;
-    this->NACC_alpha = std::log(0.991);
 }

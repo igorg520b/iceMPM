@@ -14,7 +14,6 @@
 
 #include "parameters_sim.h"
 #include "point.h"
-#include "gridnode.h"
 #include "poisson_disk_sampling.h"
 #include "gpu_implementation3_sand.h"
 
@@ -41,8 +40,7 @@ public:
 
     icy::SimParams prms;
     GPU_Implementation3 gpu;
-    float compute_time_per_cycle, time_p2g, time_update_nodes, time_g2p, time_transfer;
-    real indenter_x, indenter_x_initial, indenter_y;
+    float compute_time_per_cycle;
 
     std::vector<Point> points;
 

@@ -12,7 +12,6 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     const real &kappa = gprms.kappa;
     const real &beta = gprms.NACC_beta;
     const real &M_sq = gprms.NACC_M_sq;
-    const real &xi = gprms.NACC_xi;
     const real &dt = gprms.InitialTimeStep;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
@@ -115,7 +114,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 }
 
 
-
+/*
 __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
@@ -200,3 +199,4 @@ __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)
         p.Fe = FeTr;
     }
 }
+*/

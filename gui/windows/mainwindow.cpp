@@ -62,7 +62,9 @@ MainWindow::MainWindow(QWidget *parent)
     slider1->setTracking(true);
     slider1->setMinimum(0);
     slider1->setMaximum(0);
-    connect(slider1, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
+//    connect(slider1, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
+    connect(slider1, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
+
 
     // statusbar
     statusLabel = new QLabel();
@@ -70,7 +72,7 @@ MainWindow::MainWindow(QWidget *parent)
     labelStepCount = new QLabel();
 
     QSizePolicy sp;
-    const int status_width = 60;
+    const int status_width = 80;
     sp.setHorizontalPolicy(QSizePolicy::Fixed);
     labelStepCount->setSizePolicy(sp);
     labelStepCount->setFixedWidth(status_width);
@@ -279,15 +281,32 @@ void MainWindow::cameraReset_triggered()
 
 void MainWindow::sliderValueChanged(int val)
 {
-    labelStepCount->setText(QString{"step: %1"}.arg(val));
-    GoToStep(val);
 }
+
+void MainWindow::sliderReleased()
+{
+    int val = slider1->value();
+    QString stringIdx = QString{"%1"}.arg(val,5, 10, QLatin1Char('0'));
+    labelStepCount->setText(stringIdx);
+    QString stringFileName = stringIdx + ".h5";
+    stringFileName = QString::fromStdString(snapshot.path) + "/"+stringFileName;
+    OpenFile(stringFileName);
+}
+
+
 
 void MainWindow::open_snapshot_triggered()
 {
     QString qFileName = QFileDialog::getOpenFileName(this, "Open Simulation Snapshot", QDir::currentPath(), "HDF5 Files (*.h5)");
     if(qFileName.isNull())return;
-    OpenFile(qFileName);
+    int idx = OpenFile(qFileName);
+    QString fileDirectory = QFileInfo(qFileName).absolutePath();
+    snapshot.ReadDirectory(fileDirectory.toStdString());
+    slider1->blockSignals(true);
+    slider1->setEnabled(snapshot.last_file_index > 1);
+    slider1->setRange(1,snapshot.last_file_index);
+    slider1->setValue(idx);
+    slider1->blockSignals(false);
 }
 
 void MainWindow::simulation_reset_triggered()
@@ -298,20 +317,13 @@ void MainWindow::simulation_reset_triggered()
     renderWindow->Render();
 }
 
-void MainWindow::OpenFile(QString fileName)
+int MainWindow::OpenFile(QString fileName)
 {
-    snapshot.ReadSnapshot(fileName.toStdString());
+    int idx = snapshot.ReadSnapshot(fileName.toStdString());
     representation.SynchronizeTopology();
     updateGUI();
     pbrowser->setActiveObject(params);
-
-
-    /*
-    slider1->blockSignals(true);
-    slider1->setRange(1, mesh.nFrames);
-    slider1->setValue(1);
-    slider1->blockSignals(false);
-*/
+    return idx;
 }
 
 void MainWindow::load_parameter_triggered()
@@ -332,22 +344,25 @@ void MainWindow::load_parameter_triggered()
 
 void MainWindow::createVideo_triggered()
 {
-/*
-    QDir pngDir(QDir::currentPath()+ "/png");
-    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ "/png");
-    QString tentativeDir = QDir::currentPath()+ "/png" + "/" + qBaseFileName;
-    QDir dir(tentativeDir);
-    if(!dir.exists()) dir.mkdir(tentativeDir);
+    QString filePath = QDir::currentPath()+ "/video";
+
+    QDir videoDir(filePath);
+    if(!videoDir.exists()) videoDir.mkdir(filePath);
 
     renderWindow->DoubleBufferOff();
     windowToImageFilter->SetInputBufferTypeToRGBA(); //also record the alpha (transparency) channel
 
-    for(int i=1;i<=mesh.nFrames;i++)
+    int nFrames = snapshot.last_file_index;
+    for(int i=1; i<=nFrames; i++)
     {
-        GoToStep(i);
+        QString stringIdx = QString{"%1"}.arg(i,5, 10, QLatin1Char('0'));
+        labelStepCount->setText(stringIdx);
+        QString stringFileName = stringIdx + ".h5";
+        stringFileName = QString::fromStdString(snapshot.path) + "/"+stringFileName;
+        OpenFile(stringFileName);
         renderWindow->WaitForCompletion();
 
-        QString outputPath = tentativeDir + "/" + QString::number(i) + ".png";
+        QString outputPath = filePath + "/" + stringIdx + ".png";
 
         windowToImageFilter->Update();
         windowToImageFilter->Modified();
@@ -358,23 +373,14 @@ void MainWindow::createVideo_triggered()
     }
     renderWindow->DoubleBufferOn();
 
-    std::string ffmpegCommand = "ffmpeg -y -r 24 -f image2 -start_number 1 -i \"" + tentativeDir.toStdString() + "/%d.png\" -vframes " +
-            std::to_string(mesh.nFrames) +" -vcodec libx264 -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" -crf 25  -pix_fmt yuv420p "+
-        qBaseFileName.toStdString() + ".mp4\n";
-    std::system(ffmpegCommand.c_str());
-*/
+    std::string ffmpegCommand = "ffmpeg -y -r 60 -f image2 -start_number 1 -i \"" + filePath.toStdString() +
+                                "/%05d.png\" -vframes " + std::to_string(nFrames) +
+                                " -vcodec libx264 -vf \"pad=ceil(iw/2)*2:ceil(ih/2)*2\" -crf 25  -pix_fmt yuv420p "+
+        filePath.toStdString() + "/result.mp4\n";
+    qDebug() << ffmpegCommand.c_str();
+    int result = std::system(ffmpegCommand.c_str());
 }
 
-void MainWindow::GoToStep(int step)
-{
-    /*
-    mesh.GoToStep(step);
-    meshRepresentation.SynchronizeValues();
-    updateActorText();
-    renderWindow->Render();
-    statusLabel->setText(QString{"elems: %1/%2; czs: %3/%4; "}.arg(mesh.nRemovedTris).arg(mesh.elems.size()).arg(mesh.nRemovedCZs).arg(mesh.czs.size()));
-    */
-}
 
 
 
@@ -415,7 +421,7 @@ void MainWindow::save_binary_data()
     int snapshot_number = model.prms.SimulationStep / model.prms.UpdateEveryNthStep;
     QString outputPathSnapshot = QDir::currentPath()+ "/"+outputDirectory.c_str() + "/" +
                          QString::number(snapshot_number).rightJustified(5, '0') + ".h5";
-    snapshot.SaveSnapshot(outputPathSnapshot.toStdString(),snapshot_number % 100 == 0);
+    snapshot.SaveSnapshot(outputPathSnapshot.toStdString());
 }
 
 

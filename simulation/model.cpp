@@ -13,15 +13,11 @@ bool icy::Model::Step()
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventCycleStart);
     do
     {
-        indenter_x = indenter_x_initial + simulation_time*prms.IndVelocity;
+        prms.indenter_x = prms.indenter_x_initial + simulation_time*prms.IndVelocity;
         gpu.cuda_reset_grid();
-        if((prms.SimulationStep+count_unupdated_steps) % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventP2GStart);
         gpu.cuda_p2g();
-        if((prms.SimulationStep+count_unupdated_steps) % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventUpdGridStart);
-        gpu.cuda_update_nodes(indenter_x, indenter_y);
-        if((prms.SimulationStep+count_unupdated_steps) % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventG2PStart);
+        gpu.cuda_update_nodes(prms.indenter_x, prms.indenter_y);
         gpu.cuda_g2p();
-        if((prms.SimulationStep+count_unupdated_steps) % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventG2PStop);
         count_unupdated_steps++;
         simulation_time += prms.InitialTimeStep;
     } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
@@ -29,21 +25,14 @@ bool icy::Model::Step()
 
     processing_current_cycle_data.lock();   // if locked, previous results are not yet processed by the host
 
-    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventTransferStart);
     gpu.cuda_transfer_from_device();
-    if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventTransferStop);
 
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) != 0)
     {
         cudaEventSynchronize(gpu.eventCycleStop);
         cudaEventElapsedTime(&compute_time_per_cycle, gpu.eventCycleStart, gpu.eventCycleStop);
         compute_time_per_cycle /= prms.UpdateEveryNthStep;
-        cudaEventElapsedTime(&time_p2g, gpu.eventP2GStart, gpu.eventUpdGridStart);
-        cudaEventElapsedTime(&time_update_nodes, gpu.eventUpdGridStart, gpu.eventG2PStart);
-        cudaEventElapsedTime(&time_g2p, gpu.eventG2PStart, gpu.eventG2PStop);
-        cudaEventElapsedTime(&time_transfer, gpu.eventTransferStart, gpu.eventTransferStop);
-        spdlog::info("cycle time {:.3} ms; p2g {:.3}; upd {:.3}; g2p {:.3}; transfer {:.3}",
-                     compute_time_per_cycle, time_p2g, time_update_nodes, time_g2p, time_transfer);
+        spdlog::info("cycle time {:.3} ms", compute_time_per_cycle);
     }
 
     prms.SimulationTime = simulation_time;
@@ -74,7 +63,6 @@ void icy::Model::Reset()
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
-    time_p2g = time_update_nodes = time_g2p = 0;
 
     const real &block_length = prms.BlockLength;
     const real &block_height = prms.BlockHeight;
@@ -94,13 +82,13 @@ void icy::Model::Reset()
     for(int k = 0; k<prms.nPts; k++)
     {
         Point &p = points[k];
-        p.Reset(prms.NACC_alpha);
+        p.Reset();
         p.pos[0] = prresult[k][0];
         p.pos[1] = prresult[k][1];
         p.pos_initial = p.pos;
     }
-    indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    indenter_x = indenter_x_initial = 4*h - prms.IndDiameter/2;
+    prms.indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
+    prms.indenter_x = prms.indenter_x_initial = 4*h - prms.IndDiameter/2;
 
     gpu.cuda_allocate_arrays(prms.GridX*prms.GridY, prms.nPts);
     gpu.transfer_ponts_to_device(points);
@@ -115,19 +103,16 @@ void icy::Model::ResetToStep0()
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
-    time_p2g = time_update_nodes = time_g2p = 0;
 
-    const real &block_length = prms.BlockLength;
-    const real &block_height = prms.BlockHeight;
     const real &h = prms.cellsize;
 
     for(int k = 0; k<points.size(); k++)
     {
         Point &p = points[k];
-        p.Reset(prms.NACC_alpha);
+        p.Reset();
     }
-    indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    indenter_x = indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
+    prms.indenter_y = prms.BlockHeight + 2*h + prms.IndDiameter/2 - prms.IndDepth;
+    prms.indenter_x = prms.indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
     gpu.transfer_ponts_to_device(points);
     gpu.cuda_update_constants();
     Prepare();

@@ -12,7 +12,6 @@ struct icy::Point
 {
     Vector2r pos, velocity;
     Matrix2r Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
-    real NACC_alpha_p;
 
     double q; // Drucker Prager hardening paremeter
     double Jp; // track the change in det(Fp)
@@ -21,7 +20,7 @@ struct icy::Point
 
     double visualize_p, visualize_q, visualize_p0, visualize_psi;
 
-    void Reset(real alpha);
+    void Reset();
 };
 
 

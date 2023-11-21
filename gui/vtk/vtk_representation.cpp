@@ -148,7 +148,6 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
-    const real &alpha0 = model->prms.NACC_alpha;
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->hostside_data_update_mutex.lock();
@@ -169,11 +168,6 @@ void icy::VisualRepresentation::SynchronizeValues()
     if(VisualizingVariable == VisOpt::none)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, 0);
-    }
-    else if(VisualizingVariable == VisOpt::NACC_alpha)
-    {
-        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, exp(-model->points[i].NACC_alpha_p));
-        centerVal = exp(alpha0);
     }
     else if(VisualizingVariable == VisOpt::NACC_case)
     {
@@ -215,7 +209,7 @@ void icy::VisualRepresentation::SynchronizeValues()
     points->Modified();
     visualized_values->Modified();
     points_filter->Update();
-    indenterSource->SetCenter(model->indenter_x, model->indenter_y, 1);
+    indenterSource->SetCenter(model->prms.indenter_x, model->prms.indenter_y, 1);
 }
 
 

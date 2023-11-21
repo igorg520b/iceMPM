@@ -43,7 +43,7 @@
 #include "model.h"
 #include "parameters_wrapper.h"
 #include "backgroundworker.h"
-#include "snapshotwriter.h"
+#include "snapshotmanager.h"
 
 #include <fstream>
 #include <iomanip>
@@ -79,6 +79,7 @@ private Q_SLOTS:
     void simulation_reset_triggered();
 
     void sliderValueChanged(int val);
+    void sliderReleased();
     void comboboxIndexChanged_visualizations(int index);
     void createVideo_triggered();
     void screenshot_triggered();
@@ -90,7 +91,7 @@ private:
     void save_binary_data();
     BackgroundWorker *worker;
     icy::VisualRepresentation representation;
-    icy::SnapshotWriter snapshot;
+    icy::SnapshotManager snapshot;
     ParamsWrapper *params;
 
     QString settingsFileName;       // includes current dir
@@ -111,8 +112,7 @@ private:
     vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
 
     // other
-    void OpenFile(QString fileName);
-    void GoToStep(int step);
+    int OpenFile(QString fileName);
     QString qLastParameterFile;
     std::string outputDirectory = "tmp_output";
     const std::string screenshot_directory = "screenshots";

@@ -123,8 +123,6 @@ if(GUI_VERSION_BUILD)
         simulation/model.h
         simulation/point.h
         simulation/point.cpp
-#        simulation/gridnode.h
-#        simulation/gridnode.cpp
 
         simulation/givens.cuh
         simulation/helper_math.cuh
@@ -132,9 +130,8 @@ if(GUI_VERSION_BUILD)
         simulation/gpu_implementation3_sand.cu
         simulation/constitutive_model.cu
 
-
-        simulation/snapshotwriter.h
-        simulation/snapshotwriter.cpp
+        simulation/snapshotmanager.h
+        simulation/snapshotmanager.cpp
     )
 
     set_target_properties(iceMPM_GUI PROPERTIES CUDA_ARCHITECTURES "89")

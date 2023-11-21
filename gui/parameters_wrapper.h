@@ -60,8 +60,9 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double IndDiameter READ getIndDiameter NOTIFY propertyChanged)
     double getIndDiameter() {return prms->IndDiameter;}
 
-    Q_PROPERTY(double IndVelocity READ getIndVelocity NOTIFY propertyChanged)
+    Q_PROPERTY(double IndVelocity READ getIndVelocity WRITE setIndVelocity NOTIFY propertyChanged)
     double getIndVelocity() {return prms->IndVelocity;}
+    void setIndVelocity(double val) {prms->IndVelocity=val;}
 
     Q_PROPERTY(double IndDepth READ getIndDepth NOTIFY propertyChanged)
     double getIndDepth() {return prms->IndDepth;}
@@ -86,10 +87,6 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double nacc_M READ getNaccM NOTIFY propertyChanged)
     double getNaccM() {return sqrt(prms->NACC_M_sq);}
 
-    Q_PROPERTY(double nacc_magic_coeff READ getNaccMagicCoeff WRITE setNaccMagicCoeff NOTIFY propertyChanged)
-    double getNaccMagicCoeff() {return prms->NACC_magic_coeff;}
-    void setNaccMagicCoeff(double val) {prms->NACC_magic_coeff = val;}
-
 
     Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)
     double getIce_CompressiveStr() {return prms->IceCompressiveStrength;}
@@ -102,36 +99,6 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double ice_ShearStr READ getIce_ShearStr WRITE setIce_ShearStr NOTIFY propertyChanged)
     double getIce_ShearStr() {return prms->IceShearStrength;}
     void setIce_ShearStr(double val) {prms->IceShearStrength = val; prms->ComputeCamClayParams2();}
-
-
-//    Q_PROPERTY(double sand_H0 READ getH0 WRITE setH0 NOTIFY propertyChanged)
-//    double getH0() {return prms->H0 * 180 / icy::SimParams::pi;}
-//   void setH0(double val) {prms->H0 = val * icy::SimParams::pi / 180;}
-
-//    Q_PROPERTY(double sand_H1 READ getH1 WRITE setH1 NOTIFY propertyChanged)
-//    double getH1() {return prms->H1 * 180 / icy::SimParams::pi;}
-//    void setH1(double val) {prms->H1 = val * icy::SimParams::pi / 180;}
-
-//    Q_PROPERTY(double sand_H2 READ getH2 WRITE setH2 NOTIFY propertyChanged)
-//    double getH2() {return prms->H2;}
-//    void setH2(double val) {prms->H2 = val;}
-
-//    Q_PROPERTY(double sand_H3 READ getH3 WRITE setH3 NOTIFY propertyChanged)
-//    double getH3() {return prms->H3 * 180 / icy::SimParams::pi;}
-//    void setH3(double val) {prms->H3 = val * icy::SimParams::pi / 180;}
-
-
-//    Q_PROPERTY(double snow_Xi READ getSnowXi WRITE setSnowXi NOTIFY propertyChanged)
-//    double getSnowXi() {return prms->XiSnow;}
-//    void setSnowXi(double val) {prms->XiSnow = val;}
-
-//    Q_PROPERTY(double snow_ThC READ getSnowThC WRITE setSnowThC NOTIFY propertyChanged)
-//    double getSnowThC() {return prms->THT_C_snow;}
-//    void setSnowThC(double val) {prms->THT_C_snow = val;}
-
-//    Q_PROPERTY(double snow_ThS READ getSnowThS WRITE setSnowThS NOTIFY propertyChanged)
-//    double getSnowThS() {return prms->THT_S_snow;}
-//    void setSnowThS(double val) {prms->THT_S_snow = val;}
 
 
     Q_PROPERTY(int tpb_P2G READ get_tpb_P2G WRITE set_tpb_P2G NOTIFY propertyChanged)
