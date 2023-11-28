@@ -12,7 +12,7 @@ void icy::Point::Reset()
     velocity.setZero();
     Bp.setZero();
     q = 0;
-    Jp = 1;
+    Jp_inv = 1;
     zeta = 1;
 }
 

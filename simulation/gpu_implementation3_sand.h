@@ -23,7 +23,8 @@ __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4]);
 __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r &mV);
 
 
-__device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
+__device__ void NACCUpdateDeformationGradient_q_hardening_2(icy::Point &p);
+//__device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
 //__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 
 //__device__ void NACCUpdateDeformationGradient(icy::Point &p);
@@ -31,10 +32,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
 //__device__ void SnowUpdateDeformationGradient(icy::Point &p);
 
 __device__ Matrix2r dev(Matrix2r A);
-__device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, const Matrix2r &F);
-//__device__ Matrix2r KirchhoffStress_Klar(const double mu, const double lambda, const Matrix2r &F);
-//__device__ Matrix2r KirchhoffStress_Sifakis(const double mu, const double lambda, const Matrix2r &F);
-//__device__ Matrix2r KirchhoffStress_Stomakhin(const double mu, const double lambda, const Matrix2r &F);
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F, real zeta, real J_inv);
 
 
 __device__ double clamp(double x, double a, double b);

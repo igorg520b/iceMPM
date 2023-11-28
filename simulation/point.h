@@ -14,7 +14,7 @@ struct icy::Point
     Matrix2r Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
 
     double q; // Drucker Prager hardening paremeter
-    double Jp; // track the change in det(Fp)
+    double Jp_inv; // track the change in det(Fp)
     double zeta; // track shear accumulation
     Vector2r pos_initial; // for resetting
 

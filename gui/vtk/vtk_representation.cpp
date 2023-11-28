@@ -138,10 +138,7 @@ void icy::VisualRepresentation::SynchronizeTopology()
             double pt_pos[3] {x, y, -1.0};
             grid_points->SetPoint((vtkIdType)(idx_x+idx_y*gx), pt_pos);
         }
-
     structuredGrid->SetPoints(grid_points);
-
-    // indenter
     indenterSource->SetRadius(model->prms.IndDiameter/2.f);
 }
 
@@ -177,7 +174,11 @@ void icy::VisualRepresentation::SynchronizeValues()
     }
     else if(VisualizingVariable == VisOpt::Jp)
     {
-        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp-1);
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp_inv-1);
+    }
+    else if(VisualizingVariable == VisOpt::zeta)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].zeta-1);
     }
     else if(VisualizingVariable == VisOpt::p0)
     {

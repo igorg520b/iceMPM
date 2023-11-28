@@ -107,7 +107,7 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::Fe10] = points[i].Fe(1,0);
         tmp_transfer_buffer[i + n*icy::SimParams::Fe11] = points[i].Fe(1,1);
         tmp_transfer_buffer[i + n*icy::SimParams::idx_case] = points[i].q;
-        tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp_inv;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta] = points[i].zeta;
     }
 
@@ -161,7 +161,7 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].Fe(0,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe01];
         points[i].Fe(1,0) = tmp_transfer_buffer[i + n*icy::SimParams::Fe10];
         points[i].Fe(1,1) = tmp_transfer_buffer[i + n*icy::SimParams::Fe11];
-        points[i].Jp = tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp];
+        points[i].Jp_inv = tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp];
         points[i].zeta = tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta];
 
         points[i].visualize_p = tmp_transfer_buffer[i + n*icy::SimParams::idx_p];
@@ -227,8 +227,16 @@ void GPU_Implementation3::cuda_g2p()
 
 // ==============================  Functions that compute Kirchhoff stress via Strain Energy Density ========
 
-__device__ Matrix2r KirchhoffStress_Wolper(const double kappa, const double mu, const Matrix2r &F)
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F, real zeta, real J_inv)
 {
+    real kappa = gprms.kappa;
+    real mu = gprms.mu;
+    const real &ms = gprms.NACC_max_strain;
+
+    if(J_inv > 1) J_inv = 1;
+    kappa *= exp((J_inv-1)/ms);
+    mu *= exp(((J_inv*zeta)-1)/ms);
+
     // Kirchhoff stress as per Wolper (2019)
     real Je = F.determinant();
     Matrix2r b = F*F.transpose();
@@ -272,8 +280,12 @@ __global__ void v2_kernel_p2g()
     p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitch + pt_idx];
     p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitch + pt_idx];
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
+    p.Jp_inv = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
+    p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitch + pt_idx];
 
-    Matrix2r PFt = KirchhoffStress_Wolper(gprms.kappa, gprms.mu, p.Fe);
+
+
+    Matrix2r PFt = KirchhoffStress_Wolper(p.Fe, p.zeta, p.Jp_inv);
 
     Matrix2r subterm2 = particle_mass*p.Bp - (dt*vol*Dinv)*PFt;
 
@@ -405,7 +417,7 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
 
     p.q = gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx];
-    p.Jp = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
+    p.Jp_inv = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
     p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx];
 
     p.velocity.setZero();
@@ -443,7 +455,7 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    NACCUpdateDeformationGradient_q_hardening(p);
+    NACCUpdateDeformationGradient_q_hardening_2(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];
@@ -458,7 +470,7 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx] = p.Fe(1,0);
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
 
-    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp;
+    gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp_inv;
     gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx] = p.zeta;
 
     // visualized variables
