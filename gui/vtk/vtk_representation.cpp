@@ -176,6 +176,10 @@ void icy::VisualRepresentation::SynchronizeValues()
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp_inv-1);
     }
+    else if(VisualizingVariable == VisOpt::Jp_positive)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp_inv>1 ? 1. : 0.);
+    }
     else if(VisualizingVariable == VisOpt::zeta)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].zeta-1);

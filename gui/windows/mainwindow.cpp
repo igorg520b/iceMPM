@@ -60,10 +60,8 @@ MainWindow::MainWindow(QWidget *parent)
     slider1 = new QSlider(Qt::Horizontal);
     ui->toolBar->addWidget(slider1);
     slider1->setTracking(true);
-    slider1->setMinimum(0);
-    slider1->setMaximum(0);
-//    connect(slider1, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
-    connect(slider1, SIGNAL(sliderReleased()), this, SLOT(sliderReleased()));
+    slider1->setRange(0,0);
+    connect(slider1, SIGNAL(valueChanged(int)), this, SLOT(sliderValueChanged(int)));
 
 
     // statusbar
@@ -281,18 +279,13 @@ void MainWindow::cameraReset_triggered()
 
 void MainWindow::sliderValueChanged(int val)
 {
-}
-
-void MainWindow::sliderReleased()
-{
-    int val = slider1->value();
+//    int val = slider1->value();
     QString stringIdx = QString{"%1"}.arg(val,5, 10, QLatin1Char('0'));
     labelStepCount->setText(stringIdx);
     QString stringFileName = stringIdx + ".h5";
     stringFileName = QString::fromStdString(snapshot.path) + "/"+stringFileName;
     OpenFile(stringFileName);
 }
-
 
 
 void MainWindow::open_snapshot_triggered()

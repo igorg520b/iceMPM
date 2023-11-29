@@ -37,6 +37,9 @@ void icy::SimParams::Reset()
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
+    ms_beta_J = ms_beta_zeta = ms_M = ms_p0 = 0.01;
+    ms_kappa = ms_mu_zeta = ms_mu_J = 1;
+
 
     tpb_P2G = 256;
     tpb_Upd = 512;

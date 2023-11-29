@@ -6,6 +6,8 @@
 #include "point.h"
 
 #include <Eigen/Core>
+#include <Eigen/LU>
+
 
 #include <cuda.h>
 #include <cuda_runtime.h>
@@ -24,7 +26,7 @@ __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r 
 
 
 __device__ void NACCUpdateDeformationGradient_q_hardening_2(icy::Point &p);
-//__device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
+__device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
 //__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 
 //__device__ void NACCUpdateDeformationGradient(icy::Point &p);

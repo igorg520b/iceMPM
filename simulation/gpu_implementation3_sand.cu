@@ -227,22 +227,6 @@ void GPU_Implementation3::cuda_g2p()
 
 // ==============================  Functions that compute Kirchhoff stress via Strain Energy Density ========
 
-__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F, real zeta, real J_inv)
-{
-    real kappa = gprms.kappa;
-    real mu = gprms.mu;
-    const real &ms = gprms.NACC_max_strain;
-
-    if(J_inv > 1) J_inv = 1;
-    kappa *= exp((J_inv-1)/ms);
-    mu *= exp(((J_inv*zeta)-1)/ms);
-
-    // Kirchhoff stress as per Wolper (2019)
-    real Je = F.determinant();
-    Matrix2r b = F*F.transpose();
-    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + Je*kappa*(Je-1/Je)*Matrix2r::Identity();
-    return PFt;
-}
 
 
 
@@ -455,7 +439,8 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    NACCUpdateDeformationGradient_q_hardening_2(p);
+//    NACCUpdateDeformationGradient_q_hardening_2(p);
+    NACCUpdateDeformationGradient_q_hardening(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];

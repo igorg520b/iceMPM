@@ -70,6 +70,7 @@ public:
     real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
     real NACC_beta, NACC_M;     // these are all computed
     real NACC_max_strain;
+    real ms_kappa, ms_mu_J, ms_mu_zeta, ms_beta_J, ms_beta_zeta, ms_M, ms_p0;
 
     real cellsize, cellsize_inv, Dp_inv;
 

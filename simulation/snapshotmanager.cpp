@@ -54,8 +54,9 @@ int icy::SnapshotManager::ReadSnapshot(std::string fileName)
 
     if(tmp_params.nGridPitch != model->prms.nGridPitch || tmp_params.nPtsPitch != model->prms.nPtsPitch)
         model->gpu.cuda_allocate_arrays(tmp_params.nGridPitch/sizeof(real),tmp_params.nPtsPitch/sizeof(real));
+    real ParticleViewSize = model->prms.ParticleViewSize;
     model->prms = tmp_params;
-
+    model->prms.ParticleViewSize = ParticleViewSize;
 
     // read point data
     H5::DataSet dataset_points = file.openDataSet("Points");
