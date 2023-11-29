@@ -133,8 +133,14 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     // line 4
 
     const real &ms = gprms.NACC_max_strain;
-    real p0 = gprms.IceCompressiveStrength/ms * (p.Jp_inv - (1.-ms));
-    p0 = max(magic_epsilon, p0);
+    real p0;
+    p0 = gprms.IceCompressiveStrength/ms * (p.Jp_inv - (1.-ms));
+    //p0 = max(magic_epsilon, p0);
+
+    //p0 = gprms.IceCompressiveStrength * exp((p.Jp_inv-1)/ms);
+    p0 = max(gprms.IceCompressiveStrength*1e-4, p0);
+    p0 = min(gprms.IceCompressiveStrength*2, p0);
+
     p.visualize_p0 = p0;
 
     // line 5
@@ -144,22 +150,21 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     Matrix2r SigmaSquared = Sigma*Sigma;
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
 
-    // line 7
-    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
-
     // line 8
-    real p_trial = -psi_kappa_prime * Je_tr;
+    real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
     p.visualize_p = p_trial;
     p.visualize_q = s_hat_tr.norm()*sqrt((6-d)/2.);
 
     // line 9 (case 1)
+    const real magic_threshold = gprms.IceCompressiveStrength * 0.4;
     real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(p_trial > p0)
     {
         p.q = 1;
+        if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 1;
         if(p.Jp_inv < 1)
         {
-            real Je_new = sqrt(-2.*p0 / kappa + 1.);
+            real Je_new = sqrt(-2.*p0/kappa + 1.);
             Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
             p.Fe = U*Sigma_new*V.transpose();
             p.Jp_inv *= Je_new/Je_tr;
@@ -175,6 +180,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     else if(p_trial < -beta*p0)
     {
         p.q = 2;
+        if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 2;
         real Je_new = sqrt(2.*beta*p0/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
@@ -211,11 +217,13 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
         {
             p.Jp_inv *= zeta_tr/zeta_n_1;           // original version
             p.q = 3;
+            if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 3;
         }
         else
         {
             p.Jp_inv *= zeta_n_1/zeta_tr;
             p.q = 4;
+            if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 4;
         }
     }
     else
@@ -226,14 +234,17 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 
 
 
-__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F, real zeta, real J_inv)
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
 {
+//    const Matrix2r &F = p.Fe;
+//    const real &zeta = p.zeta;
+//    const real &J_inv = p.Jp_inv;
     real kappa = gprms.kappa;
     real mu = gprms.mu;
 
-    if(J_inv > 1) J_inv = 1;
-    kappa *= exp((J_inv-1)/gprms.ms_kappa);
-    mu *= exp((J_inv-1)/gprms.ms_mu_J)*exp((zeta-1)/gprms.ms_mu_zeta);
+//    if(J_inv > 1) J_inv = 1;
+//    kappa *= exp((J_inv-1)/gprms.ms_kappa);
+//    mu *= exp((J_inv-1)/gprms.ms_mu_J)*exp((zeta-1)/gprms.ms_mu_zeta);
 
     // Kirchhoff stress as per Wolper (2019)
     real Je = F.determinant();

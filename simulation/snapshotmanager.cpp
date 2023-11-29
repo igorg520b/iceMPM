@@ -18,7 +18,7 @@ void icy::SnapshotManager::SaveSnapshot(std::string fileName)
     dataset_params.write(&model->prms, H5::PredType::NATIVE_B8);
 
     int fullDataArrays = icy::SimParams::nPtsArrays;
-    hsize_t nPtsPitched = model->prms.nPtsPitch/sizeof(real);
+    hsize_t nPtsPitched = model->prms.nPtsPitch;
     hsize_t dims_points = nPtsPitched*fullDataArrays;
 
     H5::DataSpace dataspace_points(1, &dims_points);
@@ -53,7 +53,7 @@ int icy::SnapshotManager::ReadSnapshot(std::string fileName)
     dataset_params.read(&tmp_params, H5::PredType::NATIVE_B8);
 
     if(tmp_params.nGridPitch != model->prms.nGridPitch || tmp_params.nPtsPitch != model->prms.nPtsPitch)
-        model->gpu.cuda_allocate_arrays(tmp_params.nGridPitch/sizeof(real),tmp_params.nPtsPitch/sizeof(real));
+        model->gpu.cuda_allocate_arrays(tmp_params.nGridPitch,tmp_params.nPtsPitch);
     real ParticleViewSize = model->prms.ParticleViewSize;
     model->prms = tmp_params;
     model->prms.ParticleViewSize = ParticleViewSize;

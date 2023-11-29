@@ -80,9 +80,9 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double nacc_pc READ getNaccPc NOTIFY propertyChanged)
     double getNaccPc() {return (1 - prms->NACC_beta)*prms->IceCompressiveStrength/2.;}
 
-//    Q_PROPERTY(double nacc_max_strain READ getNaccMaxStrain WRITE setNaccMaxStrain NOTIFY propertyChanged)
-//    double getNaccMaxStrain() {return prms->NACC_max_strain;}
-//    void setNaccMaxStrain(double val) {prms->NACC_max_strain = val;}
+    Q_PROPERTY(double nacc_ms READ getNaccMaxStrain WRITE setNaccMaxStrain NOTIFY propertyChanged)
+    double getNaccMaxStrain() {return prms->NACC_max_strain;}
+    void setNaccMaxStrain(double val) {prms->NACC_max_strain = val;}
 
     Q_PROPERTY(double nacc_M READ getNaccM NOTIFY propertyChanged)
     double getNaccM() {return sqrt(prms->NACC_M);}

@@ -27,7 +27,7 @@ struct icy::SimParams
 public:
     constexpr static double pi = 3.14159265358979323846;
     constexpr static int dim = 2;
-    constexpr static int nGridArrays = 3, nPtsArrays = 19;
+    constexpr static int nGridArrays = 3, nPtsArrays = 20;
 
     // index of the corresponding array in SoA
     constexpr static size_t posx = 0;
@@ -50,10 +50,11 @@ public:
     constexpr static size_t idx_q = 16;
     constexpr static size_t idx_psi = 17;
     constexpr static size_t idx_case = 18;
+    constexpr static size_t idx_case_when_Jp_first_changes = 19;
 
     real *grid_array;      // device-side grid data
     real *pts_array;
-    size_t nPtsPitch, nGridPitch; // in bytes (!), for coalesced access on the device
+    size_t nPtsPitch, nGridPitch; // in number of elements(!), for coalesced access on the device
 
     int tpb_P2G, tpb_Upd, tpb_G2P;  // threads per block for each operation
 

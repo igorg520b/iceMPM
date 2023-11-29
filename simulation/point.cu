@@ -14,7 +14,10 @@ void icy::Point::Reset()
     q = 0;
     Jp_inv = 1;
     zeta = 1;
+    case_when_Jp_first_changes = 0;
 }
+
+
 
 /*
 

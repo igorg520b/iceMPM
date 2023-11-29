@@ -57,8 +57,6 @@ void GPU_Implementation3::cuda_update_constants()
 void GPU_Implementation3::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
 {
     if(!initialized) initialize();
-//    size_t nGridNodes = prms->GridX*prms->GridY;
-//    size_t nPoints = prms->nPts;
     cudaError_t err;
 
     // device memory for grid
@@ -68,29 +66,29 @@ void GPU_Implementation3::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
 
     err = cudaMallocPitch (&prms->grid_array, &prms->nGridPitch, sizeof(real)*nGridNodes, icy::SimParams::nGridArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    spdlog::info("Grid: requested {}B, pitched width is {} B", sizeof(real)*nGridNodes, prms->nGridPitch);
+    prms->nGridPitch /= sizeof(real); // assume that this divides without remainder
 
     // device memory for points
     err = cudaMallocPitch (&prms->pts_array, &prms->nPtsPitch, sizeof(real)*nPoints, icy::SimParams::nPtsArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    spdlog::info("Points: requested {} B, pitched width is {} B", sizeof(real)*nPoints, prms->nPtsPitch);
-    spdlog::info("cuda_allocate_arrays done");
+    prms->nPtsPitch /= sizeof(real);
 
     // pinned host memory
-    err = cudaMallocHost(&tmp_transfer_buffer, prms->nPtsPitch*icy::SimParams::nPtsArrays);
+    err = cudaMallocHost(&tmp_transfer_buffer, sizeof(real)*prms->nPtsPitch*icy::SimParams::nPtsArrays);
     if(err!=cudaSuccess) throw std::runtime_error("GPU_Implementation3::Prepare(int nPoints)");
 
-    double MemAllocGrid = (double)prms->nGridPitch*icy::SimParams::nGridArrays/(1024*1024);
-    double MemAllocPoints = (double)prms->nPtsPitch*icy::SimParams::nPtsArrays/(1024*1024);
+    double MemAllocGrid = (double)prms->nGridPitch*sizeof(real)*icy::SimParams::nGridArrays/(1024*1024);
+    double MemAllocPoints = (double)prms->nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays/(1024*1024);
     double MemAllocTotal = MemAllocGrid + MemAllocPoints;
     spdlog::info("memory use: grid {:03.2f} Mb; points {:03.2f} Mb ; total {:03.2f} Mb",
                  MemAllocGrid, MemAllocPoints, MemAllocTotal);
     error_code = 0;
+    spdlog::info("cuda_allocate_arrays done");
 }
 
 void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point> &points)
 {
-    int n = prms->nPtsPitch/sizeof(real);
+    int n = prms->nPtsPitch;
 
     for(int i=0;i<prms->nPts;i++)
     {
@@ -109,11 +107,12 @@ void GPU_Implementation3::transfer_ponts_to_device(const std::vector<icy::Point>
         tmp_transfer_buffer[i + n*icy::SimParams::idx_case] = points[i].q;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_Jp] = points[i].Jp_inv;
         tmp_transfer_buffer[i + n*icy::SimParams::idx_zeta] = points[i].zeta;
+        tmp_transfer_buffer[i + n*icy::SimParams::idx_case_when_Jp_first_changes] = points[i].case_when_Jp_first_changes;
     }
 
     // transfer point data to device
     cudaError_t err;
-    err = cudaMemcpy(prms->pts_array, tmp_transfer_buffer, prms->nPtsPitch*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
+    err = cudaMemcpy(prms->pts_array, tmp_transfer_buffer, prms->nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 }
 
@@ -121,7 +120,7 @@ void GPU_Implementation3::cuda_transfer_from_device()
 {
     cudaError_t err;
 
-    err = cudaMemcpyAsync(tmp_transfer_buffer, prms->pts_array, prms->nPtsPitch*icy::SimParams::nPtsArrays,
+    err = cudaMemcpyAsync(tmp_transfer_buffer, prms->pts_array, prms->nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays,
                           cudaMemcpyDeviceToHost, streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
 
@@ -145,7 +144,7 @@ void CUDART_CB GPU_Implementation3::callback_transfer_from_device_completion(cud
 
 void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point> &points)
 {
-    int n = prms->nPtsPitch/sizeof(real);
+    int n = prms->nPtsPitch;
     if(points.size() != prms->nPts) points.resize(prms->nPts);
     for(int i=0;i<prms->nPts;i++)
     {
@@ -169,13 +168,14 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].visualize_q = tmp_transfer_buffer[i + n*icy::SimParams::idx_q];
         points[i].visualize_psi = tmp_transfer_buffer[i + n*icy::SimParams::idx_psi];
         points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_case];
+        points[i].case_when_Jp_first_changes = tmp_transfer_buffer[i + n*icy::SimParams::idx_case_when_Jp_first_changes];
     }
 }
 
 
 void GPU_Implementation3::cuda_reset_grid()
 {
-    cudaError_t err = cudaMemsetAsync(prms->grid_array, 0, prms->nGridPitch*icy::SimParams::nGridArrays, streamCompute);
+    cudaError_t err = cudaMemsetAsync(prms->grid_array, 0, prms->nGridPitch*icy::SimParams::nGridArrays*sizeof(real), streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
 }
 
@@ -248,37 +248,31 @@ __global__ void v2_kernel_p2g()
     const int &gridX = gprms.GridX;
     const int &gridY = gprms.GridY;
     const real &particle_mass = gprms.ParticleMass;
-    const int &nGridPitch = gprms.nGridPitch/sizeof(real);
-    const int nPtsPitch = gprms.nPtsPitch/sizeof(real);
+    const int &nGridPitch = gprms.nGridPitch;
+    const int &nPtsPitch = gprms.nPtsPitch;
 
-    icy::Point p;
-    p.pos[0] = gprms.pts_array[icy::SimParams::posx*nPtsPitch + pt_idx];
-    p.pos[1] = gprms.pts_array[icy::SimParams::posy*nPtsPitch + pt_idx];
-    p.velocity[0] = gprms.pts_array[icy::SimParams::velx*nPtsPitch + pt_idx];
-    p.velocity[1] = gprms.pts_array[icy::SimParams::vely*nPtsPitch + pt_idx];
-    p.Bp(0,0) = gprms.pts_array[icy::SimParams::Bp00*nPtsPitch + pt_idx];
-    p.Bp(0,1) = gprms.pts_array[icy::SimParams::Bp01*nPtsPitch + pt_idx];
-    p.Bp(1,0) = gprms.pts_array[icy::SimParams::Bp10*nPtsPitch + pt_idx];
-    p.Bp(1,1) = gprms.pts_array[icy::SimParams::Bp11*nPtsPitch + pt_idx];
-    p.Fe(0,0) = gprms.pts_array[icy::SimParams::Fe00*nPtsPitch + pt_idx];
-    p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitch + pt_idx];
-    p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitch + pt_idx];
-    p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitch + pt_idx];
-    p.Jp_inv = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitch + pt_idx];
-    p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitch + pt_idx];
+    // pull point data from SOA
+    const real *data = gprms.pts_array;
+    Vector2r pos(data[pt_idx + nPtsPitch*icy::SimParams::posx], data[pt_idx + nPtsPitch*icy::SimParams::posy]);
+    Vector2r velocity(data[pt_idx + nPtsPitch*icy::SimParams::velx], data[pt_idx + nPtsPitch*icy::SimParams::vely]);
+    Matrix2r Bp, Fe;
+    Bp << data[pt_idx + nPtsPitch*icy::SimParams::Bp00], data[pt_idx + nPtsPitch*icy::SimParams::Bp01],
+        data[pt_idx + nPtsPitch*icy::SimParams::Bp10], data[pt_idx + nPtsPitch*icy::SimParams::Bp11];
+    Fe << data[pt_idx + nPtsPitch*icy::SimParams::Fe00], data[pt_idx + nPtsPitch*icy::SimParams::Fe01],
+        data[pt_idx + nPtsPitch*icy::SimParams::Fe10], data[pt_idx + nPtsPitch*icy::SimParams::Fe11];
+    real Jp_inv =        data[pt_idx + nPtsPitch*icy::SimParams::idx_Jp];
+    real zeta =          data[pt_idx + nPtsPitch*icy::SimParams::idx_zeta];
 
 
-
-    Matrix2r PFt = KirchhoffStress_Wolper(p.Fe, p.zeta, p.Jp_inv);
-
-    Matrix2r subterm2 = particle_mass*p.Bp - (dt*vol*Dinv)*PFt;
+    Matrix2r PFt = KirchhoffStress_Wolper(Fe);
+    Matrix2r subterm2 = particle_mass*Bp - (dt*vol*Dinv)*PFt;
 
     constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
-    const int i0 = (int)(p.pos[0]*h_inv - offset);
-    const int j0 = (int)(p.pos[1]*h_inv - offset);
+    const int i0 = (int)(pos[0]*h_inv - offset);
+    const int j0 = (int)(pos[1]*h_inv - offset);
 
     Vector2r base_coord(i0,j0);
-    Vector2r fx = p.pos*h_inv - base_coord;
+    Vector2r fx = pos*h_inv - base_coord;
 
     real v0[2] {1.5-fx[0], 1.5-fx[1]};
     real v1[2] {fx[0]-1.,  fx[1]-1.};
@@ -293,7 +287,7 @@ __global__ void v2_kernel_p2g()
         {
             real Wip = w[i][0]*w[j][1];
             Vector2r dpos((i-fx[0])*h, (j-fx[1])*h);
-            Vector2r incV = Wip*(p.velocity*particle_mass + subterm2*dpos);
+            Vector2r incV = Wip*(velocity*particle_mass + subterm2*dpos);
             real incM = Wip*particle_mass;
 
             int idx_gridnode = (i+i0) + (j+j0)*gridX;
@@ -312,14 +306,11 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
     const int &nGridNodes = gprms.GridX*gprms.GridY;
     if(idx >= nGridNodes) return;
 
-    const int &nGridPitch = gprms.nGridPitch/sizeof(real);
-    real mass = gprms.grid_array[0*nGridPitch + idx];
+    real mass = gprms.grid_array[idx];
     if(mass == 0) return;
 
-    Vector2r velocity;
-    velocity[0] = gprms.grid_array[1*nGridPitch + idx];
-    velocity[1] = gprms.grid_array[2*nGridPitch + idx];
-
+    const int &nGridPitch = gprms.nGridPitch;
+    Vector2r velocity(gprms.grid_array[1*nGridPitch + idx], gprms.grid_array[2*nGridPitch + idx]);
     const real &gravity = gprms.Gravity;
     const real &indRsq = gprms.IndRSq;
     const int &gridX = gprms.GridX;
@@ -373,8 +364,6 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
         if(idx_x >= blocksGridX && idx_x <= blocksGridX + 2 && idx_y < blocksGridY) velocity.setZero();
         if(idx_x <= 7 && idx_x > 4 && idx_y < blocksGridY) velocity.setZero();
     }
-
-
     // write the updated grid velocity back to memory
     gprms.grid_array[1*nGridPitch + idx] = velocity[0];
     gprms.grid_array[2*nGridPitch + idx] = velocity[1];
@@ -386,23 +375,23 @@ __global__ void v2_kernel_g2p()
     const int &nPoints = gprms.nPts;
     if(pt_idx >= nPoints) return;
 
-    const int nPtsPitched = gprms.nPtsPitch/sizeof(real);
-    const int nGridPitched = gprms.nGridPitch/sizeof(real);
+    const int &nPtsPitched = gprms.nPtsPitch;
+    const int &nGridPitched = gprms.nGridPitch;
     const real &h_inv = gprms.cellsize_inv;
     const real &dt = gprms.InitialTimeStep;
     const int &gridX = gprms.GridX;
 
     icy::Point p;
-    p.pos[0] = gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx];
-    p.pos[1] = gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx];
-    p.Fe(0,0) = gprms.pts_array[icy::SimParams::Fe00*nPtsPitched + pt_idx];
-    p.Fe(0,1) = gprms.pts_array[icy::SimParams::Fe01*nPtsPitched + pt_idx];
-    p.Fe(1,0) = gprms.pts_array[icy::SimParams::Fe10*nPtsPitched + pt_idx];
-    p.Fe(1,1) = gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx];
-
-    p.q = gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx];
-    p.Jp_inv = gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx];
-    p.zeta = gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx];
+    p.pos[0] =      gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::posx];
+    p.pos[1] =      gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::posy];
+    p.Fe(0,0) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe00];
+    p.Fe(0,1) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe01];
+    p.Fe(1,0) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe10];
+    p.Fe(1,1) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe11];
+    p.Jp_inv =      gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_Jp];
+    p.zeta =        gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_zeta];
+    p.q =           gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_case];
+    p.case_when_Jp_first_changes = gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_case_when_Jp_first_changes];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -464,11 +453,11 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
     gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
     gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx] = p.q;
+    gprms.pts_array[icy::SimParams::idx_case_when_Jp_first_changes*nPtsPitched + pt_idx] = p.case_when_Jp_first_changes;
+
 }
 
 //===========================================================================
-
-
 
 
 

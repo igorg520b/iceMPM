@@ -172,6 +172,12 @@ void icy::VisualRepresentation::SynchronizeValues()
         points_mapper->SetLookupTable(hueLut_four);
         scalarBar->SetLookupTable(hueLut_four);
     }
+    else if(VisualizingVariable == VisOpt::NACC_case_first)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].case_when_Jp_first_changes);
+        points_mapper->SetLookupTable(hueLut_four);
+        scalarBar->SetLookupTable(hueLut_four);
+    }
     else if(VisualizingVariable == VisOpt::Jp)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].Jp_inv-1);
@@ -187,6 +193,7 @@ void icy::VisualRepresentation::SynchronizeValues()
     else if(VisualizingVariable == VisOpt::p0)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p0);
+        centerVal = model->prms.IceCompressiveStrength;
         points_mapper->SetLookupTable(hueLut);
         scalarBar->SetLookupTable(hueLut);
     }

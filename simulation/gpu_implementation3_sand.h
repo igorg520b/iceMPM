@@ -34,7 +34,7 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
 //__device__ void SnowUpdateDeformationGradient(icy::Point &p);
 
 __device__ Matrix2r dev(Matrix2r A);
-__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F, real zeta, real J_inv);
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F);
 
 
 __device__ double clamp(double x, double a, double b);

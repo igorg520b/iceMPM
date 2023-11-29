@@ -122,7 +122,7 @@ if(GUI_VERSION_BUILD)
         simulation/model.cpp
         simulation/model.h
         simulation/point.h
-        simulation/point.cpp
+        simulation/point.cu
 
         simulation/givens.cuh
         simulation/helper_math.cuh
