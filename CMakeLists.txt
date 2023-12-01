@@ -112,9 +112,13 @@ if(GUI_VERSION_BUILD)
         gui/vtk/vtk_representation.cpp
         gui/vtk/vtk_representation.h
 
+        gui/vtk/pointselector2d.h
+        gui/vtk/pointselector2d.cpp
+
         gui/backgroundworker.cpp
         gui/backgroundworker.h
         gui/parameters_wrapper.h
+
 
         # simulation
         simulation/parameters_sim.h

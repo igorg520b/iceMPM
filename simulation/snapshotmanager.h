@@ -16,6 +16,7 @@ public:
     void SaveSnapshot(std::string fileName);
     int ReadSnapshot(std::string fileName); // return file number
     void ReadDirectory(std::string directoryPath);
+    void DumpPointData(int pt_idx);
 };
 
 #endif // SNAPSHOTWRITER_H

@@ -1,10 +1,13 @@
 #include "snapshotmanager.h"
 #include "model.h"
+
 #include <spdlog/spdlog.h>
 #include <H5Cpp.h>
 #include <filesystem>
 #include <string>
-
+#include <sstream>
+#include <iomanip>
+#include <fstream>
 
 void icy::SnapshotManager::SaveSnapshot(std::string fileName)
 {
@@ -38,8 +41,10 @@ void icy::SnapshotManager::SaveSnapshot(std::string fileName)
 int icy::SnapshotManager::ReadSnapshot(std::string fileName)
 {
     if(!std::filesystem::exists(fileName)) return -1;
+
     std::string numbers = fileName.substr(fileName.length()-8,5);
     int idx = std::stoi(numbers);
+    spdlog::info("reading snapshot {}", idx);
 
     H5::H5File file(fileName, H5F_ACC_RDONLY);
 
@@ -90,3 +95,80 @@ void icy::SnapshotManager::ReadDirectory(std::string directoryPath)
 
 }
 
+void icy::SnapshotManager::DumpPointData(int pt_idx)
+{
+    std::vector<double> p0, p, q, Jp, c;
+
+    for(int i=1; i<=last_file_index; i++)
+    {
+        std::stringstream ss;
+        ss << std::setw(5) << std::setfill('0') << i;
+        std::string s = ss.str();
+        std::string fileName = this->path + "/" + s + ".h5";
+        std::cout << "reading " << fileName << std::endl;
+
+
+        if(!std::filesystem::exists(fileName)) throw std::runtime_error("saved file not found");
+        H5::H5File file(fileName, H5F_ACC_RDONLY);
+        H5::DataSet dataset_points = file.openDataSet("Points");
+
+        //DATASPACE
+        H5::DataSpace space1 = dataset_points.getSpace();
+        double tmp[5];
+        hsize_t dimsm[1] {5};
+        H5::DataSpace memspace(1, dimsm);
+
+        hsize_t count[1] {1};
+        hsize_t offset[1] {icy::SimParams::idx_p0 * model->prms.nPtsPitch + pt_idx};
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+
+        hsize_t moffset[1] {0};
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
+
+
+        offset[0] = icy::SimParams::idx_p * model->prms.nPtsPitch + pt_idx;
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+        moffset[0] = 1;
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
+        offset[0] = icy::SimParams::idx_q * model->prms.nPtsPitch + pt_idx;
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+        moffset[0] = 2;
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
+        offset[0] = icy::SimParams::idx_Jp * model->prms.nPtsPitch + pt_idx;
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+        moffset[0] = 3;
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
+        offset[0] = icy::SimParams::idx_case * model->prms.nPtsPitch + pt_idx;
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+        moffset[0] = 4;
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
+
+        p0.push_back(tmp[0]);
+        p.push_back(tmp[1]);
+        q.push_back(tmp[2]);
+        Jp.push_back(tmp[3]);
+        c.push_back(tmp[4]);
+    }
+
+    std::string outputFile = std::to_string(pt_idx) + ".csv";
+    std::ofstream ofs(outputFile, std::ofstream::out);
+    ofs << "p0, p, q, Jp, c\n";
+    for(int i=0;i<last_file_index;i++)
+    {
+        ofs << p0[i] << ',' << p[i] << ',' << q[i] << ',' << Jp[i] << ',' << c[i];
+        ofs << '\n';
+    }
+    ofs.close();
+
+
+}

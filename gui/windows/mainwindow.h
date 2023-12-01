@@ -44,6 +44,7 @@
 #include "parameters_wrapper.h"
 #include "backgroundworker.h"
 #include "snapshotmanager.h"
+#include "pointselector2d.h"
 
 #include <fstream>
 #include <iomanip>
@@ -80,6 +81,7 @@ private Q_SLOTS:
 
     void sliderValueChanged(int val);
     void comboboxIndexChanged_visualizations(int index);
+    void point_selection(double x, double y);
     void createVideo_triggered();
     void screenshot_triggered();
     void limits_changed(double val);
@@ -108,7 +110,8 @@ private:
     vtkNew<vtkGenericOpenGLRenderWindow> renderWindow;
     QVTKOpenGLNativeWidget *qt_vtk_widget;
     vtkNew<vtkRenderer> renderer;
-    vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
+//    vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
+    vtkNew<PointSelector2D> pointSelector;
 
     // other
     int OpenFile(QString fileName);

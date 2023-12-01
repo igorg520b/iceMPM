@@ -43,6 +43,7 @@ class icy::VisualRepresentation : public QObject
 
 public:
     VisualRepresentation();
+    int FindPoint(double x, double y);
 
     icy::Model *model;
 

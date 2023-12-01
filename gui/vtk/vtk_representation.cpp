@@ -1,7 +1,9 @@
 #include "vtk_representation.h"
 #include "model.h"
 #include "parameters_sim.h"
-#include <omp.h>
+//#include <omp.h>
+#include <algorithm>
+#include <iostream>
 
 icy::VisualRepresentation::VisualRepresentation()
 {
@@ -200,6 +202,7 @@ void icy::VisualRepresentation::SynchronizeValues()
     else if(VisualizingVariable == VisOpt::p_tr)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p);
+        centerVal = (model->prms.IceCompressiveStrength-model->prms.IceTensileStrength)/2;
         points_mapper->SetLookupTable(hueLut);
         scalarBar->SetLookupTable(hueLut);
     }
@@ -230,3 +233,20 @@ void icy::VisualRepresentation::ChangeVisualizationOption(int option)
     VisualizingVariable = (VisOpt)option;
     SynchronizeTopology();
 }
+
+int icy::VisualRepresentation::FindPoint(double x, double y)
+{
+    Vector2r v(x,y);
+    auto result = std::min_element(model->points.begin(), model->points.end(),
+                                   [v](icy::Point &p1, icy::Point &p2)
+    {return (p1.pos-v).norm() < (p2.pos-v).norm();});
+    int idx = std::distance(model->points.begin(),result);
+    std::cout << "FindPoint " << idx << std::endl;
+    Vector2r pos = result->pos;
+    real x1 = pos[0];
+    real y1 = pos[1];
+    std::cout << "pt " << x1 << "; " << y1 << std::endl;
+    return idx;
+
+}
+

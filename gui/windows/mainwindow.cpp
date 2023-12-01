@@ -28,7 +28,9 @@ MainWindow::MainWindow(QWidget *parent)
 
     renderer->SetBackground(1.0,1.0,1.0);
     renderWindow->AddRenderer(renderer);
-    renderWindow->GetInteractor()->SetInteractorStyle(rubberBand);
+    renderWindow->GetInteractor()->SetInteractorStyle(pointSelector);
+
+    pointSelector->clicked_on_a_point = [&](double x, double y) { point_selection(x,y);};
 
     // VTK - scalar bar
     renderer->AddActor(representation.scalarBar);
@@ -94,7 +96,7 @@ MainWindow::MainWindow(QWidget *parent)
     for(int i=0;i<qme.keyCount();i++) comboBox_visualizations->addItem(qme.key(i));
 
     connect(comboBox_visualizations, QOverload<int>::of(&QComboBox::currentIndexChanged),
-            [=](int index){ comboboxIndexChanged_visualizations(index); });
+            [&](int index){ comboboxIndexChanged_visualizations(index); });
 
     // read/restore saved settings
     settingsFileName = QDir::currentPath() + "/cm.ini";
@@ -466,4 +468,12 @@ void MainWindow::background_worker_paused()
     ui->actionStart_Pause->setChecked(false);
     ui->actionStart_Pause->blockSignals(false);
     statusLabel->setText("simulation stopped");
+}
+
+void MainWindow::point_selection(double x, double y)
+{
+    qDebug() << QString("clicked %1; %2").arg(x).arg(y);
+    int idx = representation.FindPoint(x,y);
+    qDebug() << QString("found point index %1").arg(idx);
+    snapshot.DumpPointData(idx);
 }
