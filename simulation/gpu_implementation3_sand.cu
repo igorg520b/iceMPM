@@ -169,6 +169,7 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].visualize_psi = tmp_transfer_buffer[i + n*icy::SimParams::idx_psi];
         points[i].q = tmp_transfer_buffer[i + n*icy::SimParams::idx_case];
         points[i].case_when_Jp_first_changes = tmp_transfer_buffer[i + n*icy::SimParams::idx_case_when_Jp_first_changes];
+        points[i].visualize_q_limit = tmp_transfer_buffer[i + n*icy::SimParams::idx_q_limit];
     }
 }
 
@@ -391,7 +392,6 @@ __global__ void v2_kernel_g2p()
     p.Jp_inv =      gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_Jp];
     p.zeta =        gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_zeta];
     p.q =           gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_case];
-    p.case_when_Jp_first_changes = gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_case_when_Jp_first_changes];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -428,8 +428,9 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-//    NACCUpdateDeformationGradient_q_hardening_2(p);
-    NACCUpdateDeformationGradient_q_hardening(p);
+    if(p.q == 0) NACCUpdateDeformationGradient_q_hardening(p);
+    else Wolper_Drucker_Prager(p);
+//    Wolper_Drucker_Prager(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];
@@ -453,8 +454,7 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
     gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
     gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx] = p.q;
-    gprms.pts_array[icy::SimParams::idx_case_when_Jp_first_changes*nPtsPitched + pt_idx] = p.case_when_Jp_first_changes;
-
+    gprms.pts_array[icy::SimParams::idx_q_limit*nPtsPitched + pt_idx] = p.visualize_q_limit;
 }
 
 //===========================================================================

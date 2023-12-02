@@ -37,9 +37,9 @@ void icy::SimParams::Reset()
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
-    ms_beta_J = ms_beta_zeta = ms_M = ms_p0 = 0.01;
-    ms_kappa = ms_mu_zeta = ms_mu_J = 1;
 
+    DP_cc = 1e3;
+    DP_tan_phi = std::tan(30*pi/180.);
 
     tpb_P2G = 256;
     tpb_Upd = 512;
@@ -112,7 +112,8 @@ void icy::SimParams::ComputeLame()
 
 void icy::SimParams::ComputeHelperVariables()
 {
-    UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+//    UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+    UpdateEveryNthStep = (int)(1.f/(400*InitialTimeStep));
     cellsize = GridXDimension/GridX;
     cellsize_inv = 1./cellsize;
     Dp_inv = 4./(cellsize*cellsize);

@@ -20,7 +20,7 @@ struct icy::Point
     real zeta; // track shear accumulation
     Vector2r pos_initial; // for resetting
 
-    real visualize_p, visualize_q, visualize_p0, visualize_psi;
+    real visualize_p, visualize_q, visualize_p0, visualize_psi, visualize_q_limit;
     real case_when_Jp_first_changes;
 
     void Reset();

@@ -199,6 +199,12 @@ void icy::VisualRepresentation::SynchronizeValues()
         points_mapper->SetLookupTable(hueLut);
         scalarBar->SetLookupTable(hueLut);
     }
+    else if(VisualizingVariable == VisOpt::q_limit)
+    {
+        for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_q_limit);
+        points_mapper->SetLookupTable(hueLut);
+        scalarBar->SetLookupTable(hueLut);
+    }
     else if(VisualizingVariable == VisOpt::p_tr)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p);

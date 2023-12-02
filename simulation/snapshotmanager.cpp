@@ -97,7 +97,7 @@ void icy::SnapshotManager::ReadDirectory(std::string directoryPath)
 
 void icy::SnapshotManager::DumpPointData(int pt_idx)
 {
-    std::vector<double> p0, p, q, Jp, c;
+    std::vector<double> p0, p, q, q_limit, Jp, c;
 
     for(int i=1; i<=last_file_index; i++)
     {
@@ -114,8 +114,8 @@ void icy::SnapshotManager::DumpPointData(int pt_idx)
 
         //DATASPACE
         H5::DataSpace space1 = dataset_points.getSpace();
-        double tmp[5];
-        hsize_t dimsm[1] {5};
+        double tmp[6];
+        hsize_t dimsm[1] {6};
         H5::DataSpace memspace(1, dimsm);
 
         hsize_t count[1] {1};
@@ -152,20 +152,28 @@ void icy::SnapshotManager::DumpPointData(int pt_idx)
         memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
         dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
 
+        offset[0] = icy::SimParams::idx_q_limit * model->prms.nPtsPitch + pt_idx;
+        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
+        moffset[0] = 5;
+        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
+        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
+
 
         p0.push_back(tmp[0]);
         p.push_back(tmp[1]);
         q.push_back(tmp[2]);
         Jp.push_back(tmp[3]);
         c.push_back(tmp[4]);
+        q_limit.push_back((tmp[5]));
     }
 
     std::string outputFile = std::to_string(pt_idx) + ".csv";
     std::ofstream ofs(outputFile, std::ofstream::out);
-    ofs << "p0, p, q, Jp, c\n";
+    ofs << "p0, pc, p, q, q_limit, Jp, c\n";
     for(int i=0;i<last_file_index;i++)
     {
-        ofs << p0[i] << ',' << p[i] << ',' << q[i] << ',' << Jp[i] << ',' << c[i];
+        double pc = p0[i]*(1-model->prms.NACC_beta)*0.5;
+        ofs << p0[i] << ',' << pc << ',' << p[i] << ',' << q[i] << ',' << q_limit[i] << ',' << Jp[i] << ',' << c[i];
         ofs << '\n';
     }
     ofs.close();

@@ -5,6 +5,7 @@
 #include <QObject>
 #include <QString>
 #include "simulation/parameters_sim.h"
+#include <cmath>
 
 // wrapper for SimParams to display/edit them in GUI
 class ParamsWrapper : public QObject
@@ -87,35 +88,19 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double nacc_M READ getNaccM NOTIFY propertyChanged)
     double getNaccM() {return sqrt(prms->NACC_M);}
 
-    Q_PROPERTY(double ms_kappa READ getMsKappa WRITE setMsKappa NOTIFY propertyChanged)
-    double getMsKappa() {return prms->ms_kappa;}
-    void setMsKappa(double val) {prms->ms_kappa = val;}
-
-    Q_PROPERTY(double ms_mu_J READ getMsMuJ WRITE setMsMuJ NOTIFY propertyChanged)
-    double getMsMuJ() {return prms->ms_mu_J;}
-    void setMsMuJ(double val) {prms->ms_mu_J = val;}
-
-    Q_PROPERTY(double ms_mu_zeta READ getMsMuZeta WRITE setMsMuZeta NOTIFY propertyChanged)
-    double getMsMuZeta() {return prms->ms_mu_zeta;}
-    void setMsMuZeta(double val) {prms->ms_mu_zeta = val;}
-
-    Q_PROPERTY(double ms_beta_J READ getMsBetaJ WRITE setMsBetaJ NOTIFY propertyChanged)
-    double getMsBetaJ() {return prms->ms_beta_J;}
-    void setMsBetaJ(double val) {prms->ms_beta_J = val;}
-
-    Q_PROPERTY(double ms_beta_zeta READ getMsBetaZeta WRITE setMsBetaZeta NOTIFY propertyChanged)
-    double getMsBetaZeta() {return prms->ms_beta_zeta;}
-    void setMsBetaZeta(double val) {prms->ms_beta_zeta = val;}
 
 
-    Q_PROPERTY(double ms_M READ getMsM WRITE setMsM NOTIFY propertyChanged)
-    double getMsM() {return prms->ms_M;}
-    void setMsM(double val) {prms->ms_M = val;}
+    // Drucker-Prager
+    Q_PROPERTY(double DP_cc READ getDPcc WRITE setDPcc NOTIFY propertyChanged)
+    double getDPcc() {return prms->DP_cc;}
+    void setDPcc(double val) {prms->DP_cc = val;}
 
-    Q_PROPERTY(double ms_p0 READ getMsP0 WRITE setMsP0 NOTIFY propertyChanged)
-    double getMsP0() {return prms->ms_p0;}
-    void setMsP0(double val) {prms->ms_p0 = val;}
+    Q_PROPERTY(double DP_phi READ getDPPhi WRITE setDPPhi NOTIFY propertyChanged)
+    double getDPPhi() {return std::atan(prms->DP_tan_phi)*180/icy::SimParams::pi;}
+    void setDPPhi(double val) {prms->DP_tan_phi = tan(val*icy::SimParams::pi/180);}
 
+    Q_PROPERTY(double DP_tan_phi READ getDPTanPhi NOTIFY propertyChanged)
+    double getDPTanPhi() {return prms->DP_tan_phi;}
 
 
     Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)

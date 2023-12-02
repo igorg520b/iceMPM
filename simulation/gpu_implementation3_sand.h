@@ -25,8 +25,8 @@ __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4]);
 __device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r &mV);
 
 
-__device__ void NACCUpdateDeformationGradient_q_hardening_2(icy::Point &p);
 __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p);
+__device__ void Wolper_Drucker_Prager(icy::Point &p);
 //__device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p);
 
 //__device__ void NACCUpdateDeformationGradient(icy::Point &p);

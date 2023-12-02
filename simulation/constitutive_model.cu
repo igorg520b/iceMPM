@@ -2,116 +2,60 @@
 
 extern __constant__ icy::SimParams gprms;
 
-
-__device__ void NACCUpdateDeformationGradient_q_hardening_2(icy::Point &p)
+__device__ void Wolper_Drucker_Prager(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
-    constexpr real magic_epsilon = 1.e-5;
-    constexpr int d = 2; // dimensions
+    const real &mu = gprms.mu;
+    const real &kappa = gprms.kappa;
     const real &dt = gprms.InitialTimeStep;
-    const real &ms = gprms.NACC_max_strain;
-
-
-    real kappa = gprms.kappa;
-    real mu = gprms.mu;
-    real &J_inv = p.Jp_inv;
-    real &zeta = p.zeta;
-
-    if(J_inv > 1) J_inv = 1;
-    kappa *= exp((J_inv-1)/gprms.ms_kappa);
-    mu *= exp((J_inv-1)/gprms.ms_mu_J)*exp((zeta-1)/gprms.ms_mu_zeta);
-
-    real beta = gprms.NACC_beta;
-    beta *= exp((J_inv-1)/gprms.ms_beta_J)*exp((zeta-1)/gprms.ms_beta_zeta);
-
-
+    const real d = (real)icy::SimParams::dim;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     Matrix2r U, V, Sigma;
     svd2x2(FeTr, U, Sigma, V);
 
-
-    // compute p_trial
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-    real psi_kappa_prime = (kappa/2.) * (Je_tr - 1./Je_tr);
-    real p_trial = -psi_kappa_prime * Je_tr;
-    p.visualize_p = p_trial;
-    if(p_trial > gprms.IceCompressiveStrength) zeta = 1;    // restore the bearing capacity in shear
-
-    real M = gprms.NACC_M;
-    M *= exp((zeta-1)/gprms.ms_M);
-    const real M_sq = M*M;
-    real p0 = gprms.IceCompressiveStrength;
-    p0 *= exp((zeta-1)/gprms.ms_p0);
-    p.visualize_p0 = p0;
-
-    // compute s_trial and q_trial
     Matrix2r SigmaSquared = Sigma*Sigma;
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
+    real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
     real q_tr = sqrt((6-d)/2.)*s_hat_tr.norm();
-    p.visualize_q = q_tr;
+    
+    
+    real y = q_tr - (p_trial+gprms.DP_cc)*gprms.DP_tan_phi;
+    real q_n_1 = (p_trial+gprms.DP_cc)*gprms.DP_tan_phi;
+    p.visualize_q_limit = q_n_1;
+    p.q = 5;
 
-
-    // line 9 (case 1)
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(p_trial > p0)
+    if(p_trial > -gprms.DP_cc)
     {
-        p.q = 1;
-        Matrix2r Sigma_new;
-        if(J_inv < 1)
+        if(y < 0)
         {
-            real Je_new = sqrt(-2.*p0 / kappa + 1.);
-            Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-            J_inv *= Je_new/Je_tr;
-            J_inv = min(J_inv, 1.);
+            // elastic regime
+            p.Fe = FeTr;
         }
         else
         {
-            Sigma_new = Matrix2r::Identity() * pow(Je_tr, 1./(real)d);
+//            p.q = 1;
+            // project onto YS
+            real s_hat_n_1_norm = q_n_1/sqrt((6-d)/2.);
+
+            Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+            Matrix2r Sigma_new;
+            Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
+            p.Fe = U*Sigma_new*V.transpose();
         }
-        p.Fe = U*Sigma_new*V.transpose();
-    }
-
-    // line 14 (case 2)
-    else if(p_trial < -beta*p0)
-    {
-        p.q = 2;
-        real Je_new = sqrt(2.*beta*p0/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        J_inv *= Je_new/Je_tr;
-    }
-
-    // line 19 (case 3)
-    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
-    {
-        // projection
-        real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
-        //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r Sigma_new;
-        Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
-        p.Fe = U*Sigma_new*V.transpose();
-
-        // update hardening
-        // zeta_tr
-        real zeta_tr = sqrt((q_tr*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
-
-        // zeta_n_1
-        real Je_n_1 = Sigma_new(0,0)*Sigma_new(1,1);
-        Matrix2r SigmaSquared_n_1 = Sigma_new*Sigma_new;
-        Matrix2r s_hat_n_1 = mu/Je_n_1 * dev(SigmaSquared_n_1); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-        real q_n_1 = sqrt((6-d)/2.)*s_hat_n_1.norm();
-        real zeta_n_1 = sqrt((q_n_1*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
-
-        p.zeta *= zeta_n_1/zeta_tr;
-        p.q = 3;
     }
     else
     {
-        p.Fe = FeTr;
+//        p.q = 2;
+        // tear in tension
+        real p_new = -gprms.DP_cc;
+        real Je_new = sqrt(-2.*p_new/kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
     }
 }
+
 
 
 
@@ -130,8 +74,6 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     Matrix2r U, V, Sigma;
     svd2x2(FeTr, U, Sigma, V);
 
-    // line 4
-
     const real &ms = gprms.NACC_max_strain;
     real p0;
     p0 = gprms.IceCompressiveStrength/ms * (p.Jp_inv - (1.-ms));
@@ -143,25 +85,19 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 
     p.visualize_p0 = p0;
 
-    // line 5
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-
-    // line 6
     Matrix2r SigmaSquared = Sigma*Sigma;
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-
-    // line 8
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
+
     p.visualize_p = p_trial;
     p.visualize_q = s_hat_tr.norm()*sqrt((6-d)/2.);
 
     // line 9 (case 1)
-    const real magic_threshold = gprms.IceCompressiveStrength * 0.4;
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(p_trial > p0)
     {
         p.q = 1;
-        if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 1;
+        p.visualize_q_limit = 0;
         if(p.Jp_inv < 1)
         {
             real Je_new = sqrt(-2.*p0/kappa + 1.);
@@ -180,55 +116,56 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
     else if(p_trial < -beta*p0)
     {
         p.q = 2;
-        if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 2;
+        p.visualize_q_limit = 0;
         real Je_new = sqrt(2.*beta*p0/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
         p.Jp_inv *= Je_new/Je_tr;
     }
-
-    // line 19 (case 3)
-    else if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
+    else
     {
-        // projection
         real expr_under_root = (-M_sq*(p_trial+beta*p0)*(p_trial-p0))/((1+2.*beta)*(3.-d/2.));
-        //        Matrix2r B_hat_E_new = sqrt(expr_under_root)*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-        Matrix2r B_hat_E_new = sqrt(expr_under_root)*Je_tr/mu*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+        real norm_s_n_1 = sqrt(expr_under_root);
+        Matrix2r B_hat_E_new = norm_s_n_1*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
         Matrix2r Sigma_new;
         Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
-        p.Fe = U*Sigma_new*V.transpose();
-
-        // update hardening
-        // zeta_tr
-        real q_tr = sqrt((6-d)/2.)*s_hat_tr.norm();
-        real zeta_tr = sqrt((q_tr*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
-
-        // zeta_n_1
         real Je_n_1 = Sigma_new(0,0)*Sigma_new(1,1);
         Matrix2r SigmaSquared_n_1 = Sigma_new*Sigma_new;
+
+        // this is for visualization of q_n_1 only; expr_under_root is the norm or s_n_1 => can yield q_n_1
         Matrix2r s_hat_n_1 = mu/Je_n_1 * dev(SigmaSquared_n_1); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
         real q_n_1 = sqrt((6-d)/2.)*s_hat_n_1.norm();
-        real zeta_n_1 = sqrt((q_n_1*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
+        p.visualize_q_limit = q_n_1;
 
-        real p_c = (1.-beta)*p0/2.;
-        //        real coeff = gprms.NACC_magic_coeff;
-        //        real p_c = coeff*p0 - (1.-coeff)*beta*p0;
-        if(p_trial > p_c)
+        real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+        // case 3
+        if(y >= magic_epsilon && p0 > magic_epsilon && p_trial < p0 - magic_epsilon && p_trial > -beta*p0 + magic_epsilon)
         {
-            p.Jp_inv *= zeta_tr/zeta_n_1;           // original version
-            p.q = 3;
-            if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 3;
+            // projection
+            p.Fe = U*Sigma_new*V.transpose();
+
+            // update hardening: as a ratio of zeta_tr and zeta_n_1
+            real q_tr = sqrt((6-d)/2.)*s_hat_tr.norm();
+            real zeta_tr = sqrt((q_tr*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
+            real zeta_n_1 = sqrt((q_n_1*Je_tr)/(mu*sqrt((6-d)/2.)) + 1);
+
+            real p_c = (1.-beta)*p0/2.;
+            if(p_trial > p_c)
+            {
+                p.Jp_inv *= zeta_tr/zeta_n_1;           // original version
+                p.q = 3;
+            }
+            else
+            {
+                p.Jp_inv *= zeta_n_1/zeta_tr;
+                p.q = 4;
+            }
         }
         else
         {
-            p.Jp_inv *= zeta_n_1/zeta_tr;
-            p.q = 4;
-            if(p.case_when_Jp_first_changes == 0 && p0 < magic_threshold) p.case_when_Jp_first_changes = 4;
+            p.Fe = FeTr;
+            p.q = 0;
         }
-    }
-    else
-    {
-        p.Fe = FeTr;
     }
 }
 
@@ -249,7 +186,7 @@ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
     // Kirchhoff stress as per Wolper (2019)
     real Je = F.determinant();
     Matrix2r b = F*F.transpose();
-    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + Je*kappa*(Je-1/Je)*Matrix2r::Identity();
+    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + kappa*(Je*Je-1.)*Matrix2r::Identity();
     return PFt;
 }
 

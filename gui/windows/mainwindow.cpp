@@ -32,8 +32,6 @@ MainWindow::MainWindow(QWidget *parent)
 
     pointSelector->clicked_on_a_point = [&](double x, double y) { point_selection(x,y);};
 
-    // VTK - scalar bar
-    renderer->AddActor(representation.scalarBar);
 
     // property browser
     pbrowser = new ObjectPropertyBrowser(this);
@@ -53,8 +51,8 @@ MainWindow::MainWindow(QWidget *parent)
     qdsbValRange = new QDoubleSpinBox();
     qdsbValRange->setRange(-10, 10);
     qdsbValRange->setValue(-2);
-    qdsbValRange->setDecimals(1);
-    qdsbValRange->setSingleStep(0.5);
+    qdsbValRange->setDecimals(2);
+    qdsbValRange->setSingleStep(0.25);
     ui->toolBar->addWidget(qdsbValRange);
 
     // slider
@@ -90,6 +88,8 @@ MainWindow::MainWindow(QWidget *parent)
     renderer->AddActor(representation.actor_grid);
     renderer->AddActor(representation.actor_indenter);
     renderer->AddActor(representation.actorText);
+    renderer->AddActor(representation.scalarBar);
+
 
     // populate combobox
     QMetaEnum qme = QMetaEnum::fromType<icy::VisualRepresentation::VisOpt>();
@@ -126,11 +126,8 @@ MainWindow::MainWindow(QWidget *parent)
         var = settings.value("visualization_ranges");
         if(!var.isNull())
         {
-            double *vec = (double*)var.toByteArray().constData();
-            memcpy(representation.ranges, vec, sizeof(representation.ranges));
-            cout << "restored viz values: ";
-            for(int i=0; i<10; i++) cout << representation.ranges[i] << ", ";
-            cout << '\n';
+            QByteArray ba = var.toByteArray();
+            memcpy(representation.ranges, ba.constData(), ba.size());
         }
 
         var = settings.value("lastParameterFile");
