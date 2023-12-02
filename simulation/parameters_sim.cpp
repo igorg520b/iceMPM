@@ -93,6 +93,10 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
     if(doc.HasMember("NACC_max_strain")) NACC_max_strain = doc["NACC_max_strain"].GetDouble();
 
+    if(doc.HasMember("DP_cc")) DP_cc = doc["DP_cc"].GetDouble();
+    if(doc.HasMember("DP_phi")) DP_tan_phi = std::tan(doc["DP_phi"].GetDouble()*pi/180);
+
+
     ComputeCamClayParams2();
     ComputeLame();
     ComputeHelperVariables();
@@ -112,8 +116,8 @@ void icy::SimParams::ComputeLame()
 
 void icy::SimParams::ComputeHelperVariables()
 {
-//    UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
-    UpdateEveryNthStep = (int)(1.f/(400*InitialTimeStep));
+    UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
+//    UpdateEveryNthStep = (int)(1.f/(400*InitialTimeStep));
     cellsize = GridXDimension/GridX;
     cellsize_inv = 1./cellsize;
     Dp_inv = 4./(cellsize*cellsize);

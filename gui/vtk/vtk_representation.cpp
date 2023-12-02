@@ -195,7 +195,7 @@ void icy::VisualRepresentation::SynchronizeValues()
     else if(VisualizingVariable == VisOpt::p0)
     {
         for(int i=0;i<model->points.size();i++) visualized_values->SetValue((vtkIdType)i, model->points[i].visualize_p0);
-        centerVal = model->prms.IceCompressiveStrength;
+        //centerVal = model->prms.IceCompressiveStrength;
         points_mapper->SetLookupTable(hueLut);
         scalarBar->SetLookupTable(hueLut);
     }

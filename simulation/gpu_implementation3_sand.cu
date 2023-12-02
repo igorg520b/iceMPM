@@ -428,9 +428,8 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    if(p.q == 0) NACCUpdateDeformationGradient_q_hardening(p);
+    if(p.q == 0) NACCUpdateDeformationGradient_trimmed(p);
     else Wolper_Drucker_Prager(p);
-//    Wolper_Drucker_Prager(p);
 
     gprms.pts_array[icy::SimParams::posx*nPtsPitched + pt_idx] = p.pos[0];
     gprms.pts_array[icy::SimParams::posy*nPtsPitched + pt_idx] = p.pos[1];

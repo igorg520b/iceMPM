@@ -9,6 +9,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     const real &kappa = gprms.kappa;
     const real &dt = gprms.InitialTimeStep;
     const real d = (real)icy::SimParams::dim;
+    const real &ms = gprms.NACC_max_strain;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     Matrix2r U, V, Sigma;
@@ -19,40 +20,90 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
     real q_tr = sqrt((6-d)/2.)*s_hat_tr.norm();
+    p.visualize_p = p_trial;
+    p.visualize_q = q_tr;
     
     
-    real y = q_tr - (p_trial+gprms.DP_cc)*gprms.DP_tan_phi;
-    real q_n_1 = (p_trial+gprms.DP_cc)*gprms.DP_tan_phi;
-    p.visualize_q_limit = q_n_1;
-    p.q = 5;
+//    p.visualize_q_limit = q_n_1;
 
-    if(p_trial > -gprms.DP_cc)
+    real p0 = gprms.DP_cc/ms * (p.Jp_inv - (1.-ms));
+    if(p0 < 0) p0 = 0;
+    real y = q_tr - (p_trial+p0)*gprms.DP_tan_phi;
+    real q_n_1 = (p_trial+p0)*gprms.DP_tan_phi;
+    p.visualize_p0 = p0;
+    p.visualize_q_limit = q_n_1;
+
+    if(p_trial > -p0)
     {
         if(y < 0)
         {
             // elastic regime
             p.Fe = FeTr;
+            p.q = 4;
         }
         else
         {
-//            p.q = 1;
             // project onto YS
             real s_hat_n_1_norm = q_n_1/sqrt((6-d)/2.);
-
             Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
             Matrix2r Sigma_new;
             Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
             p.Fe = U*Sigma_new*V.transpose();
+            p.q = 2;
         }
     }
     else
     {
-//        p.q = 2;
         // tear in tension
         real p_new = -gprms.DP_cc;
         real Je_new = sqrt(-2.*p_new/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
+        p.Jp_inv *= Je_new/Je_tr;
+        p.q = 1;
+    }
+}
+
+
+
+__device__ void NACCUpdateDeformationGradient_trimmed(icy::Point &p)
+{
+    const Matrix2r &gradV = p.Bp;
+    constexpr int d = 2; // dimensions
+    const real &mu = gprms.mu;
+    const real &kappa = gprms.kappa;
+    const real &beta = gprms.NACC_beta;
+    const real &dt = gprms.InitialTimeStep;
+
+
+    p.visualize_p = 0;
+    p.visualize_q = 0;
+    p.visualize_p0 = 0;
+    p.visualize_q_limit = 0;
+
+    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
+    p.Fe = FeTr;
+    Matrix2r U, V, Sigma;
+    svd2x2(FeTr, U, Sigma, V);
+
+    real p0 = gprms.IceCompressiveStrength;
+
+    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
+    real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
+
+    // line 9 (case 1)
+    if(p_trial > p0) { p.q = 1; return; }
+    if(p_trial < -beta*p0) { p.q = 2; return; }
+
+    Matrix2r SigmaSquared = Sigma*Sigma;
+    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
+    const real M_sq = gprms.NACC_M * gprms.NACC_M;
+    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    if(y > 0)
+    {
+        real p_c = (1.-beta)*p0/2.;
+        if(p_trial > p_c) p.q = 3;
+        else p.q = 4;
     }
 }
 
