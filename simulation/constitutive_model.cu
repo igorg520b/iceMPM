@@ -26,16 +26,35 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     
 //    p.visualize_q_limit = q_n_1;
 
-    real p0 = gprms.DP_cc/ms * (p.Jp_inv - (1.-ms));
-    if(p0 < 0) p0 = 0;
-    real y = q_tr - (p_trial+p0)*gprms.DP_tan_phi;
-    real q_n_1 = (p_trial+p0)*gprms.DP_tan_phi;
-    p.visualize_p0 = p0;
-    p.visualize_q_limit = q_n_1;
+//    real p0 = gprms.DP_cc/ms * (p.Jp_inv - (1.-ms));
+//    if(p0 < 0) p0 = 1e-5;
+//    real y = q_tr - (p_trial+p0)*gprms.DP_tan_phi;
+    real q_n_1 = p_trial*gprms.DP_tan_phi;
+//    real q_n_1 = (p_trial+p0)*(p_trial+p0)/gprms.DP_coeff1;
+//    q_n_1 = min(gprms.IceShearStrength*gprms.DP_tan_phi, q_n_1);
+//    real q_n_1 = gprms.DP_tan_phi*gprms.IceShearStrength*(1.0-exp(-(p_trial+p0)/gprms.DP_coeff1));
 
-    if(p_trial > -p0)
+//    p.visualize_p0 = p0;
+//    p.visualize_q_limit = q_n_1;
+
+//    real pmax = gprms.IceCompressiveStrength/ms * (p.Jp_inv - (1.-ms));
+//    if(pmax < 0) pmax = 1e-5;
+
+
+    if(p_trial < 0)
     {
-        if(y < 0)
+        // tear in tension
+        real p_new = 0;
+        real Je_new = sqrt(-2.*p_new/kappa + 1.);
+        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*Sigma_new*V.transpose();
+        p.Jp_inv *= Je_new/Je_tr;
+        p.q = 1;
+
+    }
+    else
+    {
+        if(q_tr < q_n_1)
         {
             // elastic regime
             p.Fe = FeTr;
@@ -51,16 +70,6 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
             p.Fe = U*Sigma_new*V.transpose();
             p.q = 2;
         }
-    }
-    else
-    {
-        // tear in tension
-        real p_new = -gprms.DP_cc;
-        real Je_new = sqrt(-2.*p_new/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
-        p.Jp_inv *= Je_new/Je_tr;
-        p.q = 1;
     }
 }
 

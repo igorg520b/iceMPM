@@ -102,6 +102,11 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double DP_tan_phi READ getDPTanPhi NOTIFY propertyChanged)
     double getDPTanPhi() {return prms->DP_tan_phi;}
 
+    Q_PROPERTY(double DP_coeff1 READ getDPCoeff1 WRITE setDPCoeff1 NOTIFY propertyChanged)
+    double getDPCoeff1() {return prms->DP_coeff1;}
+    void setDPCoeff1(double val) {prms->DP_coeff1 = val;}
+
+
 
     Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)
     double getIce_CompressiveStr() {return prms->IceCompressiveStrength;}

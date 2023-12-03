@@ -71,7 +71,7 @@ public:
     real NACC_beta, NACC_M;     // these are all computed
     real NACC_max_strain;
 
-    real DP_cc, DP_tan_phi;
+    real DP_cc, DP_tan_phi, DP_coeff1;
 
     real cellsize, cellsize_inv, Dp_inv;
 

@@ -469,8 +469,10 @@ void MainWindow::background_worker_paused()
 
 void MainWindow::point_selection(double x, double y)
 {
+    /*
     qDebug() << QString("clicked %1; %2").arg(x).arg(y);
     int idx = representation.FindPoint(x,y);
     qDebug() << QString("found point index %1").arg(idx);
     snapshot.DumpPointData(idx);
+*/
 }

@@ -40,6 +40,7 @@ void icy::SimParams::Reset()
 
     DP_cc = 1e3;
     DP_tan_phi = std::tan(30*pi/180.);
+    DP_coeff1 = 1e4;
 
     tpb_P2G = 256;
     tpb_Upd = 512;
