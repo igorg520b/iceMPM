@@ -2,14 +2,26 @@
 
 extern __constant__ icy::SimParams gprms;
 
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
+{
+    const real &kappa = gprms.kappa;
+    const real &mu = gprms.mu;
+
+    // Kirchhoff stress as per Wolper (2019)
+    real Je = F.determinant();
+    Matrix2r b = F*F.transpose();
+    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + kappa*(Je*Je-1.)*Matrix2r::Identity();
+    return PFt;
+}
+
+
 __device__ void Wolper_Drucker_Prager(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
     const real &dt = gprms.InitialTimeStep;
-    const real d = (real)icy::SimParams::dim;
-    const real &ms = gprms.NACC_max_strain;
+    constexpr real d = 2;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     Matrix2r U, V, Sigma;
@@ -19,29 +31,6 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     Matrix2r SigmaSquared = Sigma*Sigma;
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
-    real q_tr = sqrt((6-d)/2.)*s_hat_tr.norm();
-    p.visualize_p = p_trial;
-    p.visualize_q = q_tr;
-    
-    
-//    p.visualize_q_limit = q_n_1;
-
-//    real p0 = gprms.DP_cc/ms * (p.Jp_inv - (1.-ms));
-//    if(p0 < 0) p0 = 1e-5;
-//    real y = q_tr - (p_trial+p0)*gprms.DP_tan_phi;
-    real q_n_1 = p_trial*gprms.DP_tan_phi;
-    q_n_1 = min(gprms.IceShearStrength, q_n_1);
-
-//    real q_n_1 = (p_trial+p0)*(p_trial+p0)/gprms.DP_coeff1;
-//
-//    real q_n_1 = gprms.DP_tan_phi*gprms.IceShearStrength*(1.0-exp(-(p_trial+p0)/gprms.DP_coeff1));
-
-//    p.visualize_p0 = p0;
-//    p.visualize_q_limit = q_n_1;
-
-//    real pmax = gprms.IceCompressiveStrength/ms * (p.Jp_inv - (1.-ms));
-//    if(pmax < 0) pmax = 1e-5;
-
 
     if(p_trial < 0 || p.Jp_inv < 1)
     {
@@ -58,6 +47,11 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     }
     else
     {
+        constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
+        real q_tr = coeff1*s_hat_tr.norm();
+        real q_n_1 = p_trial*gprms.DP_tan_phi;
+        q_n_1 = min(gprms.IceShearStrength, q_n_1);
+
         if(q_tr < q_n_1)
         {
             // elastic regime
@@ -67,7 +61,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
         else
         {
             // project onto YS
-            real s_hat_n_1_norm = q_n_1/sqrt((6-d)/2.);
+            real s_hat_n_1_norm = q_n_1/coeff1;
             Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
             Matrix2r Sigma_new;
             Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
@@ -78,51 +72,35 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 }
 
 
-
 __device__ void NACCUpdateDeformationGradient_trimmed(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
-    constexpr int d = 2; // dimensions
+    constexpr real d = 2; // dimensions
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
     const real &beta = gprms.NACC_beta;
     const real &dt = gprms.InitialTimeStep;
-
-
-    p.visualize_p = 0;
-    p.visualize_q = 0;
-    p.visualize_p0 = 0;
-    p.visualize_q_limit = 0;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     p.Fe = FeTr;
     Matrix2r U, V, Sigma;
     svd2x2(FeTr, U, Sigma, V);
 
-    real p0 = gprms.IceCompressiveStrength;
-
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
-    real p_c = (1.-beta)*p0/2.;
 
-    // line 9 (case 1)
-    if(p_trial > p0) { p.q = 1; return; }
-    if(p_trial < -beta*p0) { p.q = 2; return; }
+    const real &p0 = gprms.IceCompressiveStrength;
 
     Matrix2r SigmaSquared = Sigma*Sigma;
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-    const real M_sq = gprms.NACC_M * gprms.NACC_M;
-    real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(y > 0)
-    {
-        if(p_trial > p_c) p.q = 3;
-        else p.q = 4;
-    }
+    const real &M_sq = gprms.NACC_Msq;
+    real y = (1.+2.*beta)*(3.-d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    if(y > 0) p.q = 3;
 }
 
 
 
-
+/*
 __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
@@ -232,27 +210,9 @@ __device__ void NACCUpdateDeformationGradient_q_hardening(icy::Point &p)
         }
     }
 }
+*/
 
 
-
-__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
-{
-//    const Matrix2r &F = p.Fe;
-//    const real &zeta = p.zeta;
-//    const real &J_inv = p.Jp_inv;
-    real kappa = gprms.kappa;
-    real mu = gprms.mu;
-
-//    if(J_inv > 1) J_inv = 1;
-//    kappa *= exp((J_inv-1)/gprms.ms_kappa);
-//    mu *= exp((J_inv-1)/gprms.ms_mu_J)*exp((zeta-1)/gprms.ms_mu_zeta);
-
-    // Kirchhoff stress as per Wolper (2019)
-    real Je = F.determinant();
-    Matrix2r b = F*F.transpose();
-    Matrix2r PFt = mu*(1/Je)*(b-b.trace()*Matrix2r::Identity()/2) + kappa*(Je*Je-1.)*Matrix2r::Identity();
-    return PFt;
-}
 
 /*
 __device__ void NACCUpdateDeformationGradient_Alt(icy::Point &p)

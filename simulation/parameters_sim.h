@@ -68,7 +68,7 @@ public:
     real IceFrictionCoefficient;
 
     real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
-    real NACC_beta, NACC_M;     // these are all computed
+    real NACC_beta, NACC_M, NACC_Msq;     // these are all computed
     real NACC_max_strain;
 
     real DP_cc, DP_tan_phi, DP_coeff1;

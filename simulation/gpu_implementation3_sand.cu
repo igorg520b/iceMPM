@@ -261,8 +261,8 @@ __global__ void v2_kernel_p2g()
         data[pt_idx + nPtsPitch*icy::SimParams::Bp10], data[pt_idx + nPtsPitch*icy::SimParams::Bp11];
     Fe << data[pt_idx + nPtsPitch*icy::SimParams::Fe00], data[pt_idx + nPtsPitch*icy::SimParams::Fe01],
         data[pt_idx + nPtsPitch*icy::SimParams::Fe10], data[pt_idx + nPtsPitch*icy::SimParams::Fe11];
-    real Jp_inv =        data[pt_idx + nPtsPitch*icy::SimParams::idx_Jp];
-    real zeta =          data[pt_idx + nPtsPitch*icy::SimParams::idx_zeta];
+    // real Jp_inv =        data[pt_idx + nPtsPitch*icy::SimParams::idx_Jp];
+    // real zeta =          data[pt_idx + nPtsPitch*icy::SimParams::idx_zeta];
 
 
     Matrix2r PFt = KirchhoffStress_Wolper(Fe);
@@ -390,8 +390,9 @@ __global__ void v2_kernel_g2p()
     p.Fe(1,0) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe10];
     p.Fe(1,1) =     gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::Fe11];
     p.Jp_inv =      gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_Jp];
-    p.zeta =        gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_zeta];
-    p.q =           gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_case];
+//    p.zeta =        gprms.pts_array[pt_idx + nPtsPitched*icy::SimParams::idx_zeta];
+    char* pq_ptr = (char*)&gprms.pts_array[nPtsPitched*icy::SimParams::idx_case];
+    p.q =           pq_ptr[pt_idx];
 
     p.velocity.setZero();
     p.Bp.setZero();
@@ -445,15 +446,17 @@ __global__ void v2_kernel_g2p()
     gprms.pts_array[icy::SimParams::Fe11*nPtsPitched + pt_idx] = p.Fe(1,1);
 
     gprms.pts_array[icy::SimParams::idx_Jp*nPtsPitched + pt_idx] = p.Jp_inv;
-    gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx] = p.zeta;
+//    gprms.pts_array[icy::SimParams::idx_zeta*nPtsPitched + pt_idx] = p.zeta;
 
     // visualized variables
-    gprms.pts_array[icy::SimParams::idx_p*nPtsPitched + pt_idx] = p.visualize_p;
-    gprms.pts_array[icy::SimParams::idx_p0*nPtsPitched + pt_idx] = p.visualize_p0;
-    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
-    gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
-    gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx] = p.q;
-    gprms.pts_array[icy::SimParams::idx_q_limit*nPtsPitched + pt_idx] = p.visualize_q_limit;
+//    gprms.pts_array[icy::SimParams::idx_p*nPtsPitched + pt_idx] = p.visualize_p;
+//    gprms.pts_array[icy::SimParams::idx_p0*nPtsPitched + pt_idx] = p.visualize_p0;
+//    gprms.pts_array[icy::SimParams::idx_q*nPtsPitched + pt_idx] = p.visualize_q;
+//    gprms.pts_array[icy::SimParams::idx_psi*nPtsPitched + pt_idx] = p.visualize_psi;
+//    gprms.pts_array[icy::SimParams::idx_case*nPtsPitched + pt_idx] = p.q;
+//    gprms.pts_array[icy::SimParams::idx_q_limit*nPtsPitched + pt_idx] = p.visualize_q_limit;
+
+    pq_ptr[pt_idx] = p.q;
 }
 
 //===========================================================================

@@ -132,5 +132,6 @@ void icy::SimParams::ComputeCamClayParams2()
     const real &beta = NACC_beta;
     const real &q = IceShearStrength;
     const real &p0 = IceCompressiveStrength;
-    this->NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
+    NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
+    NACC_Msq = NACC_M*NACC_M;
 }
