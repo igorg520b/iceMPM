@@ -30,8 +30,10 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 //    if(p0 < 0) p0 = 1e-5;
 //    real y = q_tr - (p_trial+p0)*gprms.DP_tan_phi;
     real q_n_1 = p_trial*gprms.DP_tan_phi;
+    q_n_1 = min(gprms.IceShearStrength, q_n_1);
+
 //    real q_n_1 = (p_trial+p0)*(p_trial+p0)/gprms.DP_coeff1;
-//    q_n_1 = min(gprms.IceShearStrength*gprms.DP_tan_phi, q_n_1);
+//
 //    real q_n_1 = gprms.DP_tan_phi*gprms.IceShearStrength*(1.0-exp(-(p_trial+p0)/gprms.DP_coeff1));
 
 //    p.visualize_p0 = p0;
@@ -41,15 +43,17 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 //    if(pmax < 0) pmax = 1e-5;
 
 
-    if(p_trial < 0)
+    if(p_trial < 0 || p.Jp_inv < 1)
     {
-        // tear in tension
+        if(p_trial < 1)  p.q = 1;
+        else if(p.Jp_inv < 1) p.q = 2;
+
+        // tear in tension or compress until original state
         real p_new = 0;
         real Je_new = sqrt(-2.*p_new/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
         p.Jp_inv *= Je_new/Je_tr;
-        p.q = 1;
 
     }
     else
@@ -68,7 +72,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
             Matrix2r Sigma_new;
             Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
             p.Fe = U*Sigma_new*V.transpose();
-            p.q = 2;
+            p.q = 3;
         }
     }
 }
@@ -99,6 +103,7 @@ __device__ void NACCUpdateDeformationGradient_trimmed(icy::Point &p)
 
     real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
+    real p_c = (1.-beta)*p0/2.;
 
     // line 9 (case 1)
     if(p_trial > p0) { p.q = 1; return; }
@@ -110,7 +115,6 @@ __device__ void NACCUpdateDeformationGradient_trimmed(icy::Point &p)
     real y = (1. + 2.*beta)*(3.-(real)d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
     if(y > 0)
     {
-        real p_c = (1.-beta)*p0/2.;
         if(p_trial > p_c) p.q = 3;
         else p.q = 4;
     }
