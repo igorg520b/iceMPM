@@ -40,11 +40,13 @@ __device__ Matrix2r dev(Matrix2r A);
 __device__ double clamp(double x, double a, double b);
 
 // Naive GPU Implementation with memory coalescing
+namespace icy { class Model; }
 
 class GPU_Implementation3
 {
 public:
     icy::SimParams *prms;
+    icy::Model *model;
     int error_code;
     std::function<void()> transfer_completion_callback;
 
@@ -58,6 +60,7 @@ public:
     void cuda_p2g();
     void cuda_g2p();
     void cuda_update_nodes(real indenter_x, real indenter_y);
+    void cuda_reset_indenter_force_accumulator();
 
     void cuda_transfer_from_device();
     void transfer_ponts_to_host_finalize(std::vector<icy::Point> &points);
@@ -65,6 +68,7 @@ public:
     cudaEvent_t eventCycleStart, eventCycleStop;
 
     real *tmp_transfer_buffer = nullptr; // buffer in page-locked memory for transferring the data between device and host
+    real *host_side_indenter_force_accumulator = nullptr;
 
 private:
 

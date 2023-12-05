@@ -1,6 +1,7 @@
 #include "gpu_implementation3_sand.h"
 #include "parameters_sim.h"
 #include "point.h"
+#include "model.h"
 #include <stdio.h>
 #include <iostream>
 #include <vector>
@@ -14,8 +15,6 @@
 
 __device__ int gpu_error_indicator;
 __constant__ icy::SimParams gprms;
-
-
 
 
 void GPU_Implementation3::initialize()
@@ -62,7 +61,9 @@ void GPU_Implementation3::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
     // device memory for grid
     cudaFree(prms->grid_array);
     cudaFree(prms->pts_array);
+    cudaFree(prms->indenter_force_accumulator);
     cudaFreeHost(tmp_transfer_buffer);
+    cudaFreeHost(host_side_indenter_force_accumulator);
 
     err = cudaMallocPitch (&prms->grid_array, &prms->nGridPitch, sizeof(real)*nGridNodes, icy::SimParams::nGridArrays);
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
@@ -73,9 +74,14 @@ void GPU_Implementation3::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints
     if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
     prms->nPtsPitch /= sizeof(real);
 
+    err = cudaMalloc(&prms->indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+
     // pinned host memory
     err = cudaMallocHost(&tmp_transfer_buffer, sizeof(real)*prms->nPtsPitch*icy::SimParams::nPtsArrays);
-    if(err!=cudaSuccess) throw std::runtime_error("GPU_Implementation3::Prepare(int nPoints)");
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    err = cudaMallocHost(&host_side_indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
 
     double MemAllocGrid = (double)prms->nGridPitch*sizeof(real)*icy::SimParams::nGridArrays/(1024*1024);
     double MemAllocPoints = (double)prms->nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays/(1024*1024);
@@ -124,6 +130,11 @@ void GPU_Implementation3::cuda_transfer_from_device()
                           cudaMemcpyDeviceToHost, streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
 
+    err = cudaMemcpyAsync(host_side_indenter_force_accumulator, prms->indenter_force_accumulator,
+                          sizeof(real)*icy::SimParams::n_indenter_subdivisions*2,
+                          cudaMemcpyDeviceToHost, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+
     err = cudaMemcpyFromSymbolAsync(&error_code, gpu_error_indicator, sizeof(int), 0, cudaMemcpyDeviceToHost, streamCompute);
     if(err != cudaSuccess)
     {
@@ -139,6 +150,7 @@ void CUDART_CB GPU_Implementation3::callback_transfer_from_device_completion(cud
 {
     // simulation data was copied to host memory -> proceed with processing of this data
     GPU_Implementation3 *m = reinterpret_cast<GPU_Implementation3*>(userData);
+    m->model->FinalizeDataTransfer();
     if(m->transfer_completion_callback) m->transfer_completion_callback();
 }
 
@@ -171,6 +183,16 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         points[i].case_when_Jp_first_changes = tmp_transfer_buffer[i + n*icy::SimParams::idx_case_when_Jp_first_changes];
         points[i].visualize_q_limit = tmp_transfer_buffer[i + n*icy::SimParams::idx_q_limit];
     }
+
+    Vector2r indenter_force;
+    indenter_force.setZero();
+    for(int i=0; i<icy::SimParams::n_indenter_subdivisions; i++)
+    {
+        indenter_force[0] += host_side_indenter_force_accumulator[0+i*2];
+        indenter_force[1] += host_side_indenter_force_accumulator[1+i*2];
+    }
+    indenter_force /= icy::SimParams::n_indenter_subdivisions;
+    model->indenter_force_history.push_back(indenter_force);
 }
 
 
@@ -179,6 +201,14 @@ void GPU_Implementation3::cuda_reset_grid()
     cudaError_t err = cudaMemsetAsync(prms->grid_array, 0, prms->nGridPitch*icy::SimParams::nGridArrays*sizeof(real), streamCompute);
     if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
 }
+
+void GPU_Implementation3::cuda_reset_indenter_force_accumulator()
+{
+    cudaError_t err = cudaMemsetAsync(prms->indenter_force_accumulator, 0,
+                                      sizeof(real)*icy::SimParams::n_indenter_subdivisions*2, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
+}
+
 
 void GPU_Implementation3::cuda_p2g()
 {
@@ -225,9 +255,6 @@ void GPU_Implementation3::cuda_g2p()
         throw std::runtime_error("cuda_g2p");
     }
 }
-
-// ==============================  Functions that compute Kirchhoff stress via Strain Energy Density ========
-
 
 
 
@@ -344,7 +371,19 @@ __global__ void v2_kernel_update_nodes(real indenter_x, real indenter_y)
         if(vn < 0)
         {
             Vector2r vt = vrel - n*vn;   // tangential portion of relative velocity
+            Vector2r prev_velocity = velocity;
             velocity = vco + vt + ice_friction_coeff*vn*vt.normalized();
+
+            // force on the indenter
+            Vector2r force = (prev_velocity-velocity)*mass/dt;
+            double angle = atan2(n[0],n[1]);
+            angle += icy::SimParams::pi;
+            angle *= icy::SimParams::n_indenter_subdivisions/ (2*icy::SimParams::pi);
+            int index = (int)angle;
+            index = max(index, 0);
+            index = min(index, icy::SimParams::n_indenter_subdivisions-1);
+            atomicAdd(&gprms.indenter_force_accumulator[0+2*index], force[0]);
+            atomicAdd(&gprms.indenter_force_accumulator[1+2*index], force[1]);
         }
     }
 

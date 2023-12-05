@@ -56,6 +56,8 @@ public:
     real *grid_array;      // device-side grid data
     real *pts_array;
     size_t nPtsPitch, nGridPitch; // in number of elements(!), for coalesced access on the device
+    constexpr static int n_indenter_subdivisions = 360;
+    real *indenter_force_accumulator; // size is 2*n_indenter_subdivisions
     int tpb_P2G, tpb_Upd, tpb_G2P;  // threads per block for each operation
 
     int PointsWanted, nPts;
@@ -69,9 +71,8 @@ public:
 
     real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
     real NACC_beta, NACC_M, NACC_Msq;     // these are all computed
-    real NACC_max_strain;
 
-    real DP_cc, DP_tan_phi, DP_coeff1;
+    real DP_tan_phi;
 
     real cellsize, cellsize_inv, Dp_inv;
 

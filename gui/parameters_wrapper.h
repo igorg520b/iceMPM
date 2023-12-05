@@ -81,31 +81,18 @@ class ParamsWrapper : public QObject
     Q_PROPERTY(double nacc_pc READ getNaccPc NOTIFY propertyChanged)
     double getNaccPc() {return (1 - prms->NACC_beta)*prms->IceCompressiveStrength/2.;}
 
-    Q_PROPERTY(double nacc_ms READ getNaccMaxStrain WRITE setNaccMaxStrain NOTIFY propertyChanged)
-    double getNaccMaxStrain() {return prms->NACC_max_strain;}
-    void setNaccMaxStrain(double val) {prms->NACC_max_strain = val;}
-
     Q_PROPERTY(double nacc_M READ getNaccM NOTIFY propertyChanged)
     double getNaccM() {return sqrt(prms->NACC_M);}
 
 
 
     // Drucker-Prager
-    Q_PROPERTY(double DP_cc READ getDPcc WRITE setDPcc NOTIFY propertyChanged)
-    double getDPcc() {return prms->DP_cc;}
-    void setDPcc(double val) {prms->DP_cc = val;}
-
     Q_PROPERTY(double DP_phi READ getDPPhi WRITE setDPPhi NOTIFY propertyChanged)
     double getDPPhi() {return std::atan(prms->DP_tan_phi)*180/icy::SimParams::pi;}
     void setDPPhi(double val) {prms->DP_tan_phi = tan(val*icy::SimParams::pi/180);}
 
     Q_PROPERTY(double DP_tan_phi READ getDPTanPhi NOTIFY propertyChanged)
     double getDPTanPhi() {return prms->DP_tan_phi;}
-
-    Q_PROPERTY(double DP_coeff1 READ getDPCoeff1 WRITE setDPCoeff1 NOTIFY propertyChanged)
-    double getDPCoeff1() {return prms->DP_coeff1;}
-    void setDPCoeff1(double val) {prms->DP_coeff1 = val;}
-
 
 
     Q_PROPERTY(double ice_CompressiveStr READ getIce_CompressiveStr WRITE setIce_CompressiveStr NOTIFY propertyChanged)

@@ -21,6 +21,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
     const real &dt = gprms.InitialTimeStep;
+    const real &tan_phi = gprms.DP_tan_phi;
     constexpr real d = 2;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
@@ -49,7 +50,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     {
         constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
         real q_tr = coeff1*s_hat_tr.norm();
-        real q_n_1 = p_trial*gprms.DP_tan_phi;
+        real q_n_1 = p_trial*tan_phi;
         q_n_1 = min(gprms.IceShearStrength, q_n_1);
 
         if(q_tr < q_n_1)

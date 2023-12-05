@@ -6,6 +6,7 @@ void icy::SimParams::Reset()
 {
     grid_array = nullptr;
     pts_array = nullptr;
+    indenter_force_accumulator = nullptr;
 
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
@@ -33,14 +34,11 @@ void icy::SimParams::Reset()
     SimulationStep = 0;
     SimulationTime = 0;
 
-    NACC_max_strain = 0.01;
     IceCompressiveStrength = 100e6;
     IceTensileStrength = 1e6;
     IceShearStrength = 0.5e6;
 
-    DP_cc = 1e3;
     DP_tan_phi = std::tan(30*pi/180.);
-    DP_coeff1 = 1e4;
 
     tpb_P2G = 256;
     tpb_Upd = 512;
@@ -92,9 +90,7 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("IceCompressiveStrength")) IceCompressiveStrength = doc["IceCompressiveStrength"].GetDouble();
     if(doc.HasMember("IceTensileStrength")) IceTensileStrength = doc["IceTensileStrength"].GetDouble();
     if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
-    if(doc.HasMember("NACC_max_strain")) NACC_max_strain = doc["NACC_max_strain"].GetDouble();
 
-    if(doc.HasMember("DP_cc")) DP_cc = doc["DP_cc"].GetDouble();
     if(doc.HasMember("DP_phi")) DP_tan_phi = std::tan(doc["DP_phi"].GetDouble()*pi/180);
 
 

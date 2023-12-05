@@ -5,6 +5,7 @@
 #include <QStringList>
 #include <algorithm>
 #include <cmath>
+#include <fstream>
 #include "mainwindow.h"
 #include "./ui_mainwindow.h"
 
@@ -185,6 +186,9 @@ MainWindow::MainWindow(QWidget *parent)
     connect(ui->actionStart_Pause, &QAction::triggered, this, &MainWindow::simulation_start_pause);
     connect(ui->actionLoad_Parameters, &QAction::triggered, this, &MainWindow::load_parameter_triggered);
     connect(ui->actionReset, &QAction::triggered, this, &MainWindow::simulation_reset_triggered);
+
+    connect(ui->actionExport_Indenter_Forces, &QAction::triggered, this, &MainWindow::export_indenter_force_triggered);
+
 
     connect(qdsbValRange,QOverload<double>::of(&QDoubleSpinBox::valueChanged), this, &MainWindow::limits_changed);
 
@@ -419,7 +423,6 @@ void MainWindow::save_binary_data()
 
 void MainWindow::simulation_data_ready()
 {
-    model.FinalizeDataTransfer();
     updateGUI();
     if(worker->running && ui->actionTake_Screenshots->isChecked()) screenshot_triggered();
     if(worker->running && ui->actionSave_Binary_Data->isChecked()) save_binary_data();
@@ -476,3 +479,17 @@ void MainWindow::point_selection(double x, double y)
     snapshot.DumpPointData(idx);
 */
 }
+
+void MainWindow::export_indenter_force_triggered()
+{
+    std::ofstream ofs("indenter_force.csv", std::ofstream::out | std::ofstream::trunc);
+    ofs << "fx,fy,F_total\n";
+    for(int i=0;i<model.indenter_force_history.size();i++)
+    {
+        Vector2r v = model.indenter_force_history[i];
+        ofs << v[0] << ',' << v[1] << ',' << v.norm() << '\n';
+    }
+    ofs.close();
+    qDebug() << "export_indenter_force_triggered()";
+}
+

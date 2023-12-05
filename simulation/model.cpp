@@ -1,6 +1,12 @@
 #include "model.h"
 #include <spdlog/spdlog.h>
 
+icy::Model::Model()
+{
+    prms.Reset();
+    gpu.prms = &prms;
+    gpu.model = this;
+};
 
 
 bool icy::Model::Step()
@@ -10,6 +16,7 @@ bool icy::Model::Step()
     spdlog::info("step {} ({}) started; sim_time {:.3}", prms.SimulationStep, prms.SimulationStep/prms.UpdateEveryNthStep, simulation_time);
 
     int count_unupdated_steps = 0;
+    gpu.cuda_reset_indenter_force_accumulator();
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventCycleStart);
     do
     {
@@ -63,6 +70,7 @@ void icy::Model::Reset()
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
+    indenter_force_history.clear();
 
     const real &block_length = prms.BlockLength;
     const real &block_height = prms.BlockHeight;
@@ -103,14 +111,11 @@ void icy::Model::ResetToStep0()
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
+    indenter_force_history.clear();
 
     const real &h = prms.cellsize;
 
-    for(int k = 0; k<points.size(); k++)
-    {
-        Point &p = points[k];
-        p.Reset();
-    }
+    for(int k = 0; k<points.size(); k++) points[k].Reset();
     prms.indenter_y = prms.BlockHeight + 2*h + prms.IndDiameter/2 - prms.IndDepth;
     prms.indenter_x = prms.indenter_x_initial = 5*h - prms.IndDiameter/2 - h;
     gpu.transfer_ponts_to_device(points);
