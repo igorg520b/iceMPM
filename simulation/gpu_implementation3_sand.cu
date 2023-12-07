@@ -191,7 +191,7 @@ void GPU_Implementation3::transfer_ponts_to_host_finalize(std::vector<icy::Point
         indenter_force[0] += host_side_indenter_force_accumulator[0+i*2];
         indenter_force[1] += host_side_indenter_force_accumulator[1+i*2];
     }
-    indenter_force /= icy::SimParams::n_indenter_subdivisions;
+    indenter_force /= model->prms.UpdateEveryNthStep;
     model->indenter_force_history.push_back(indenter_force);
 }
 
