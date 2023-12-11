@@ -13,7 +13,7 @@ set(CMAKE_AUTORCC ON)
 set(CUDA_TOOLKIT_ROOT_DIR "/usr/local/cuda")
 include_directories(${CMAKE_CUDA_TOOLKIT_INCLUDE_DIRECTORIES})
 
-option(GUI_VERSION_BUILD "Build the Qt version" OFF)
+#option(GUI_VERSION_BUILD "Build the Qt version" OFF)
 
 
 find_package(Eigen3 REQUIRED NO_MODULE HINTS "C:\\libraries\\eigen-build")
@@ -80,7 +80,7 @@ endif()
 
 
 # Qt GUI executable
-if(GUI_VERSION_BUILD)
+
     find_package(VTK 9.1 HINTS "C:\\libraries\\vtk-build\\lib\\cmake\\vtk-9.1" REQUIRED COMPONENTS
       CommonColor
       CommonCore
@@ -198,5 +198,5 @@ vtk_module_autoinit(
   MODULES ${VTK_LIBRARIES}
 )
 
-endif()
+
 

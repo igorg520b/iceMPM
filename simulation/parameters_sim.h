@@ -16,6 +16,7 @@ typedef double real;
 //typedef float real;
 typedef Eigen::Vector2<real> Vector2r;
 typedef Eigen::Matrix2<real> Matrix2r;
+typedef Eigen::Array2<real> Array2r;
 
 
 // variables related to the formulation of the model

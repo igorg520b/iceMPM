@@ -302,18 +302,16 @@ __global__ void v2_kernel_p2g()
     Vector2r base_coord(i0,j0);
     Vector2r fx = pos*h_inv - base_coord;
 
-    real v0[2] {1.5-fx[0], 1.5-fx[1]};
-    real v1[2] {fx[0]-1.,  fx[1]-1.};
-    real v2[2] {fx[0]-.5,  fx[1]-.5};
-
-    real w[3][2] = {{.5*v0[0]*v0[0],  .5*v0[1]*v0[1]},
-                    {.75-v1[0]*v1[0], .75-v1[1]*v1[1]},
-                    {.5*v2[0]*v2[0],  .5*v2[1]*v2[1]}};
+    // optimized method of computing the quadratic (!) weight function (no conditional operators)
+    Array2r arr_v0 = 1.5-fx.array();
+    Array2r arr_v1 = fx.array() - 1.0;
+    Array2r arr_v2 = fx.array() - 0.5;
+    Array2r ww[3] = {0.5*arr_v0*arr_v0, 0.75-arr_v1*arr_v1, 0.5*arr_v2*arr_v2};
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
         {
-            real Wip = w[i][0]*w[j][1];
+            real Wip = ww[i][0]*ww[j][1];
             Vector2r dpos((i-fx[0])*h, (j-fx[1])*h);
             Vector2r incV = Wip*(velocity*particle_mass + subterm2*dpos);
             real incM = Wip*particle_mass;
@@ -443,19 +441,17 @@ __global__ void v2_kernel_g2p()
     Vector2r base_coord(i0,j0);
     Vector2r fx = p.pos*h_inv - base_coord;
 
-    real v0[2] {1.5-fx[0], 1.5-fx[1]};
-    real v1[2] {fx[0]-1.,  fx[1]-1.};
-    real v2[2] {fx[0]-.5,  fx[1]-.5};
-
-    real w[3][2] = {{.5*v0[0]*v0[0],  .5*v0[1]*v0[1]},
-                    {.75-v1[0]*v1[0], .75-v1[1]*v1[1]},
-                    {.5*v2[0]*v2[0],  .5*v2[1]*v2[1]}};
+    // optimized method of computing the quadratic (!) weight function (no conditional operators)
+    Array2r arr_v0 = 1.5-fx.array();
+    Array2r arr_v1 = fx.array() - 1.0;
+    Array2r arr_v2 = fx.array() - 0.5;
+    Array2r ww[3] = {0.5*arr_v0*arr_v0, 0.75-arr_v1*arr_v1, 0.5*arr_v2*arr_v2};
 
     for (int i = 0; i < 3; i++)
         for (int j = 0; j < 3; j++)
         {
             Vector2r dpos = Vector2r(i, j) - fx;
-            real weight = w[i][0]*w[j][1];
+            real weight = ww[i][0]*ww[j][1];
 
             int idx_gridnode = i+i0 + (j+j0)*gridX;
             Vector2r node_velocity;
