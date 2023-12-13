@@ -1,4 +1,6 @@
-cmake_minimum_required(VERSION 3.20)
+cmake_minimum_required(VERSION 3.27)
+
+#set(CMAKE_CUDA_ARCHITECTURES "89")
 
 project(RHITA_MPM LANGUAGES CXX C CUDA)
 set(CMAKE_CXX_STANDARD 17)
