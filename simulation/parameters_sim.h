@@ -73,7 +73,7 @@ public:
     real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
     real NACC_beta, NACC_M, NACC_Msq;     // these are all computed
 
-    real DP_tan_phi;
+    real DP_tan_phi, DP_threshold_p;
 
     real cellsize, cellsize_inv, Dp_inv;
 

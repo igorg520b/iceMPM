@@ -22,6 +22,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     const real &kappa = gprms.kappa;
     const real &dt = gprms.InitialTimeStep;
     const real &tan_phi = gprms.DP_tan_phi;
+    const real &DP_threshold_p = gprms.DP_threshold_p;
     constexpr real d = 2;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
@@ -33,13 +34,13 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
 
-    if(p_trial < 0 || p.Jp_inv < 1)
+    if(p_trial < -DP_threshold_p || p.Jp_inv < 1)
     {
         if(p_trial < 1)  p.q = 1;
         else if(p.Jp_inv < 1) p.q = 2;
 
         // tear in tension or compress until original state
-        real p_new = 0;
+        real p_new = -DP_threshold_p;
         real Je_new = sqrt(-2.*p_new/kappa + 1.);
         Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
         p.Fe = U*Sigma_new*V.transpose();
@@ -50,7 +51,7 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     {
         constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
         real q_tr = coeff1*s_hat_tr.norm();
-        real q_n_1 = p_trial*tan_phi;
+        real q_n_1 = (p_trial+DP_threshold_p)*tan_phi;
         q_n_1 = min(gprms.IceShearStrength, q_n_1);
 
         if(q_tr < q_n_1)

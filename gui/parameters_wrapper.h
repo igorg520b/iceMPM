@@ -88,6 +88,10 @@ class ParamsWrapper : public QObject
 
 
     // Drucker-Prager
+    Q_PROPERTY(double DP_threshold_p READ getDP_threshold_p WRITE setDP_threshold_p NOTIFY propertyChanged)
+    double getDP_threshold_p() {return prms->DP_threshold_p;}
+    void setDP_threshold_p(double val) {prms->DP_threshold_p = val;}
+
     Q_PROPERTY(double DP_phi READ getDPPhi WRITE setDPPhi NOTIFY propertyChanged)
     double getDPPhi() {return std::atan(prms->DP_tan_phi)*180/icy::SimParams::pi;}
     void setDPPhi(double val) {prms->DP_tan_phi = tan(val*icy::SimParams::pi/180);}
