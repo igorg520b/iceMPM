@@ -39,18 +39,13 @@
      <string>Tools</string>
     </property>
     <addaction name="action_camera_reset"/>
-    <addaction name="actionCreate_Video"/>
-    <addaction name="actionScreenshot"/>
     <addaction name="actionTake_Screenshots"/>
-    <addaction name="actionSave_Binary_Data"/>
-    <addaction name="actionExport_Indenter_Forces"/>
    </widget>
    <widget class="QMenu" name="menuSimulation">
     <property name="title">
      <string>Simulation</string>
     </property>
     <addaction name="actionStart_Pause"/>
-    <addaction name="actionReset"/>
    </widget>
    <addaction name="menuFile"/>
    <addaction name="menuTools_2"/>
@@ -115,22 +110,6 @@
     <string>Ctrl+O</string>
    </property>
   </action>
-  <action name="actionCreate_Video">
-   <property name="text">
-    <string>Create Video</string>
-   </property>
-   <property name="shortcut">
-    <string>F3</string>
-   </property>
-  </action>
-  <action name="actionScreenshot">
-   <property name="text">
-    <string>Screenshot</string>
-   </property>
-   <property name="shortcut">
-    <string>F11</string>
-   </property>
-  </action>
   <action name="actionStart_Pause">
    <property name="checkable">
     <bool>true</bool>
@@ -147,14 +126,6 @@
     <string>F5</string>
    </property>
   </action>
-  <action name="actionReset">
-   <property name="text">
-    <string>Reset</string>
-   </property>
-   <property name="shortcut">
-    <string>Ctrl+R</string>
-   </property>
-  </action>
   <action name="actionTake_Screenshots">
    <property name="checkable">
     <bool>true</bool>
@@ -169,19 +140,6 @@
    </property>
    <property name="shortcut">
     <string>Ctrl+L</string>
-   </property>
-  </action>
-  <action name="actionSave_Binary_Data">
-   <property name="checkable">
-    <bool>true</bool>
-   </property>
-   <property name="text">
-    <string>Save Binary Data</string>
-   </property>
-  </action>
-  <action name="actionExport_Indenter_Forces">
-   <property name="text">
-    <string>Export Indenter Forces</string>
    </property>
   </action>
  </widget>

@@ -10,7 +10,6 @@ void icy::SimParams::Reset()
 
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
-    PointsWanted = 50'000;
     GridX = 128;
     GridY = 55;
     ParticleViewSize = 2.5f;
@@ -21,15 +20,10 @@ void icy::SimParams::Reset()
     PoissonsRatio = 0.3;
     Gravity = 9.81;
     Density = 980;
-    IceFrictionCoefficient = 0.03;
 
     IndDiameter = 0.324;
     IndVelocity = 0.2;
     IndDepth = 0.25;//0.101;
-
-    BlockHeight = 1.0;
-    BlockLength = 2.5;
-    HoldBlockOnTheRight = 0;
 
     SimulationStep = 0;
     SimulationTime = 0;
@@ -45,7 +39,8 @@ void icy::SimParams::Reset()
     tpb_Upd = 512;
     tpb_G2P = 128;
 
-    indenter_x = indenter_x_initial = indenter_y = 0;
+    indenter_x = indenter_x_initial = indenter_y = indenter_y_initial = 0;
+    SetupType = 0;
 
     ComputeLame();
     ComputeCamClayParams2();
@@ -67,33 +62,26 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     doc.Parse(strConfigFile.data());
     if(!doc.IsObject()) throw std::runtime_error("configuration file is not JSON");
 
-    std::string outputDirectory = "output";
-    if(doc.HasMember("OutputDirectory")) outputDirectory = doc["OutputDirectory"].GetString();
     if(doc.HasMember("InitialTimeStep")) InitialTimeStep = doc["InitialTimeStep"].GetDouble();
     if(doc.HasMember("YoungsModulus")) YoungsModulus = doc["YoungsModulus"].GetDouble();
-    if(doc.HasMember("PointsWanted")) PointsWanted = doc["PointsWanted"].GetDouble();
     if(doc.HasMember("GridX")) GridX = doc["GridX"].GetInt();
     if(doc.HasMember("GridY")) GridY = doc["GridY"].GetInt();
     if(doc.HasMember("GridXDimension")) GridXDimension = doc["GridXDimension"].GetDouble();
-    if(doc.HasMember("HoldBlockOnTheRight")) HoldBlockOnTheRight = doc["HoldBlockOnTheRight"].GetInt();
     if(doc.HasMember("ParticleViewSize")) ParticleViewSize = doc["ParticleViewSize"].GetDouble();
     if(doc.HasMember("SimulationEndTime")) SimulationEndTime = doc["SimulationEndTime"].GetDouble();
     if(doc.HasMember("PoissonsRatio")) PoissonsRatio = doc["PoissonsRatio"].GetDouble();
     if(doc.HasMember("Gravity")) Gravity = doc["Gravity"].GetDouble();
     if(doc.HasMember("Density")) Density = doc["Density"].GetDouble();
-    if(doc.HasMember("IceFrictionCoefficient")) IceFrictionCoefficient = doc["IceFrictionCoefficient"].GetDouble();
     if(doc.HasMember("IndDiameter")) IndDiameter = doc["IndDiameter"].GetDouble();
     if(doc.HasMember("IndVelocity")) IndVelocity = doc["IndVelocity"].GetDouble();
     if(doc.HasMember("IndDepth")) IndDepth = doc["IndDepth"].GetDouble();
-    if(doc.HasMember("BlockHeight")) BlockHeight = doc["BlockHeight"].GetDouble();
-    if(doc.HasMember("BlockLength")) BlockLength = doc["BlockLength"].GetDouble();
 
     if(doc.HasMember("IceCompressiveStrength")) IceCompressiveStrength = doc["IceCompressiveStrength"].GetDouble();
     if(doc.HasMember("IceTensileStrength")) IceTensileStrength = doc["IceTensileStrength"].GetDouble();
     if(doc.HasMember("IceShearStrength")) IceShearStrength = doc["IceShearStrength"].GetDouble();
 
     if(doc.HasMember("DP_phi")) DP_tan_phi = std::tan(doc["DP_phi"].GetDouble()*pi/180);
-
+    if(doc.HasMember("DP_threshold_p")) DP_threshold_p = doc["DP_threshold_p"].GetDouble();
 
     ComputeCamClayParams2();
     ComputeLame();
@@ -102,7 +90,7 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     std::cout << "loaded parameters file " << fileName << '\n';
     std::cout << "GridXDimension " << GridXDimension << '\n';
     std::cout << "cellsize " << cellsize << '\n';
-    return outputDirectory;
+    return doc["InputRawPoints"].GetString();
 }
 
 void icy::SimParams::ComputeLame()
@@ -115,11 +103,11 @@ void icy::SimParams::ComputeLame()
 void icy::SimParams::ComputeHelperVariables()
 {
     UpdateEveryNthStep = (int)(1.f/(200*InitialTimeStep));
-//    UpdateEveryNthStep = (int)(1.f/(400*InitialTimeStep));
     cellsize = GridXDimension/GridX;
     cellsize_inv = 1./cellsize;
     Dp_inv = 4./(cellsize*cellsize);
     IndRSq = IndDiameter*IndDiameter/4.;
+    GridTotal = GridX*GridY;
 }
 
 void icy::SimParams::ComputeCamClayParams2()
@@ -131,4 +119,12 @@ void icy::SimParams::ComputeCamClayParams2()
     const real &p0 = IceCompressiveStrength;
     NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
     NACC_Msq = NACC_M*NACC_M;
+}
+
+void icy::SimParams::ComputeIntegerBlockCoords()
+{
+    nxmin = floor(xmin/cellsize);
+    nxmax = ceil(xmax/cellsize);
+    nymin = floor(ymin/cellsize);
+    nymax = ceil(ymax/cellsize);
 }

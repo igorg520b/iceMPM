@@ -49,6 +49,10 @@
 #include <fstream>
 #include <iomanip>
 #include <iostream>
+#include <string>
+#include <filesystem>
+
+#include <spdlog/spdlog.h>
 
 QT_BEGIN_NAMESPACE
 namespace Ui { class MainWindow; }
@@ -64,7 +68,6 @@ public:
     MainWindow(QWidget *parent = nullptr);
     ~MainWindow();
     void closeEvent( QCloseEvent* event ) override;
-    //void showEvent( QShowEvent* event ) override;
     icy::Model model;
 
 private Q_SLOTS:
@@ -77,20 +80,17 @@ private Q_SLOTS:
     void cameraReset_triggered();
     void open_snapshot_triggered();
     void load_parameter_triggered();
-    void simulation_reset_triggered();
 
-    void sliderValueChanged(int val);
     void comboboxIndexChanged_visualizations(int index);
-    void point_selection(double x, double y);
-    void createVideo_triggered();
-    void screenshot_triggered();
     void limits_changed(double val);
-    void export_indenter_force_triggered();
 
 private:
     void updateGUI();   // when simulation is started/stopped or when a step is advanced
     void updateActorText();
     void save_binary_data();
+    std::string LoadParameterFile(std::string fileName);    // return file name of the point cloud
+    void OpenSnapshot(QString fileName);
+
     BackgroundWorker *worker;
     icy::VisualRepresentation representation;
     icy::SnapshotManager snapshot;
@@ -101,7 +101,7 @@ private:
     QLabel *labelElapsedTime;
     QLabel *labelStepCount;
     QComboBox *comboBox_visualizations;
-    QSlider *slider1;
+    // QSlider *slider1;
     QDoubleSpinBox *qdsbValRange;   // high and low limits for value scale
 
     ObjectPropertyBrowser *pbrowser;    // to show simulation settings/properties
@@ -111,18 +111,10 @@ private:
     vtkNew<vtkGenericOpenGLRenderWindow> renderWindow;
     QVTKOpenGLNativeWidget *qt_vtk_widget;
     vtkNew<vtkRenderer> renderer;
-//    vtkNew<vtkInteractorStyleRubberBand2D> rubberBand;
-    vtkNew<PointSelector2D> pointSelector;
 
     // other
-    int OpenFile(QString fileName);
     QString qLastParameterFile;
-    std::string outputDirectory = "tmp_output";
-    const std::string screenshot_directory = "screenshots";
-    bool replayMode = false;
-    int replayFrame;
-
-    vtkNew<vtkWindowToImageFilter> windowToImageFilter;
-    vtkNew<vtkPNGWriter> writerPNG;
+    const std::string outputDirectory = "default_output";
+    vtkNew<vtkInteractorStyleRubberBand2D> interactor;
 };
 #endif // MAINWINDOW_H

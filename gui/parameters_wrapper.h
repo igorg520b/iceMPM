@@ -49,10 +49,6 @@ class ParamsWrapper : public QObject
     double getKappa() {return prms->kappa;}
 
 
-    Q_PROPERTY(double p_FrictionCoeff READ getIceFrictionCoefficient WRITE setIceFrictionCoefficient NOTIFY propertyChanged)
-    double getIceFrictionCoefficient() {return prms->IceFrictionCoefficient;}
-    void setIceFrictionCoefficient(double val) {prms->IceFrictionCoefficient = val;}
-
     Q_PROPERTY(double p_ParticleViewSize READ getParticleViewSize WRITE setParticleViewSize NOTIFY propertyChanged)
     double getParticleViewSize() {return prms->ParticleViewSize;}
     void setParticleViewSize(double val) {prms->ParticleViewSize=val;}

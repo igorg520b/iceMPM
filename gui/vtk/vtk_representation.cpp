@@ -117,7 +117,12 @@ icy::VisualRepresentation::VisualRepresentation()
 
 void icy::VisualRepresentation::SynchronizeTopology()
 {
-    points->SetNumberOfPoints(model->points.size());
+    points->SetNumberOfPoints(model->prms.nPts);
+    SynchronizeValues();
+
+    indenterSource->SetRadius(model->prms.IndDiameter/2.f);
+
+    /*
     visualized_values->SetNumberOfValues(model->points.size());
     points_polydata->GetPointData()->SetActiveScalars("visualized_values");
     points_mapper->ScalarVisibilityOn();
@@ -141,12 +146,92 @@ void icy::VisualRepresentation::SynchronizeTopology()
             grid_points->SetPoint((vtkIdType)(idx_x+idx_y*gx), pt_pos);
         }
     structuredGrid->SetPoints(grid_points);
-    indenterSource->SetRadius(model->prms.IndDiameter/2.f);
+*/
 }
 
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
+    for(int i=0;i<model->prms.nPts;i++)
+    {
+        Vector2r pos = icy::Point::getPos(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
+        points->SetPoint((vtkIdType)i, pos[0], pos[1], pos[2]);
+    }
+    points->Modified();
+
+    double centerVal = 0;
+    double range = std::pow(10,ranges[VisualizingVariable]);
+
+    actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
+    points_filter->Update();
+
+    if(VisualizingVariable == VisOpt::none)
+    {
+        points_mapper->ScalarVisibilityOff();
+        points_polydata->GetPointData()->RemoveArray(0);
+        scalarBar->VisibilityOff();
+    }
+    /*
+    else if(VisualizingVariable == VisOpt::NACC_case)
+    {
+        scalarBar->VisibilityOn();
+        points_polydata->GetPointData()->AddArray(visualized_values);
+        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
+        points_mapper->ScalarVisibilityOn();
+        points_mapper->SetColorModeToMapScalars();
+        points_mapper->UseLookupTableScalarRangeOn();
+        points_mapper->SetLookupTable(hueLut_four);
+        scalarBar->SetLookupTable(hueLut_four);
+        hueLut->SetTableRange(centerVal-range, centerVal+range);
+
+        visualized_values->SetNumberOfValues(model->prms.nPts);
+        for(int i=0;i<model->prms.nPts;i++)
+            visualized_values->SetValue((vtkIdType)i,
+                                        icy::Point3D::getQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
+        visualized_values->Modified();
+    }
+    else if(VisualizingVariable == VisOpt::Jp)
+    {
+        scalarBar->VisibilityOn();
+        points_polydata->GetPointData()->AddArray(visualized_values);
+        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
+        points_mapper->ScalarVisibilityOn();
+        points_mapper->SetColorModeToMapScalars();
+        points_mapper->UseLookupTableScalarRangeOn();
+        points_mapper->SetLookupTable(lutMPM);
+        scalarBar->SetLookupTable(lutMPM);
+        lutMPM->SetTableRange(centerVal-range, centerVal+range);
+
+        visualized_values->SetNumberOfValues(model->prms.nPts);
+        for(int i=0;i<model->prms.nPts;i++)
+            visualized_values->SetValue((vtkIdType)i,
+                                        icy::Point3D::getJp_inv(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)-1);
+        visualized_values->Modified();
+    }
+    else if(VisualizingVariable == VisOpt::grains)
+    {
+        scalarBar->VisibilityOn();
+        points_polydata->GetPointData()->AddArray(visualized_values);
+        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
+        points_mapper->ScalarVisibilityOn();
+        points_mapper->SetColorModeToMapScalars();
+        points_mapper->UseLookupTableScalarRangeOn();
+        points_mapper->SetLookupTable(hueLut_pastel);
+        scalarBar->SetLookupTable(hueLut_pastel);
+        lutMPM->SetTableRange(0,39);
+
+        visualized_values->SetNumberOfValues(model->prms.nPts);
+        for(int i=0;i<model->prms.nPts;i++)
+            visualized_values->SetValue((vtkIdType)i,
+                                        icy::Point3D::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40);
+        visualized_values->Modified();
+    }
+*/
+    double indenter_x = model->prms.indenter_x;
+    double indenter_y = model->prms.indenter_y;
+    indenterSource->SetCenter(indenter_x, indenter_y, 1);
+
+    /*
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
 
     model->hostside_data_update_mutex.lock();
@@ -219,8 +304,6 @@ void icy::VisualRepresentation::SynchronizeValues()
         scalarBar->SetLookupTable(hueLut);
     }
 
-    model->hostside_data_update_mutex.unlock();
-
 
 //    float minmax[2];
 //    visualized_values->GetValueRange(minmax);
@@ -231,6 +314,8 @@ void icy::VisualRepresentation::SynchronizeValues()
     visualized_values->Modified();
     points_filter->Update();
     indenterSource->SetCenter(model->prms.indenter_x, model->prms.indenter_y, 1);
+
+*/
 }
 
 
@@ -238,21 +323,5 @@ void icy::VisualRepresentation::ChangeVisualizationOption(int option)
 {
     VisualizingVariable = (VisOpt)option;
     SynchronizeTopology();
-}
-
-int icy::VisualRepresentation::FindPoint(double x, double y)
-{
-    Vector2r v(x,y);
-    auto result = std::min_element(model->points.begin(), model->points.end(),
-                                   [v](icy::Point &p1, icy::Point &p2)
-    {return (p1.pos-v).norm() < (p2.pos-v).norm();});
-    int idx = std::distance(model->points.begin(),result);
-    std::cout << "FindPoint " << idx << std::endl;
-    Vector2r pos = result->pos;
-    real x1 = pos[0];
-    real y1 = pos[1];
-    std::cout << "pt " << x1 << "; " << y1 << std::endl;
-    return idx;
-
 }
 

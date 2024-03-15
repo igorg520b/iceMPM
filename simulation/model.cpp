@@ -4,7 +4,6 @@
 icy::Model::Model()
 {
     prms.Reset();
-    gpu.prms = &prms;
     gpu.model = this;
 };
 
@@ -48,13 +47,6 @@ bool icy::Model::Step()
 }
 
 
-void icy::Model::FinalizeDataTransfer()
-{
-    hostside_data_update_mutex.lock();
-    gpu.transfer_ponts_to_host_finalize(points);
-    hostside_data_update_mutex.unlock();
-}
-
 void icy::Model::UnlockCycleMutex()
 {
     // current data was handled by host - allow next cycle to proceed
@@ -64,64 +56,11 @@ void icy::Model::UnlockCycleMutex()
 
 void icy::Model::Reset()
 {
-    // this should be called after prms are set as desired (either via GUI or CLI)
     spdlog::info("icy::Model::Reset()");
 
     prms.SimulationStep = 0;
     prms.SimulationTime = 0;
     compute_time_per_cycle = 0;
-    indenter_force_history.clear();
-
-    const real &block_length = prms.BlockLength;
-    const real &block_height = prms.BlockHeight;
-    const real &h = prms.cellsize;
-
-    const real kRadius = sqrt(block_length*block_height/(prms.PointsWanted*(0.5*SimParams::pi)*100./97.));
-    const std::array<real, 2>kXMin{45.0*h, 2.0*h};
-    const std::array<real, 2>kXMax{5.0*h+block_length, 2.0*h+block_height};
-    spdlog::info("starting thinks::PoissonDiskSampling");
-    std::vector<std::array<real, 2>> prresult = thinks::PoissonDiskSampling(kRadius, kXMin, kXMax);
-    spdlog::info("finished thinks::PoissonDiskSampling; {} ", prms.nPts);
-    prms.nPts = prresult.size();
-    points.resize(prms.nPts);
-
-    prms.ParticleVolume = block_length*block_height/prms.nPts;
-    prms.ParticleMass = prms.ParticleVolume*prms.Density;
-    for(int k = 0; k<prms.nPts; k++)
-    {
-        Point &p = points[k];
-        p.Reset();
-        p.pos[0] = prresult[k][0];
-        p.pos[1] = prresult[k][1];
-        p.pos_initial = p.pos;
-    }
-    prms.indenter_y = block_height + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    prms.indenter_x = prms.indenter_x_initial = 44*h - prms.IndDiameter/2;
-
-    gpu.cuda_allocate_arrays(prms.GridX*prms.GridY, prms.nPts);
-    gpu.transfer_ponts_to_device(points);
-    Prepare();
-    spdlog::info("icy::Model::Reset() done");
-}
-
-void icy::Model::ResetToStep0()
-{
-    spdlog::info("ResetToStep0()");
-
-    prms.SimulationStep = 0;
-    prms.SimulationTime = 0;
-    compute_time_per_cycle = 0;
-    indenter_force_history.clear();
-
-    const real &h = prms.cellsize;
-
-    for(int k = 0; k<points.size(); k++) points[k].Reset();
-    prms.indenter_y = prms.BlockHeight + 2*h + prms.IndDiameter/2 - prms.IndDepth;
-    prms.indenter_x = prms.indenter_x_initial = 44*h - prms.IndDiameter/2 - h;
-    gpu.transfer_ponts_to_device(points);
-    gpu.cuda_update_constants();
-    Prepare();
-    spdlog::info("ResetToStep0() done");
 }
 
 

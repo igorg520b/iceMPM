@@ -11,6 +11,7 @@
 
 void icy::SnapshotManager::SaveSnapshot(std::string fileName)
 {
+    /*
     spdlog::info("writing snapshot {}",fileName);
 
     H5::H5File file(fileName, H5F_ACC_TRUNC);
@@ -36,10 +37,12 @@ void icy::SnapshotManager::SaveSnapshot(std::string fileName)
 
     file.close();
     spdlog::info("SaveSnapshot done {}", fileName);
+*/
 }
 
-int icy::SnapshotManager::ReadSnapshot(std::string fileName)
+void icy::SnapshotManager::ReadSnapshot(std::string fileName)
 {
+    /*
     if(!std::filesystem::exists(fileName)) return -1;
 
     std::string numbers = fileName.substr(fileName.length()-8,5);
@@ -73,110 +76,92 @@ int icy::SnapshotManager::ReadSnapshot(std::string fileName)
 
     model->gpu.transfer_ponts_to_host_finalize(model->points);
     file.close();
-    return idx;
+    return idx;*/
 }
 
-void icy::SnapshotManager::ReadDirectory(std::string directoryPath)
+void icy::SnapshotManager::LoadRawPoints(std::string fileName)
 {
-    path = directoryPath;
-    // set last_file_index
-    for (const auto & entry : std::filesystem::directory_iterator(directoryPath))
+    spdlog::info("ReadRawPoints {}",fileName);
+    if(!std::filesystem::exists(fileName)) throw std::runtime_error("error reading raw points file - no file");;
+
+    spdlog::info("reading raw points file {}",fileName);
+    H5::H5File file(fileName, H5F_ACC_RDONLY);
+
+    H5::DataSet dataset = file.openDataSet("Points_Raw_2D");
+    hsize_t dims[2] = {};
+    dataset.getSpace().getSimpleExtentDims(dims, NULL);
+    int nPoints = dims[0];
+    if(dims[1]!=icy::SimParams::dim) throw std::runtime_error("error reading raw points file - dimensions mismatch");
+    spdlog::info("dims[0] {}, dims[1] {}", dims[0], dims[1]);
+    model->prms.nPts = nPoints;
+
+    std::vector<std::array<float, 2>> buffer;
+    buffer.resize(nPoints);
+    dataset.read(buffer.data(), H5::PredType::NATIVE_FLOAT);
+
+    std::vector<short> grainIDs(nPoints);
+    H5::DataSet dataset_grains = file.openDataSet("GrainIDs");
+    dataset_grains.read(grainIDs.data(), H5::PredType::NATIVE_INT16);
+
+    H5::Attribute att_volume = dataset_grains.openAttribute("volume");
+    float volume;
+    att_volume.read(H5::PredType::NATIVE_FLOAT, &volume);
+    model->prms.Volume = (double)volume;
+    file.close();
+
+    auto result = std::minmax_element(buffer.begin(),buffer.end(), [](std::array<float, 2> &p1, std::array<float, 2> &p2){
+        return p1[0]<p2[0];});
+    model->prms.xmin = (*result.first)[0];
+    model->prms.xmax = (*result.second)[0];
+    const float length = model->prms.xmax - model->prms.xmin;
+
+    result = std::minmax_element(buffer.begin(),buffer.end(), [](std::array<float, 2> &p1, std::array<float, 2> &p2){
+        return p1[1]<p2[1];});
+    model->prms.ymin = (*result.first)[1];
+    model->prms.ymax = (*result.second)[1];
+
+    model->prms.ComputeIntegerBlockCoords();
+
+    const real &h = model->prms.cellsize;
+    const real box_x = model->prms.GridX*h;
+
+    const real x_offset = (box_x - length)/2;
+    const real y_offset = 2*h;
+
+    const real block_left = x_offset;
+    const real block_top = model->prms.ymax + y_offset;
+
+    const real r = model->prms.IndDiameter/2;
+    const real ht = r - model->prms.IndDepth;
+    const real x_ind_offset = sqrt(r*r - ht*ht);
+
+    // set initial indenter position
+    model->prms.indenter_x = floor((block_left-x_ind_offset)/h)*h;
+    if(model->prms.SetupType == 0)
+        model->prms.indenter_y = block_top + ht;
+    else if(model->prms.SetupType == 1)
+        model->prms.indenter_y = ceil(block_top/h)*h;
+
+    model->prms.indenter_x_initial = model->prms.indenter_x;
+    model->prms.indenter_y_initial = model->prms.indenter_y;
+
+    model->prms.ParticleVolume = model->prms.Volume/nPoints;
+    model->prms.ParticleMass = model->prms.ParticleVolume * model->prms.Density;
+
+    model->gpu.cuda_allocate_arrays(model->prms.GridTotal, nPoints);
+    for(int k=0; k<nPoints; k++)
     {
-        std::string fileName = entry.path();
-        std::string extension = fileName.substr(fileName.length()-3,3);
-        if(extension != ".h5") continue;
-        std::string numbers = fileName.substr(fileName.length()-8,5);
-        int idx = std::stoi(numbers);
-        if(idx > last_file_index) last_file_index = idx;
-
-//        std::cout << fileName << ", " << extension << ", " << numbers << std::endl;
+        Point p;
+        p.Reset();
+        buffer[k][0] += x_offset;
+        buffer[k][1] += y_offset;
+        for(int i=0;i<icy::SimParams::dim;i++) p.pos[i] = buffer[k][i];
+        p.grain = grainIDs[k];
+        p.TransferToBuffer(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, k);
     }
-    spdlog::info("directory scanned; last_file_index is {}", last_file_index);
+    spdlog::info("raw points loaded");
 
-}
-
-void icy::SnapshotManager::DumpPointData(int pt_idx)
-{
-    std::vector<double> p0, p, q, q_limit, Jp, c;
-
-    for(int i=1; i<=last_file_index; i++)
-    {
-        std::stringstream ss;
-        ss << std::setw(5) << std::setfill('0') << i;
-        std::string s = ss.str();
-        std::string fileName = this->path + "/" + s + ".h5";
-        std::cout << "reading " << fileName << std::endl;
-
-
-        if(!std::filesystem::exists(fileName)) throw std::runtime_error("saved file not found");
-        H5::H5File file(fileName, H5F_ACC_RDONLY);
-        H5::DataSet dataset_points = file.openDataSet("Points");
-
-        //DATASPACE
-        H5::DataSpace space1 = dataset_points.getSpace();
-        double tmp[6];
-        hsize_t dimsm[1] {6};
-        H5::DataSpace memspace(1, dimsm);
-
-        hsize_t count[1] {1};
-        hsize_t offset[1] {icy::SimParams::idx_p0 * model->prms.nPtsPitch + pt_idx};
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-
-        hsize_t moffset[1] {0};
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-
-
-        offset[0] = icy::SimParams::idx_p * model->prms.nPtsPitch + pt_idx;
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-        moffset[0] = 1;
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-        offset[0] = icy::SimParams::idx_q * model->prms.nPtsPitch + pt_idx;
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-        moffset[0] = 2;
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-        offset[0] = icy::SimParams::idx_Jp * model->prms.nPtsPitch + pt_idx;
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-        moffset[0] = 3;
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-        offset[0] = icy::SimParams::idx_case * model->prms.nPtsPitch + pt_idx;
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-        moffset[0] = 4;
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-        offset[0] = icy::SimParams::idx_q_limit * model->prms.nPtsPitch + pt_idx;
-        space1.selectHyperslab(H5S_SELECT_SET, count, offset);
-        moffset[0] = 5;
-        memspace.selectHyperslab(H5S_SELECT_SET, count, moffset);
-        dataset_points.read(&tmp, H5::PredType::NATIVE_DOUBLE, memspace, space1);
-
-
-        p0.push_back(tmp[0]);
-        p.push_back(tmp[1]);
-        q.push_back(tmp[2]);
-        Jp.push_back(tmp[3]);
-        c.push_back(tmp[4]);
-        q_limit.push_back((tmp[5]));
-    }
-
-    std::string outputFile = std::to_string(pt_idx) + ".csv";
-    std::ofstream ofs(outputFile, std::ofstream::out);
-    ofs << "p0, pc, p, q, q_limit, Jp, c\n";
-    for(int i=0;i<last_file_index;i++)
-    {
-        double pc = p0[i]*(1-model->prms.NACC_beta)*0.5;
-        ofs << p0[i] << ',' << pc << ',' << p[i] << ',' << q[i] << ',' << q_limit[i] << ',' << Jp[i] << ',' << c[i];
-        ofs << '\n';
-    }
-    ofs.close();
-
-
+    model->gpu.transfer_ponts_to_device();
+    model->Reset();
+    model->Prepare();
 }
