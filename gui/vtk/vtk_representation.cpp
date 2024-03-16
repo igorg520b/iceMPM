@@ -4,6 +4,7 @@
 //#include <omp.h>
 #include <algorithm>
 #include <iostream>
+#include <spdlog/spdlog.h>
 
 icy::VisualRepresentation::VisualRepresentation()
 {
@@ -57,8 +58,10 @@ icy::VisualRepresentation::VisualRepresentation()
     actor_indenter->GetProperty()->SetLineWidth(3);
 
 
+    // points
     points_polydata->SetPoints(points);
     points_polydata->GetPointData()->AddArray(visualized_values);
+    visualized_values->SetName("visualized_values");
 
     points_filter->SetInputData(points_polydata);
     points_filter->Update();
@@ -66,8 +69,6 @@ icy::VisualRepresentation::VisualRepresentation()
     points_mapper->SetInputData(points_filter->GetOutput());
     points_mapper->UseLookupTableScalarRangeOn();
     points_mapper->SetLookupTable(lutMPM);
-
-    visualized_values->SetName("visualized_values");
 
     actor_points->SetMapper(points_mapper);
     actor_points->GetProperty()->SetPointSize(2);
@@ -117,20 +118,13 @@ icy::VisualRepresentation::VisualRepresentation()
 
 void icy::VisualRepresentation::SynchronizeTopology()
 {
+    spdlog::info("SynchronizeTopology()");
     points->SetNumberOfPoints(model->prms.nPts);
-    SynchronizeValues();
-
+    visualized_values->SetNumberOfValues(model->prms.nPts);
     indenterSource->SetRadius(model->prms.IndDiameter/2.f);
 
-    /*
-    visualized_values->SetNumberOfValues(model->points.size());
-    points_polydata->GetPointData()->SetActiveScalars("visualized_values");
-    points_mapper->ScalarVisibilityOn();
-    points_mapper->SetColorModeToMapScalars();
-
     SynchronizeValues();
 
-    // structured grid
     int &gx = model->prms.GridX;
     int &gy = model->prms.GridY;
     real &h = model->prms.cellsize;
@@ -146,12 +140,16 @@ void icy::VisualRepresentation::SynchronizeTopology()
             grid_points->SetPoint((vtkIdType)(idx_x+idx_y*gx), pt_pos);
         }
     structuredGrid->SetPoints(grid_points);
-*/
 }
 
 
 void icy::VisualRepresentation::SynchronizeValues()
 {
+    spdlog::info("SynchronizeValues() npts {}", model->prms.nPts);
+    double indenter_x = model->prms.indenter_x;
+    double indenter_y = model->prms.indenter_y;
+    indenterSource->SetCenter(indenter_x, indenter_y, 1);
+
     for(int i=0;i<model->prms.nPts;i++)
     {
         Vector2r pos = icy::Point::getPos(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
@@ -165,17 +163,10 @@ void icy::VisualRepresentation::SynchronizeValues()
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);
     points_filter->Update();
 
-    if(VisualizingVariable == VisOpt::none)
-    {
-        points_mapper->ScalarVisibilityOff();
-        points_polydata->GetPointData()->RemoveArray(0);
-        scalarBar->VisibilityOff();
-    }
-    /*
-    else if(VisualizingVariable == VisOpt::NACC_case)
+    if(VisualizingVariable == VisOpt::NACC_case)
     {
         scalarBar->VisibilityOn();
-        points_polydata->GetPointData()->AddArray(visualized_values);
+//        points_polydata->GetPointData()->AddArray(visualized_values);
         points_polydata->GetPointData()->SetActiveScalars("visualized_values");
         points_mapper->ScalarVisibilityOn();
         points_mapper->SetColorModeToMapScalars();
@@ -184,12 +175,19 @@ void icy::VisualRepresentation::SynchronizeValues()
         scalarBar->SetLookupTable(hueLut_four);
         hueLut->SetTableRange(centerVal-range, centerVal+range);
 
-        visualized_values->SetNumberOfValues(model->prms.nPts);
         for(int i=0;i<model->prms.nPts;i++)
             visualized_values->SetValue((vtkIdType)i,
-                                        icy::Point3D::getQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
+                                        icy::Point::getQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
         visualized_values->Modified();
     }
+    else
+    {
+        points_mapper->ScalarVisibilityOff();
+//        points_polydata->GetPointData()->RemoveArray(0);
+        scalarBar->VisibilityOff();
+    }
+    /*
+
     else if(VisualizingVariable == VisOpt::Jp)
     {
         scalarBar->VisibilityOn();
@@ -227,9 +225,6 @@ void icy::VisualRepresentation::SynchronizeValues()
         visualized_values->Modified();
     }
 */
-    double indenter_x = model->prms.indenter_x;
-    double indenter_y = model->prms.indenter_y;
-    indenterSource->SetCenter(indenter_x, indenter_y, 1);
 
     /*
     actor_points->GetProperty()->SetPointSize(model->prms.ParticleViewSize);

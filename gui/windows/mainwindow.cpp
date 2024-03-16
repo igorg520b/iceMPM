@@ -18,10 +18,11 @@ MainWindow::MainWindow(QWidget *parent)
     ui->setupUi(this);
 
     params = new ParamsWrapper(&model.prms);
-    worker = new BackgroundWorker(&model);
     snapshot.model = &model;
     model.gpu.initialize();
     representation.model = &model;
+    worker = new BackgroundWorker(&model);
+    representation.SynchronizeTopology();
 
     // VTK
     qt_vtk_widget = new QVTKOpenGLNativeWidget();
@@ -167,6 +168,7 @@ MainWindow::MainWindow(QWidget *parent)
 
     representation.SynchronizeTopology();
     pbrowser->setActiveObject(params);
+    qDebug() << "MainWindow constructor done";
     updateGUI();
 }
 
@@ -249,9 +251,7 @@ void MainWindow::open_snapshot_triggered()
 {
     QString qFileName = QFileDialog::getOpenFileName(this, "Open Simulation Snapshot", QDir::currentPath(), "HDF5 Files (*.h5)");
     if(qFileName.isNull())return;
-    int idx = OpenFile(qFileName);
-    QString fileDirectory = QFileInfo(qFileName).absolutePath();
-    snapshot.ReadDirectory(fileDirectory.toStdString());
+    OpenSnapshot(qFileName);
 }
 
 void MainWindow::OpenSnapshot(QString fileName)
@@ -263,13 +263,13 @@ void MainWindow::OpenSnapshot(QString fileName)
 }
 
 
-
 void MainWindow::load_parameter_triggered()
 {
     QString qFileName = QFileDialog::getOpenFileName(this, "Load Parameters", QDir::currentPath(), "JSON Files (*.json)");
     if(qFileName.isNull())return;
 
     std::string pointCloudFile = model.prms.ParseFile(qFileName.toStdString());
+    snapshot.LoadRawPoints(pointCloudFile);
     this->qLastParameterFile = qFileName;
     this->setWindowTitle(qLastParameterFile);
     model.Reset();

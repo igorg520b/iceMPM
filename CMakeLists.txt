@@ -114,9 +114,6 @@ endif()
         gui/vtk/vtk_representation.cpp
         gui/vtk/vtk_representation.h
 
-        gui/vtk/pointselector2d.h
-        gui/vtk/pointselector2d.cpp
-
         gui/backgroundworker.cpp
         gui/backgroundworker.h
         gui/parameters_wrapper.h

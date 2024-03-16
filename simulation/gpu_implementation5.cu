@@ -190,7 +190,7 @@ void GPU_Implementation5::transfer_ponts_to_device()
                                  pitch*sizeof(real)*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
     if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
 
-    memset(host_side_indenter_force_accumulator, 0, sizeof(real)*model->prms.indenter_array_size);
+    memset(host_side_indenter_force_accumulator, 0, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
     spdlog::info("transfer_ponts_to_device() done");
 }
 
@@ -286,7 +286,7 @@ __global__ void v2_kernel_p2g()
     const int &pitch = gprms.nPtsPitch;
 
     // pull point data from SOA
-    const real *data = gprms.pts_array;
+    const real *buffer = gprms.pts_array;
 
     Vector2r pos, velocity;
     Matrix2r Bp, Fe;
@@ -462,8 +462,8 @@ __global__ void v2_kernel_g2p()
             real weight = ww[i][0]*ww[j][1];
             int idx_gridnode = i+i0 + (j+j0)*gridX;
             Vector2r node_velocity;
-            node_velocity[0] = gprms.grid_array[1*nGridPitched + idx_gridnode];
-            node_velocity[1] = gprms.grid_array[2*nGridPitched + idx_gridnode];
+            node_velocity[0] = gprms.grid_array[1*pitch_grid + idx_gridnode];
+            node_velocity[1] = gprms.grid_array[2*pitch_grid + idx_gridnode];
             p.velocity += weight * node_velocity;
             p.Bp += (4.*h_inv)*weight *(node_velocity*dpos.transpose());
         }
@@ -479,12 +479,12 @@ __global__ void v2_kernel_g2p()
 
     for(int i=0; i<icy::SimParams::dim; i++)
     {
-        buffer[pt_idx + pitch_pts*(icy::SimParams3D::posx+i)] = p.pos[i];
-        buffer[pt_idx + pitch_pts*(icy::SimParams3D::velx+i)] = p.velocity[i];
+        buffer[pt_idx + pitch_pts*(icy::SimParams::posx+i)] = p.pos[i];
+        buffer[pt_idx + pitch_pts*(icy::SimParams::velx+i)] = p.velocity[i];
         for(int j=0; j<icy::SimParams::dim; j++)
         {
-            buffer[pt_idx + pitch_pts*(icy::SimParams3D::Fe00 + i*icy::SimParams::dim + j)] = p.Fe(i,j);
-            buffer[pt_idx + pitch_pts*(icy::SimParams3D::Bp00 + i*icy::SimParams::dim + j)] = p.Bp(i,j);
+            buffer[pt_idx + pitch_pts*(icy::SimParams::Fe00 + i*icy::SimParams::dim + j)] = p.Fe(i,j);
+            buffer[pt_idx + pitch_pts*(icy::SimParams::Bp00 + i*icy::SimParams::dim + j)] = p.Bp(i,j);
         }
     }
 
@@ -541,13 +541,11 @@ __global__ void kernel_hello()
 }
 
 
-void GPU_Implementation3::test()
+void GPU_Implementation5::test()
 {
     cudaError_t err;
     kernel_hello<<<1,1,0,streamCompute>>>();
-    err = cudaGetLastError();
-
-    if(err != cudaSuccess)
+    if(cudaGetLastError() != cudaSuccess)
     {
         std::cout << "cuda test error " << err << '\n';
         throw std::runtime_error("cuda test");
@@ -559,7 +557,7 @@ void GPU_Implementation3::test()
     cudaDeviceSynchronize();
 }
 
-void GPU_Implementation3::synchronize()
+void GPU_Implementation5::synchronize()
 {
     if(!initialized) return;
     cudaDeviceSynchronize();

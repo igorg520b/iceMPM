@@ -44,7 +44,6 @@
 #include "parameters_wrapper.h"
 #include "backgroundworker.h"
 #include "snapshotmanager.h"
-#include "pointselector2d.h"
 
 #include <fstream>
 #include <iomanip>

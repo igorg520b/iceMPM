@@ -1,5 +1,5 @@
 #include "parameters_sim.h"
-
+#include <spdlog/spdlog.h>
 
 
 void icy::SimParams::Reset()
@@ -7,6 +7,8 @@ void icy::SimParams::Reset()
     grid_array = nullptr;
     pts_array = nullptr;
     indenter_force_accumulator = nullptr;
+
+    nPts = 0;
 
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
@@ -45,12 +47,13 @@ void icy::SimParams::Reset()
     ComputeLame();
     ComputeCamClayParams2();
     ComputeHelperVariables();
-    std::cout << "SimParams Reset() done\n";
+    spdlog::info("SimParams reset");
 }
 
 
 std::string icy::SimParams::ParseFile(std::string fileName)
 {
+    spdlog::info("SimParams ParseFile {}",fileName);
     if(!std::filesystem::exists(fileName)) throw std::runtime_error("configuration file is not found");
     std::ifstream fileStream(fileName);
     std::string strConfigFile;
@@ -84,13 +87,22 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("DP_threshold_p")) DP_threshold_p = doc["DP_threshold_p"].GetDouble();
 
     ComputeCamClayParams2();
-    ComputeLame();
+    spdlog::info("ComputeCamClayParams2() done");
     ComputeHelperVariables();
 
-    std::cout << "loaded parameters file " << fileName << '\n';
-    std::cout << "GridXDimension " << GridXDimension << '\n';
-    std::cout << "cellsize " << cellsize << '\n';
-    return doc["InputRawPoints"].GetString();
+    std::cout << "loaded parameters file " << fileName << std::endl;
+    std::cout << "GridXDimension " << GridXDimension << std::endl;
+    std::cout << "cellsize " << cellsize << std::endl;
+
+    if(!doc.HasMember("InputRawPoints"))
+    {
+        spdlog::critical("InputRawPoints entry is missing in JSON config file");
+        throw std::runtime_error("config parameter missing");
+    }
+
+    std::string result = doc["InputRawPoints"].GetString();
+    spdlog::info("ParseFile; raw point data {}",result);
+    return result;
 }
 
 void icy::SimParams::ComputeLame()

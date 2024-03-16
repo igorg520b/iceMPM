@@ -22,11 +22,11 @@ struct icy::Point
     void Reset();
     void TransferToBuffer(real *buffer, const int pitch, const int point_index) const;  // distribute to SOA
     static Vector2r getPos(const real *buffer, const int pitch, const int point_index);
+    static char getQ(const real *buffer, const int pitch, const int point_index);
 
 /*    void PullFromBuffer(const real *buffer, const int pitch, const int point_index);
 
     static Vector2r getVelocity(const real *buffer, const int pitch, const int point_index);
-    static char getQ(const real *buffer, const int pitch, const int point_index);
     static double getJp_inv(const real *buffer, const int pitch, const int point_index);
     static void setPos_Q_Jpinv(Eigen::Vector2f _pos, float _Jp_inv, real *buff, const int pitch, const int pt_idx);
     static short getGrain(const real *buffer, const int pitch, const int point_index);

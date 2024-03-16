@@ -5,6 +5,7 @@ icy::Model::Model()
 {
     prms.Reset();
     gpu.model = this;
+    spdlog::info("Model constructor");
 };
 
 
