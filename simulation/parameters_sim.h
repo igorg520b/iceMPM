@@ -83,6 +83,7 @@ public:
     void ComputeCamClayParams2();
     void ComputeHelperVariables();
     void ComputeIntegerBlockCoords();
+    double PointsPerCell() {return nPts/(Volume/(cellsize*cellsize));}
 };
 
 #endif

@@ -121,6 +121,10 @@ class ParamsWrapper : public QObject
     int get_tpb_G2P() {return prms->tpb_G2P;}
     void set_tpb_G2P(int val) { prms->tpb_G2P = val; }
 
+    Q_PROPERTY(double pt_per_cell READ getPtPerCell NOTIFY propertyChanged)
+    double getPtPerCell() {return prms->PointsPerCell();}
+
+    //PointsPerCell()
 
 public:
     ParamsWrapper(icy::SimParams *p)

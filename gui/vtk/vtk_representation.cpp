@@ -62,6 +62,7 @@ icy::VisualRepresentation::VisualRepresentation()
     points_polydata->SetPoints(points);
     points_polydata->GetPointData()->AddArray(visualized_values);
     visualized_values->SetName("visualized_values");
+    points_polydata->GetPointData()->SetActiveScalars("visualized_values");
 
     points_filter->SetInputData(points_polydata);
     points_filter->Update();
@@ -166,8 +167,6 @@ void icy::VisualRepresentation::SynchronizeValues()
     if(VisualizingVariable == VisOpt::NACC_case)
     {
         scalarBar->VisibilityOn();
-//        points_polydata->GetPointData()->AddArray(visualized_values);
-        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
         points_mapper->ScalarVisibilityOn();
         points_mapper->SetColorModeToMapScalars();
         points_mapper->UseLookupTableScalarRangeOn();
@@ -180,19 +179,9 @@ void icy::VisualRepresentation::SynchronizeValues()
                                         icy::Point::getQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
         visualized_values->Modified();
     }
-    else
-    {
-        points_mapper->ScalarVisibilityOff();
-//        points_polydata->GetPointData()->RemoveArray(0);
-        scalarBar->VisibilityOff();
-    }
-    /*
-
-    else if(VisualizingVariable == VisOpt::Jp)
+    else if(VisualizingVariable == VisOpt::Jp_inv)
     {
         scalarBar->VisibilityOn();
-        points_polydata->GetPointData()->AddArray(visualized_values);
-        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
         points_mapper->ScalarVisibilityOn();
         points_mapper->SetColorModeToMapScalars();
         points_mapper->UseLookupTableScalarRangeOn();
@@ -203,14 +192,12 @@ void icy::VisualRepresentation::SynchronizeValues()
         visualized_values->SetNumberOfValues(model->prms.nPts);
         for(int i=0;i<model->prms.nPts;i++)
             visualized_values->SetValue((vtkIdType)i,
-                                        icy::Point3D::getJp_inv(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)-1);
+                                        icy::Point::getJp_inv(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)-1);
         visualized_values->Modified();
     }
     else if(VisualizingVariable == VisOpt::grains)
     {
         scalarBar->VisibilityOn();
-        points_polydata->GetPointData()->AddArray(visualized_values);
-        points_polydata->GetPointData()->SetActiveScalars("visualized_values");
         points_mapper->ScalarVisibilityOn();
         points_mapper->SetColorModeToMapScalars();
         points_mapper->UseLookupTableScalarRangeOn();
@@ -221,9 +208,17 @@ void icy::VisualRepresentation::SynchronizeValues()
         visualized_values->SetNumberOfValues(model->prms.nPts);
         for(int i=0;i<model->prms.nPts;i++)
             visualized_values->SetValue((vtkIdType)i,
-                                        icy::Point3D::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40);
+                                        icy::Point::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40);
         visualized_values->Modified();
     }
+    else
+    {
+        points_mapper->ScalarVisibilityOff();
+//        points_polydata->GetPointData()->RemoveArray(0);
+        scalarBar->VisibilityOff();
+    }
+    /*
+
 */
 
     /*
