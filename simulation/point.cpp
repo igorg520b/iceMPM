@@ -10,14 +10,14 @@ void icy::Point::Reset()
     Fe.setIdentity();
     velocity.setZero();
     Bp.setZero();
-    q = 0;
+    crushed = 0;
     Jp_inv = 1;
 }
 
 void icy::Point::TransferToBuffer(real *buffer, const int pitch, const int point_index) const
 {
     char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
-    ptr_intact[point_index] = q;
+    ptr_intact[point_index] = crushed;
 
     short* ptr_grain = (short*)(&ptr_intact[pitch]);
     ptr_grain[point_index] = grain;
@@ -43,7 +43,7 @@ Vector2r icy::Point::getPos(const real *buffer, const int pitch, const int point
     return result;
 }
 
-char icy::Point::getQ(const real *buffer, const int pitch, const int point_index)
+char icy::Point::getCrushedStatus(const real *buffer, const int pitch, const int point_index)
 {
     char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
     return ptr_intact[point_index];

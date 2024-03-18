@@ -16,9 +16,10 @@
 __device__ int gpu_error_indicator;
 __constant__ icy::SimParams gprms;
 
+constexpr real d = 2; // dimensions
 
 
-__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
+__forceinline__ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
 {
     const real &kappa = gprms.kappa;
     const real &mu = gprms.mu;
@@ -31,7 +32,7 @@ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
 }
 
 
-__device__ void Wolper_Drucker_Prager(icy::Point &p)
+__forceinline__ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
     const real &mu = gprms.mu;
@@ -39,34 +40,33 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     const real &dt = gprms.InitialTimeStep;
     const real &tan_phi = gprms.DP_tan_phi;
     const real &DP_threshold_p = gprms.DP_threshold_p;
-    constexpr real d = 2;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
+    Matrix2r U, V; //, Sigma;
+    Vector2r vSigma;
+    svd2x2_modified(FeTr, U, vSigma, V);
 
-    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
-    Matrix2r SigmaSquared = Sigma*Sigma;
-    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
+    real Je_tr = vSigma.prod();         // product of elements of vSigma (representation of diagonal matrix)
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
+    Vector2r vSigmaSquared = vSigma.array().square().matrix();
+    Vector2r v_s_hat_tr = mu/Je_tr * dev_d(vSigmaSquared); //mu * pow(Je_tr,-2./d)* dev(SigmaSquared);
 
     if(p_trial < -DP_threshold_p || p.Jp_inv < 1)
     {
-        if(p_trial < 1)  p.q = 1;
-        else if(p.Jp_inv < 1) p.q = 2;
+//        if(p_trial < 1)  p.q = 1;
+//        else if(p.Jp_inv < 1) p.q = 2;
 
         // tear in tension or compress until original state
         real p_new = -DP_threshold_p;
         real Je_new = sqrt(-2.*p_new/kappa + 1.);
-        Matrix2r Sigma_new = Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*Sigma_new*V.transpose();
+        Vector2r vSigma_new = Vector2r::Constant(1.)*sqrt(Je_new);  //Matrix2r::Identity() * pow(Je_new, 1./(real)d);
+        p.Fe = U*vSigma_new.asDiagonal()*V.transpose();
         p.Jp_inv *= Je_new/Je_tr;
-
     }
     else
     {
         constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
-        real q_tr = coeff1*s_hat_tr.norm();
+        real q_tr = coeff1*v_s_hat_tr.norm();
         real q_n_1 = (p_trial+DP_threshold_p)*tan_phi;
         q_n_1 = min(gprms.IceShearStrength, q_n_1);
 
@@ -74,46 +74,49 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
         {
             // elastic regime
             p.Fe = FeTr;
-            p.q = 4;
+//            p.q = 4;
         }
         else
         {
             // project onto YS
             real s_hat_n_1_norm = q_n_1/coeff1;
-            Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-            Matrix2r Sigma_new;
-            Sigma_new << sqrt(B_hat_E_new(0,0)), 0, 0, sqrt(B_hat_E_new(1,1));
-            p.Fe = U*Sigma_new*V.transpose();
-            p.q = 3;
+//            Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
+            Vector2r vB_hat_E_new = s_hat_n_1_norm*(Je_tr/mu)*v_s_hat_tr.normalized() + Vector2r::Constant(1.)*(vSigmaSquared.sum()/d);
+            Vector2r vSigma_new = vB_hat_E_new.array().sqrt().matrix();
+            p.Fe = U*vSigma_new.asDiagonal()*V.transpose();
+//            p.q = 3;
         }
     }
 }
 
 
-__device__ void NACCUpdateDeformationGradient_trimmed(icy::Point &p)
+__forceinline__ __device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p)
 {
     const Matrix2r &gradV = p.Bp;
-    constexpr real d = 2; // dimensions
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
     const real &beta = gprms.NACC_beta;
     const real &dt = gprms.InitialTimeStep;
+    const real &p0 = gprms.IceCompressiveStrength;
+    const real &M_sq = gprms.NACC_Msq;
 
     Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
     p.Fe = FeTr;
-    Matrix2r U, V, Sigma;
-    svd2x2(FeTr, U, Sigma, V);
+    Matrix2r U, V;
+    Vector2r vSigma;
+    svd2x2_modified(FeTr, U, vSigma, V);
 
-    real Je_tr = Sigma(0,0)*Sigma(1,1);    // this is for 2D
+    real Je_tr = vSigma.prod();         // product of elements of vSigma (representation of diagonal matrix)
     real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
+    Vector2r vSigmaSquared = vSigma.array().square().matrix();
+    Vector2r v_s_hat_tr = mu/Je_tr * dev_d(vSigmaSquared); //mu * pow(Je_tr,-2./d)* dev(SigmaSquared);
 
-    const real &p0 = gprms.IceCompressiveStrength;
-
-    Matrix2r SigmaSquared = Sigma*Sigma;
-    Matrix2r s_hat_tr = mu/Je_tr * dev(SigmaSquared); //mu * pow(Je_tr, -2. / (real)d)* dev(SigmaSquared);
-    const real &M_sq = gprms.NACC_Msq;
-    real y = (1.+2.*beta)*(3.-d/2.)*s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(y > 0) p.q = 3;
+    real y = (1.+2.*beta)*(3.-d/2.)*v_s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
+    if(y > 0)
+    {
+        p.crushed = 1;
+        p.crushed_status_modified = true;
+    }
 }
 
 
@@ -305,11 +308,8 @@ __global__ void v2_kernel_p2g()
     Matrix2r PFt = KirchhoffStress_Wolper(Fe);
     Matrix2r subterm2 = particle_mass*Bp - (dt*vol*Dinv)*PFt;
 
-    constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
-    const int i0 = (int)(pos[0]*h_inv - offset);
-    const int j0 = (int)(pos[1]*h_inv - offset);
-
-    Vector2r base_coord(i0,j0);
+    Eigen::Vector2i base_coord_i = (pos*h_inv - Vector2r::Constant(0.5)).cast<int>(); // coords of base grid node for point
+    Vector2r base_coord = base_coord_i.cast<real>();
     Vector2r fx = pos*h_inv - base_coord;
 
     // optimized method of computing the quadratic (!) weight function (no conditional operators)
@@ -326,8 +326,10 @@ __global__ void v2_kernel_p2g()
             Vector2r incV = Wip*(velocity*particle_mass + subterm2*dpos);
             real incM = Wip*particle_mass;
 
-            int idx_gridnode = (i+i0) + (j+j0)*gridX;
-            if((i+i0) < 0 || (j+j0) < 0 || (i+i0) >=gridX || (j+j0)>=gridY) gpu_error_indicator = 1;
+            int i2 = i+base_coord_i[0];
+            int j2 = j+base_coord_i[1];
+            int idx_gridnode = (i+base_coord_i[0]) + (j+base_coord_i[1])*gridX;
+            if(i2<0 || j2<0 || i2>=gridX || j2>=gridY) gpu_error_indicator = 1;
 
             // Udpate mass, velocity and force
             atomicAdd(&gprms.grid_array[0*nGridPitch + idx_gridnode], incM);
@@ -426,27 +428,24 @@ __global__ void v2_kernel_g2p()
     const int &gridX = gprms.GridX;
 
     icy::Point p;
+    p.crushed_status_modified = false;
     p.velocity.setZero();
     p.Bp.setZero();
     real *buffer = gprms.pts_array;
-    for(int i=0; i<2; i++)
+    for(int i=0; i<icy::SimParams::dim; i++)
     {
         p.pos[i] = buffer[pt_idx + pitch_pts*(icy::SimParams::posx+i)];
-        for(int j=0; j<2; j++)
-            p.Fe(i,j) = buffer[pt_idx + pitch_pts*(icy::SimParams::Fe00 + i*2 + j)];
+        for(int j=0; j<icy::SimParams::dim; j++)
+            p.Fe(i,j) = buffer[pt_idx + pitch_pts*(icy::SimParams::Fe00 + i*icy::SimParams::dim + j)];
     }
     char* ptr_intact = (char*)(&buffer[pitch_pts*icy::SimParams::idx_utility_data]);
-    p.q = ptr_intact[pt_idx];
+    p.crushed = ptr_intact[pt_idx];
     short* ptr_grain = (short*)(&ptr_intact[pitch_pts]);
     p.grain = ptr_grain[pt_idx];
     p.Jp_inv = buffer[pt_idx + pitch_pts*icy::SimParams::idx_Jp_inv];
 
-
-    constexpr real offset = 0.5;  // 0 for cubic; 0.5 for quadratic
-    const int i0 = (int)(p.pos[0]*h_inv - offset);
-    const int j0 = (int)(p.pos[1]*h_inv - offset);
-
-    Vector2r base_coord(i0,j0);
+    Eigen::Vector2i base_coord_i = (p.pos*h_inv - Vector2r::Constant(0.5)).cast<int>(); // coords of base grid node for point
+    Vector2r base_coord = base_coord_i.cast<real>();
     Vector2r fx = p.pos*h_inv - base_coord;
 
     // optimized method of computing the quadratic (!) weight function (no conditional operators)
@@ -460,7 +459,7 @@ __global__ void v2_kernel_g2p()
         {
             Vector2r dpos = Vector2r(i, j) - fx;
             real weight = ww[i][0]*ww[j][1];
-            int idx_gridnode = i+i0 + (j+j0)*gridX;
+            int idx_gridnode = i+base_coord_i[0] + (j+base_coord_i[1])*gridX;
             Vector2r node_velocity;
             node_velocity[0] = gprms.grid_array[1*pitch_grid + idx_gridnode];
             node_velocity[1] = gprms.grid_array[2*pitch_grid + idx_gridnode];
@@ -471,7 +470,7 @@ __global__ void v2_kernel_g2p()
     // Advection
     p.pos += dt * p.velocity;
 
-    if(p.q == 0) NACCUpdateDeformationGradient_trimmed(p);
+    if(p.crushed == 0) CheckIfPointIsInsideFailureSurface(p);
     else Wolper_Drucker_Prager(p);
 
     // distribute the values of p back into GPU memory: pos, velocity, BP, Fe, Jp_inv, q
@@ -488,18 +487,18 @@ __global__ void v2_kernel_g2p()
         }
     }
 
-    ptr_intact[pt_idx] = p.q;
+    if(p.crushed_status_modified) ptr_intact[pt_idx] = p.crushed;
 }
 
 //===========================================================================
 
 
 
-__device__ Matrix2r dev(Matrix2r A)
+// deviatoric part of a diagonal matrix
+__forceinline__ __device__ Vector2r dev_d(Vector2r Adiag)
 {
-    return A - A.trace()/2*Matrix2r::Identity();
+    return Adiag - Adiag.sum()/2*Vector2r::Constant(1.);
 }
-
 
 
 
@@ -514,16 +513,15 @@ __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4])
     gv.template fill<2, real>(v);
 }
 
-__device__ void svd2x2(const Matrix2r &mA, Matrix2r &mU, Matrix2r &mS, Matrix2r &mV)
+__device__ void svd2x2_modified(const Matrix2r &mA, Matrix2r &mU, Vector2r &mS, Matrix2r &mV)
 {
     real U[4], V[4], S[2];
     real a[4] = {mA(0,0), mA(0,1), mA(1,0), mA(1,1)};
     svd(a, U, S, V);
     mU << U[0],U[1],U[2],U[3];
-    mS << S[0],0,0,S[1];
+    mS << S[0],S[1];
     mV << V[0],V[1],V[2],V[3];
 }
-
 
 __device__ Matrix2r polar_decomp_R(const Matrix2r &val)
 {

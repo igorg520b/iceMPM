@@ -176,7 +176,7 @@ void icy::VisualRepresentation::SynchronizeValues()
 
         for(int i=0;i<model->prms.nPts;i++)
             visualized_values->SetValue((vtkIdType)i,
-                                        icy::Point::getQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
+                                        icy::Point::getCrushedStatus(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i));
         visualized_values->Modified();
     }
     else if(VisualizingVariable == VisOpt::Jp_inv)

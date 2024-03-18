@@ -17,12 +17,13 @@ struct icy::Point
 
     real Jp_inv; // track the change in det(Fp)
     short grain;
-    char q;
+    uint8_t crushed;
+    bool crushed_status_modified;
 
     void Reset();
     void TransferToBuffer(real *buffer, const int pitch, const int point_index) const;  // distribute to SOA
     static Vector2r getPos(const real *buffer, const int pitch, const int point_index);
-    static char getQ(const real *buffer, const int pitch, const int point_index);
+    static char getCrushedStatus(const real *buffer, const int pitch, const int point_index);
 
     static double getJp_inv(const real *buffer, const int pitch, const int point_index);
     static short getGrain(const real *buffer, const int pitch, const int point_index);

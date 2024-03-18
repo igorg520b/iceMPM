@@ -46,7 +46,6 @@ add_executable(cm
     simulation/helper_math.cuh
     simulation/gpu_implementation5.h
     simulation/gpu_implementation5.cu
-    simulation/constitutive_model.cu
 
     simulation/snapshotwriter.h
     simulation/snapshotwriter.cpp
@@ -131,7 +130,7 @@ endif()
         simulation/helper_math.cuh
         simulation/gpu_implementation5.h
         simulation/gpu_implementation5.cu
-        simulation/constitutive_model.cu
+
 
         simulation/snapshotmanager.h
         simulation/snapshotmanager.cpp
