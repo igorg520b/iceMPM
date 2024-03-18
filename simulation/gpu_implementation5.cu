@@ -17,9 +17,9 @@ __device__ int gpu_error_indicator;
 __constant__ icy::SimParams gprms;
 
 constexpr real d = 2; // dimensions
+constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
 
-
-__forceinline__ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
 {
     const real &kappa = gprms.kappa;
     const real &mu = gprms.mu;
@@ -31,240 +31,68 @@ __forceinline__ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F)
     return PFt;
 }
 
-
-__forceinline__ __device__ void Wolper_Drucker_Prager(icy::Point &p)
+__device__ void ComputePQ(icy::Point &p, const real &kappa, const real &mu)
 {
-    const Matrix2r &gradV = p.Bp;
+    svd2x2_modified(p.Fe, p.U, p.vSigma, p.V);
+    p.Je_tr = p.vSigma.prod();         // product of elements of vSigma (representation of diagonal matrix)
+    p.p_tr = -(kappa/2.) * (p.Je_tr*p.Je_tr - 1.);
+    p.vSigmaSquared = p.vSigma.array().square().matrix();
+    p.v_s_hat_tr = mu/p.Je_tr * dev_d(p.vSigmaSquared); //mu * pow(Je_tr,-2./d)* dev(SigmaSquared);
+    p.q_tr = coeff1*p.v_s_hat_tr.norm();
+}
+
+
+
+__device__ void Wolper_Drucker_Prager(icy::Point &p)
+{
     const real &mu = gprms.mu;
     const real &kappa = gprms.kappa;
-    const real &dt = gprms.InitialTimeStep;
     const real &tan_phi = gprms.DP_tan_phi;
     const real &DP_threshold_p = gprms.DP_threshold_p;
 
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-    Matrix2r U, V; //, Sigma;
-    Vector2r vSigma;
-    svd2x2_modified(FeTr, U, vSigma, V);
-
-    real Je_tr = vSigma.prod();         // product of elements of vSigma (representation of diagonal matrix)
-    real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
-    Vector2r vSigmaSquared = vSigma.array().square().matrix();
-    Vector2r v_s_hat_tr = mu/Je_tr * dev_d(vSigmaSquared); //mu * pow(Je_tr,-2./d)* dev(SigmaSquared);
-
-    if(p_trial < -DP_threshold_p || p.Jp_inv < 1)
+    if(p.p_tr < -DP_threshold_p || p.Jp_inv < 1)
     {
-//        if(p_trial < 1)  p.q = 1;
-//        else if(p.Jp_inv < 1) p.q = 2;
-
         // tear in tension or compress until original state
         real p_new = -DP_threshold_p;
         real Je_new = sqrt(-2.*p_new/kappa + 1.);
         Vector2r vSigma_new = Vector2r::Constant(1.)*sqrt(Je_new);  //Matrix2r::Identity() * pow(Je_new, 1./(real)d);
-        p.Fe = U*vSigma_new.asDiagonal()*V.transpose();
-        p.Jp_inv *= Je_new/Je_tr;
+        p.Fe = p.U*vSigma_new.asDiagonal()*p.V.transpose();
+        p.Jp_inv *= Je_new/p.Je_tr;
     }
     else
     {
-        constexpr real coeff1 = 1.4142135623730950; // sqrt((6-d)/2.);
-        real q_tr = coeff1*v_s_hat_tr.norm();
-        real q_n_1 = (p_trial+DP_threshold_p)*tan_phi;
+        real q_n_1 = (p.p_tr+DP_threshold_p)*tan_phi;
         q_n_1 = min(gprms.IceShearStrength, q_n_1);
 
-        if(q_tr < q_n_1)
-        {
-            // elastic regime
-            p.Fe = FeTr;
-//            p.q = 4;
-        }
-        else
+        if(p.q_tr >= q_n_1)
         {
             // project onto YS
             real s_hat_n_1_norm = q_n_1/coeff1;
 //            Matrix2r B_hat_E_new = s_hat_n_1_norm*(pow(Je_tr,2./d)/mu)*s_hat_tr.normalized() + Matrix2r::Identity()*(SigmaSquared.trace()/d);
-            Vector2r vB_hat_E_new = s_hat_n_1_norm*(Je_tr/mu)*v_s_hat_tr.normalized() + Vector2r::Constant(1.)*(vSigmaSquared.sum()/d);
+            Vector2r vB_hat_E_new = s_hat_n_1_norm*(p.Je_tr/mu)*p.v_s_hat_tr.normalized() + Vector2r::Constant(1.)*(p.vSigmaSquared.sum()/d);
             Vector2r vSigma_new = vB_hat_E_new.array().sqrt().matrix();
-            p.Fe = U*vSigma_new.asDiagonal()*V.transpose();
-//            p.q = 3;
+            p.Fe = p.U*vSigma_new.asDiagonal()*p.V.transpose();
         }
     }
 }
 
 
-__forceinline__ __device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p)
+__device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p)
 {
-    const Matrix2r &gradV = p.Bp;
-    const real &mu = gprms.mu;
-    const real &kappa = gprms.kappa;
+/*
     const real &beta = gprms.NACC_beta;
-    const real &dt = gprms.InitialTimeStep;
     const real &p0 = gprms.IceCompressiveStrength;
     const real &M_sq = gprms.NACC_Msq;
+    real y = (1.+2.*beta)*p.q_tr*p.q_tr + M_sq*(p.p_tr + beta*p0)*(p.p_tr - p0);
+*/
 
-    Matrix2r FeTr = (Matrix2r::Identity() + dt*gradV) * p.Fe;
-    p.Fe = FeTr;
-    Matrix2r U, V;
-    Vector2r vSigma;
-    svd2x2_modified(FeTr, U, vSigma, V);
-
-    real Je_tr = vSigma.prod();         // product of elements of vSigma (representation of diagonal matrix)
-    real p_trial = -(kappa/2.) * (Je_tr*Je_tr - 1.);
-    Vector2r vSigmaSquared = vSigma.array().square().matrix();
-    Vector2r v_s_hat_tr = mu/Je_tr * dev_d(vSigmaSquared); //mu * pow(Je_tr,-2./d)* dev(SigmaSquared);
-
-    real y = (1.+2.*beta)*(3.-d/2.)*v_s_hat_tr.squaredNorm() + M_sq*(p_trial + beta*p0)*(p_trial - p0);
-    if(y > 0)
-    {
-        p.crushed = 1;
-        p.crushed_status_modified = true;
-    }
-}
-
-
-
-void GPU_Implementation5::initialize()
-{
-    if(initialized) return;
-    cudaError_t err;
-    int deviceCount = 0;
-    err = cudaGetDeviceCount(&deviceCount);
-    if (err != cudaSuccess) throw std::runtime_error("initialize() cuda error");
-    if(deviceCount == 0) throw std::runtime_error("No avaialble CUDA devices");
-    cudaDeviceProp deviceProp;
-    cudaGetDeviceProperties(&deviceProp, 0);
-    spdlog::info("Compute capability {}.{}", deviceProp.major, deviceProp.minor);
-    cudaEventCreate(&eventCycleStart);
-    cudaEventCreate(&eventCycleStop);
-    err = cudaStreamCreate(&streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
-    initialized = true;
-    spdlog::info("GPU Implementation: prepared");
-}
-
-void GPU_Implementation5::cuda_update_constants()
-{
-    cudaError_t err;
-    err = cudaMemcpyToSymbol(gpu_error_indicator, &error_code, sizeof(int));
-    if(err != cudaSuccess) throw std::runtime_error("gpu_error_indicator initialization");
-    err = cudaMemcpyToSymbol(gprms, &model->prms, sizeof(icy::SimParams));
-    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: gprms");
-    std::cout << "CUDA constants copied to device\n";
-}
-
-void GPU_Implementation5::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
-{
-    if(!initialized) initialize();
-    cudaError_t err;
-
-    // device memory for grid
-    cudaFree(model->prms.grid_array);
-    cudaFree(model->prms.pts_array);
-    cudaFree(model->prms.indenter_force_accumulator);
-    cudaFreeHost(tmp_transfer_buffer);
-    cudaFreeHost(host_side_indenter_force_accumulator);
-
-    err = cudaMallocPitch (&model->prms.grid_array, &model->prms.nGridPitch, sizeof(real)*nGridNodes, icy::SimParams::nGridArrays);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    model->prms.nGridPitch /= sizeof(real); // assume that this divides without remainder
-
-    // device memory for points
-    err = cudaMallocPitch (&model->prms.pts_array, &model->prms.nPtsPitch, sizeof(real)*nPoints, icy::SimParams::nPtsArrays);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    model->prms.nPtsPitch /= sizeof(real);
-
-    err = cudaMalloc(&model->prms.indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-
-    // pinned host memory
-    err = cudaMallocHost(&tmp_transfer_buffer, sizeof(real)*model->prms.nPtsPitch*icy::SimParams::nPtsArrays);
-    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-    err = cudaMallocHost(&host_side_indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
-    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
-
-    error_code = 0;
-    spdlog::info("cuda_allocate_arrays done");
-}
-
-void GPU_Implementation5::transfer_ponts_to_device()
-{
-    spdlog::info("transfer_to_device()");
-    int pitch = model->prms.nPtsPitch;
-    // transfer point data to device
-    cudaError_t err = cudaMemcpy(model->prms.pts_array, tmp_transfer_buffer,
-                                 pitch*sizeof(real)*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
-    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
-
-    memset(host_side_indenter_force_accumulator, 0, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
-    spdlog::info("transfer_ponts_to_device() done");
-}
-
-void GPU_Implementation5::cuda_transfer_from_device()
-{
-    spdlog::info("cuda_transfer_from_device()");
-    cudaError_t err = cudaMemcpyAsync(tmp_transfer_buffer, model->prms.pts_array,
-                                      model->prms.nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays,
-                                      cudaMemcpyDeviceToHost, streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-
-    err = cudaMemcpyAsync(host_side_indenter_force_accumulator, model->prms.indenter_force_accumulator,
-                          sizeof(real)*icy::SimParams::n_indenter_subdivisions*2,
-                          cudaMemcpyDeviceToHost, streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-
-    err = cudaMemcpyFromSymbolAsync(&error_code, gpu_error_indicator, sizeof(int), 0, cudaMemcpyDeviceToHost, streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
-
-    void* userData = reinterpret_cast<void*>(this);
-    cudaStreamAddCallback(streamCompute, GPU_Implementation5::callback_from_stream, userData, 0);
-}
-
-void CUDART_CB GPU_Implementation5::callback_from_stream(cudaStream_t stream, cudaError_t status, void *userData)
-{
-    // simulation data was copied to host memory -> proceed with processing of this data
-    GPU_Implementation5 *gpu = reinterpret_cast<GPU_Implementation5*>(userData);
-    // any additional processing here
-    if(gpu->transfer_completion_callback) gpu->transfer_completion_callback();
-}
-
-void GPU_Implementation5::cuda_reset_grid()
-{
-    cudaError_t err = cudaMemsetAsync(model->prms.grid_array, 0,
-                                      model->prms.nGridPitch*icy::SimParams::nGridArrays*sizeof(real), streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
-}
-
-void GPU_Implementation5::cuda_reset_indenter_force_accumulator()
-{
-    cudaError_t err = cudaMemsetAsync(model->prms.indenter_force_accumulator, 0,
-                                      sizeof(real)*icy::SimParams::n_indenter_subdivisions*2, streamCompute);
-    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
-}
-
-
-void GPU_Implementation5::cuda_p2g()
-{
-    const int nPoints = model->prms.nPts;
-    int tpb = model->prms.tpb_P2G;
-    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
-    v2_kernel_p2g<<<blocksPerGrid, tpb, 0, streamCompute>>>();
-    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_p2g");
-}
-
-void GPU_Implementation5::cuda_update_nodes(real indenter_x, real indenter_y)
-{
-    const int nGridNodes = model->prms.GridTotal;
-    int tpb = model->prms.tpb_Upd;
-    int blocksPerGrid = (nGridNodes + tpb - 1) / tpb;
-    v2_kernel_update_nodes<<<blocksPerGrid, tpb, 0, streamCompute>>>(indenter_x, indenter_y);
-    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_update_nodes");
-}
-
-void GPU_Implementation5::cuda_g2p()
-{
-    const int nPoints = model->prms.nPts;
-    int tpb = model->prms.tpb_G2P;
-    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
-    v2_kernel_g2p<<<blocksPerGrid, tpb, 0, streamCompute>>>();
-    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_g2p");
+    const float beta = (float)gprms.NACC_beta;
+    const float p0 = (float)gprms.IceCompressiveStrength;
+    const float M_sq = (float)gprms.NACC_Msq;
+    const float p_tr = (float)p.p_tr;
+    const float q_tr = (float)p.q_tr;
+    float y = (1.f+2.f*beta)*q_tr*q_tr + M_sq*(p_tr + beta*p0)*(p_tr - p0);
+    if(y > 0) p.crushed = 1;
 }
 
 
@@ -426,9 +254,10 @@ __global__ void v2_kernel_g2p()
     const real &h_inv = gprms.cellsize_inv;
     const real &dt = gprms.InitialTimeStep;
     const int &gridX = gprms.GridX;
+    const real &mu = gprms.mu;
+    const real &kappa = gprms.kappa;
 
     icy::Point p;
-    p.crushed_status_modified = false;
     p.velocity.setZero();
     p.Bp.setZero();
     real *buffer = gprms.pts_array;
@@ -444,12 +273,13 @@ __global__ void v2_kernel_g2p()
     p.grain = ptr_grain[pt_idx];
     p.Jp_inv = buffer[pt_idx + pitch_pts*icy::SimParams::idx_Jp_inv];
 
-    Eigen::Vector2i base_coord_i = (p.pos*h_inv - Vector2r::Constant(0.5)).cast<int>(); // coords of base grid node for point
+    // coords of base grid node for point
+    Eigen::Vector2i base_coord_i = (p.pos*h_inv - Vector2r::Constant(0.5)).cast<int>();
     Vector2r base_coord = base_coord_i.cast<real>();
     Vector2r fx = p.pos*h_inv - base_coord;
 
-    // optimized method of computing the quadratic (!) weight function (no conditional operators)
-    Array2r arr_v0 = 1.5-fx.array();
+    // optimized method of computing the quadratic weight function without conditional operators
+    Array2r arr_v0 = 1.5 - fx.array();
     Array2r arr_v1 = fx.array() - 1.0;
     Array2r arr_v2 = fx.array() - 0.5;
     Array2r ww[3] = {0.5*arr_v0*arr_v0, 0.75-arr_v1*arr_v1, 0.5*arr_v2*arr_v2};
@@ -467,11 +297,15 @@ __global__ void v2_kernel_g2p()
             p.Bp += (4.*h_inv)*weight *(node_velocity*dpos.transpose());
         }
 
-    // Advection
-    p.pos += dt * p.velocity;
+    // Advection and update of the deformation gradient
+    p.pos += p.velocity * dt;
+    const Matrix2r &gradV = p.Bp;
+    p.Fe = (Matrix2r::Identity() + dt*gradV) * p.Fe;
+
+    ComputePQ(p, kappa, mu);    // pre-computes USV, p, q, etc.
 
     if(p.crushed == 0) CheckIfPointIsInsideFailureSurface(p);
-    else Wolper_Drucker_Prager(p);
+    if(p.crushed == 1) Wolper_Drucker_Prager(p);
 
     // distribute the values of p back into GPU memory: pos, velocity, BP, Fe, Jp_inv, q
     buffer[pt_idx + pitch_pts*icy::SimParams::idx_Jp_inv] = p.Jp_inv;
@@ -487,7 +321,7 @@ __global__ void v2_kernel_g2p()
         }
     }
 
-    if(p.crushed_status_modified) ptr_intact[pt_idx] = p.crushed;
+    ptr_intact[pt_idx] = p.crushed;
 }
 
 //===========================================================================
@@ -495,7 +329,7 @@ __global__ void v2_kernel_g2p()
 
 
 // deviatoric part of a diagonal matrix
-__forceinline__ __device__ Vector2r dev_d(Vector2r Adiag)
+__device__ Vector2r dev_d(Vector2r Adiag)
 {
     return Adiag - Adiag.sum()/2*Vector2r::Constant(1.);
 }
@@ -560,4 +394,155 @@ void GPU_Implementation5::synchronize()
     if(!initialized) return;
     cudaDeviceSynchronize();
 }
+
+
+// ========================================= initialization and kernel execution
+
+
+void GPU_Implementation5::initialize()
+{
+    if(initialized) return;
+    cudaError_t err;
+    int deviceCount = 0;
+    err = cudaGetDeviceCount(&deviceCount);
+    if (err != cudaSuccess) throw std::runtime_error("initialize() cuda error");
+    if(deviceCount == 0) throw std::runtime_error("No avaialble CUDA devices");
+    cudaDeviceProp deviceProp;
+    cudaGetDeviceProperties(&deviceProp, 0);
+    spdlog::info("Compute capability {}.{}", deviceProp.major, deviceProp.minor);
+    cudaEventCreate(&eventCycleStart);
+    cudaEventCreate(&eventCycleStop);
+    err = cudaStreamCreate(&streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("GPU_Implementation3::initialize() cudaEventCreate");
+    initialized = true;
+    spdlog::info("GPU Implementation: prepared");
+}
+
+void GPU_Implementation5::cuda_update_constants()
+{
+    cudaError_t err;
+    err = cudaMemcpyToSymbol(gpu_error_indicator, &error_code, sizeof(int));
+    if(err != cudaSuccess) throw std::runtime_error("gpu_error_indicator initialization");
+    err = cudaMemcpyToSymbol(gprms, &model->prms, sizeof(icy::SimParams));
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_update_constants: gprms");
+    std::cout << "CUDA constants copied to device\n";
+}
+
+void GPU_Implementation5::cuda_allocate_arrays(size_t nGridNodes, size_t nPoints)
+{
+    if(!initialized) initialize();
+    cudaError_t err;
+
+    // device memory for grid
+    cudaFree(model->prms.grid_array);
+    cudaFree(model->prms.pts_array);
+    cudaFree(model->prms.indenter_force_accumulator);
+    cudaFreeHost(tmp_transfer_buffer);
+    cudaFreeHost(host_side_indenter_force_accumulator);
+
+    err = cudaMallocPitch (&model->prms.grid_array, &model->prms.nGridPitch, sizeof(real)*nGridNodes, icy::SimParams::nGridArrays);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    model->prms.nGridPitch /= sizeof(real); // assume that this divides without remainder
+
+    // device memory for points
+    err = cudaMallocPitch (&model->prms.pts_array, &model->prms.nPtsPitch, sizeof(real)*nPoints, icy::SimParams::nPtsArrays);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    model->prms.nPtsPitch /= sizeof(real);
+
+    err = cudaMalloc(&model->prms.indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+
+    // pinned host memory
+    err = cudaMallocHost(&tmp_transfer_buffer, sizeof(real)*model->prms.nPtsPitch*icy::SimParams::nPtsArrays);
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+    err = cudaMallocHost(&host_side_indenter_force_accumulator, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
+    if(err!=cudaSuccess) throw std::runtime_error("cuda_allocate_arrays");
+
+    error_code = 0;
+    spdlog::info("cuda_allocate_arrays done");
+}
+
+void GPU_Implementation5::transfer_ponts_to_device()
+{
+    spdlog::info("transfer_to_device()");
+    int pitch = model->prms.nPtsPitch;
+    // transfer point data to device
+    cudaError_t err = cudaMemcpy(model->prms.pts_array, tmp_transfer_buffer,
+                                 pitch*sizeof(real)*icy::SimParams::nPtsArrays, cudaMemcpyHostToDevice);
+    if(err != cudaSuccess) throw std::runtime_error("transfer_points_to_device");
+
+    memset(host_side_indenter_force_accumulator, 0, sizeof(real)*icy::SimParams::n_indenter_subdivisions*2);
+    spdlog::info("transfer_ponts_to_device() done");
+}
+
+void GPU_Implementation5::cuda_transfer_from_device()
+{
+    spdlog::info("cuda_transfer_from_device()");
+    cudaError_t err = cudaMemcpyAsync(tmp_transfer_buffer, model->prms.pts_array,
+                                      model->prms.nPtsPitch*sizeof(real)*icy::SimParams::nPtsArrays,
+                                      cudaMemcpyDeviceToHost, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+
+    err = cudaMemcpyAsync(host_side_indenter_force_accumulator, model->prms.indenter_force_accumulator,
+                          sizeof(real)*icy::SimParams::n_indenter_subdivisions*2,
+                          cudaMemcpyDeviceToHost, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+
+    err = cudaMemcpyFromSymbolAsync(&error_code, gpu_error_indicator, sizeof(int), 0, cudaMemcpyDeviceToHost, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_transfer_from_device");
+
+    void* userData = reinterpret_cast<void*>(this);
+    cudaStreamAddCallback(streamCompute, GPU_Implementation5::callback_from_stream, userData, 0);
+}
+
+void CUDART_CB GPU_Implementation5::callback_from_stream(cudaStream_t stream, cudaError_t status, void *userData)
+{
+    // simulation data was copied to host memory -> proceed with processing of this data
+    GPU_Implementation5 *gpu = reinterpret_cast<GPU_Implementation5*>(userData);
+    // any additional processing here
+    if(gpu->transfer_completion_callback) gpu->transfer_completion_callback();
+}
+
+void GPU_Implementation5::cuda_reset_grid()
+{
+    cudaError_t err = cudaMemsetAsync(model->prms.grid_array, 0,
+                                      model->prms.nGridPitch*icy::SimParams::nGridArrays*sizeof(real), streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
+}
+
+void GPU_Implementation5::cuda_reset_indenter_force_accumulator()
+{
+    cudaError_t err = cudaMemsetAsync(model->prms.indenter_force_accumulator, 0,
+                                      sizeof(real)*icy::SimParams::n_indenter_subdivisions*2, streamCompute);
+    if(err != cudaSuccess) throw std::runtime_error("cuda_reset_grid error");
+}
+
+
+void GPU_Implementation5::cuda_p2g()
+{
+    const int nPoints = model->prms.nPts;
+    int tpb = model->prms.tpb_P2G;
+    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
+    v2_kernel_p2g<<<blocksPerGrid, tpb, 0, streamCompute>>>();
+    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_p2g");
+}
+
+void GPU_Implementation5::cuda_update_nodes(real indenter_x, real indenter_y)
+{
+    const int nGridNodes = model->prms.GridTotal;
+    int tpb = model->prms.tpb_Upd;
+    int blocksPerGrid = (nGridNodes + tpb - 1) / tpb;
+    v2_kernel_update_nodes<<<blocksPerGrid, tpb, 0, streamCompute>>>(indenter_x, indenter_y);
+    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_update_nodes");
+}
+
+void GPU_Implementation5::cuda_g2p()
+{
+    const int nPoints = model->prms.nPts;
+    int tpb = model->prms.tpb_G2P;
+    int blocksPerGrid = (nPoints + tpb - 1) / tpb;
+    v2_kernel_g2p<<<blocksPerGrid, tpb, 0, streamCompute>>>();
+    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_g2p");
+}
+
 

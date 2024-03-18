@@ -78,7 +78,7 @@ template <typename T> __device__ void inline my_swap(T& a, T& b)
 \param[out] V Robustly a rotation matrix in Givens form
 */
 template<typename T>
-__device__ void singular_value_decomposition(
+__forceinline__ __device__ void singular_value_decomposition(
         const T aa[4],
         GivensRotation<double>& u,
         T sigma[2],

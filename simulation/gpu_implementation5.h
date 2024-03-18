@@ -24,11 +24,13 @@ __device__ Matrix2r polar_decomp_R(const Matrix2r &val);
 __device__ void svd(const real a[4], real u[4], real sigma[2], real v[4]);
 __device__ void svd2x2_modified(const Matrix2r &mA, Matrix2r &mU, Vector2r &mS, Matrix2r &mV);
 
-__forceinline__ __device__ void Wolper_Drucker_Prager(icy::Point &p);
-__forceinline__ __device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p);
-__forceinline__ __device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F);
+__device__ void Wolper_Drucker_Prager(icy::Point &p);
+__device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p);
+__device__ Matrix2r KirchhoffStress_Wolper(const Matrix2r &F);
 
-__forceinline__ __device__ Vector2r dev_d(Vector2r Adiag);
+__device__ void ComputePQ(icy::Point &p, const real &kappa, const real &mu);
+
+__device__ Vector2r dev_d(Vector2r Adiag);
 
 // Naive GPU Implementation with memory coalescing
 namespace icy { class Model; }

@@ -32,8 +32,10 @@ public:
 
     // index of the corresponding array in SoA
     constexpr static size_t idx_utility_data = 0;
-    constexpr static size_t idx_Jp_inv = 1;
-    constexpr static size_t posx = 2;
+    constexpr static size_t idx_P = idx_utility_data + 1;
+    constexpr static size_t idx_Q = idx_P + 1;
+    constexpr static size_t idx_Jp_inv = idx_Q + 1;
+    constexpr static size_t posx = idx_Jp_inv + 1;
     constexpr static size_t velx = posx + 2;
     constexpr static size_t Fe00 = velx + 2;
     constexpr static size_t Bp00 = Fe00 + 4;
