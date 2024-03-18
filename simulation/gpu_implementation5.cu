@@ -79,19 +79,10 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 
 __device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p)
 {
-/*
     const real &beta = gprms.NACC_beta;
     const real &p0 = gprms.IceCompressiveStrength;
     const real &M_sq = gprms.NACC_Msq;
     real y = (1.+2.*beta)*p.q_tr*p.q_tr + M_sq*(p.p_tr + beta*p0)*(p.p_tr - p0);
-*/
-
-    const float beta = (float)gprms.NACC_beta;
-    const float p0 = (float)gprms.IceCompressiveStrength;
-    const float M_sq = (float)gprms.NACC_Msq;
-    const float p_tr = (float)p.p_tr;
-    const float q_tr = (float)p.q_tr;
-    float y = (1.f+2.f*beta)*q_tr*q_tr + M_sq*(p_tr + beta*p0)*(p_tr - p0);
     if(y > 0) p.crushed = 1;
 }
 
