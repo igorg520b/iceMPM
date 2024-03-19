@@ -8,10 +8,9 @@ icy::Model::Model()
     spdlog::info("Model constructor");
 };
 
-
 bool icy::Model::Step()
 {
-    real simulation_time = prms.SimulationTime;
+    double simulation_time = prms.SimulationTime;
     std::cout << '\n';
     spdlog::info("step {} ({}) started; sim_time {:.3}", prms.SimulationStep, prms.SimulationStep/prms.UpdateEveryNthStep, simulation_time);
 
@@ -20,13 +19,13 @@ bool icy::Model::Step()
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventCycleStart);
     do
     {
+        count_unupdated_steps++;
+        simulation_time += prms.InitialTimeStep;
         prms.indenter_x = prms.indenter_x_initial + simulation_time*prms.IndVelocity;
         gpu.cuda_reset_grid();
         gpu.cuda_p2g();
         gpu.cuda_update_nodes(prms.indenter_x, prms.indenter_y);
-        gpu.cuda_g2p();
-        count_unupdated_steps++;
-        simulation_time += prms.InitialTimeStep;
+        gpu.cuda_g2p((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep == 0);
     } while((prms.SimulationStep+count_unupdated_steps) % prms.UpdateEveryNthStep != 0);
     if(prms.SimulationStep % (prms.UpdateEveryNthStep*2) == 0) cudaEventRecord(gpu.eventCycleStop);
 

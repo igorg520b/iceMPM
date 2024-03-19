@@ -12,31 +12,25 @@ namespace icy { struct Point; }
 
 struct icy::Point
 {
-    Vector2r pos, velocity;
-    Matrix2r Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
+    Eigen::Vector2d pos, velocity;
+    Eigen::Matrix2d Bp, Fe; // refer to "The Material Point Method for Simulating Continuum Materials"
 
-    real Jp_inv; // track the change in det(Fp)
+    double Jp_inv; // track the change in det(Fp)
     short grain;
 
     double p_tr, q_tr, Je_tr;
-    Matrix2r U, V;
-    Vector2r vSigma, vSigmaSquared, v_s_hat_tr;
+    Eigen::Matrix2d U, V;
+    Eigen::Vector2d vSigma, vSigmaSquared, v_s_hat_tr;
 
     uint8_t crushed;
 
     void Reset();
-    void TransferToBuffer(real *buffer, const int pitch, const int point_index) const;  // distribute to SOA
-    static Vector2r getPos(const real *buffer, const int pitch, const int point_index);
-    static char getCrushedStatus(const real *buffer, const int pitch, const int point_index);
+    void TransferToBuffer(double *buffer, const int pitch, const int point_index) const;  // distribute to SOA
+    static Eigen::Vector2d getPos(const double *buffer, const int pitch, const int point_index);
+    static char getCrushedStatus(const double *buffer, const int pitch, const int point_index);
 
-    static double getJp_inv(const real *buffer, const int pitch, const int point_index);
-    static short getGrain(const real *buffer, const int pitch, const int point_index);
-
-    /*    void PullFromBuffer(const real *buffer, const int pitch, const int point_index);
-
-    static Vector2r getVelocity(const real *buffer, const int pitch, const int point_index);
-    static void setPos_Q_Jpinv(Eigen::Vector2f _pos, float _Jp_inv, real *buff, const int pitch, const int pt_idx);
-*/
+    static double getJp_inv(const double *buffer, const int pitch, const int point_index);
+    static short getGrain(const double *buffer, const int pitch, const int point_index);
 };
 
 

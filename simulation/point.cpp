@@ -14,7 +14,7 @@ void icy::Point::Reset()
     Jp_inv = 1;
 }
 
-void icy::Point::TransferToBuffer(real *buffer, const int pitch, const int point_index) const
+void icy::Point::TransferToBuffer(double *buffer, const int pitch, const int point_index) const
 {
     char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
     ptr_intact[point_index] = crushed;
@@ -36,36 +36,28 @@ void icy::Point::TransferToBuffer(real *buffer, const int pitch, const int point
     }
 }
 
-Vector2r icy::Point::getPos(const real *buffer, const int pitch, const int point_index)
+Eigen::Vector2d icy::Point::getPos(const double *buffer, const int pitch, const int point_index)
 {
-    Vector2r result;
+    Eigen::Vector2d result;
     for(int i=0; i<icy::SimParams::dim;i++) result[i] = buffer[point_index + pitch*(icy::SimParams::posx+i)];
     return result;
 }
 
-char icy::Point::getCrushedStatus(const real *buffer, const int pitch, const int point_index)
+char icy::Point::getCrushedStatus(const double *buffer, const int pitch, const int point_index)
 {
     char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
     return ptr_intact[point_index];
 }
 
-double icy::Point::getJp_inv(const real *buffer, const int pitch, const int point_index)
+double icy::Point::getJp_inv(const double *buffer, const int pitch, const int point_index)
 {
     return buffer[point_index + pitch*icy::SimParams::idx_Jp_inv];
 }
 
-short icy::Point::getGrain(const real *buffer, const int pitch, const int point_index)
+short icy::Point::getGrain(const double *buffer, const int pitch, const int point_index)
 {
     char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
     short* ptr_grain = (short*)(&ptr_intact[pitch]);
     short grain = ptr_grain[point_index];
     return grain;
 }
-
-
-/*
-void PullFromBuffer(const real *buffer, const int pitch, const int point_index);
-
-static Vector2r getVelocity(const real *buffer, const int pitch, const int point_index);
-static void setPos_Q_Jpinv(Eigen::Vector2f _pos, float _Jp_inv, real *buff, const int pitch, const int pt_idx);
-*/

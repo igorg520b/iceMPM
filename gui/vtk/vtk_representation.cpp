@@ -128,7 +128,7 @@ void icy::VisualRepresentation::SynchronizeTopology()
 
     int &gx = model->prms.GridX;
     int &gy = model->prms.GridY;
-    real &h = model->prms.cellsize;
+    double &h = model->prms.cellsize;
     structuredGrid->SetDimensions(model->prms.GridX, model->prms.GridY, 1);
 
     grid_points->SetNumberOfPoints(gx*gy);
@@ -153,8 +153,8 @@ void icy::VisualRepresentation::SynchronizeValues()
 
     for(int i=0;i<model->prms.nPts;i++)
     {
-        Vector2r pos = icy::Point::getPos(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
-        points->SetPoint((vtkIdType)i, pos[0], pos[1], pos[2]);
+        Eigen::Vector2d pos = icy::Point::getPos(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
+        points->SetPoint((vtkIdType)i, pos[0], pos[1], 0);
     }
     points->Modified();
 

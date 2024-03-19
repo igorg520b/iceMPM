@@ -46,7 +46,7 @@ private:
     void P2G();
     void UpdateNodes();
     void G2P();
-    void UpdateIndenterPosition(real simulationtime);
+    void UpdateIndenterPosition(double simulationtime);
 
     bool abortRequested;
 };

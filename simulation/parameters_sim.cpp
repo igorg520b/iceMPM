@@ -9,6 +9,7 @@ void icy::SimParams::Reset()
     indenter_force_accumulator = nullptr;
 
     nPts = 0;
+    n_indenter_subdivisions = 100;
 
     InitialTimeStep = 3.e-5;
     YoungsModulus = 5.e8;
@@ -126,9 +127,9 @@ void icy::SimParams::ComputeCamClayParams2()
 {
     ComputeLame();
     NACC_beta = IceTensileStrength/IceCompressiveStrength;
-    const real &beta = NACC_beta;
-    const real &q = IceShearStrength;
-    const real &p0 = IceCompressiveStrength;
+    const double &beta = NACC_beta;
+    const double &q = IceShearStrength;
+    const double &p0 = IceCompressiveStrength;
     NACC_M = (2*q*sqrt(1+2*beta))/(p0*(1+beta));
     NACC_Msq = NACC_M*NACC_M;
 }

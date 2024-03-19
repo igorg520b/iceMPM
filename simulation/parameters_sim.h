@@ -12,13 +12,6 @@
 #include <rapidjson/stringbuffer.h>
 #include <rapidjson/writer.h>
 
-typedef double real;
-//typedef float real;
-typedef Eigen::Vector2<real> Vector2r;
-typedef Eigen::Matrix2<real> Matrix2r;
-typedef Eigen::Array2<real> Array2r;
-
-
 // variables related to the formulation of the model
 
 namespace icy { struct SimParams; }
@@ -41,41 +34,43 @@ public:
     constexpr static size_t Bp00 = Fe00 + 4;
     constexpr static size_t nPtsArrays = Bp00 + 4;
 
-    real *grid_array;      // device-side grid data
-    real *pts_array;
+
+    double *grid_array;      // device-side grid data
+    double *indenter_force_accumulator; // size is 2*n_indenter_subdivisions
+    double *pts_array;
+
     size_t nPtsPitch, nGridPitch; // in number of elements(!), for coalesced access on the device
-    constexpr static int n_indenter_subdivisions = 360;
-    real *indenter_force_accumulator; // size is 2*n_indenter_subdivisions
+    int n_indenter_subdivisions;
     int tpb_P2G, tpb_Upd, tpb_G2P;  // threads per block for each operation
 
     int nPts;
     int GridX, GridY, GridTotal;
-    real GridXDimension;
+    double GridXDimension;
 
-    real InitialTimeStep, SimulationEndTime;
-    real Gravity, Density, PoissonsRatio, YoungsModulus;
-    real lambda, mu, kappa; // Lame
+    double InitialTimeStep, SimulationEndTime;
+    double Gravity, Density, PoissonsRatio, YoungsModulus;
+    double lambda, mu, kappa; // Lame
 
-    real IceCompressiveStrength, IceTensileStrength, IceShearStrength;
-    real NACC_beta, NACC_M, NACC_Msq;     // these are all computed
+    double IceCompressiveStrength, IceTensileStrength, IceShearStrength;
+    double NACC_beta, NACC_M, NACC_Msq;     // these are all computed
 
-    real DP_tan_phi, DP_threshold_p;
+    double DP_tan_phi, DP_threshold_p;
 
-    real cellsize, cellsize_inv, Dp_inv;
+    double cellsize, cellsize_inv, Dp_inv;
 
     int UpdateEveryNthStep; // run N steps without update
 
-    real IndDiameter, IndRSq, IndVelocity, IndDepth;
-    real xmin, xmax, ymin, ymax;            // bounding box of the material
+    double IndDiameter, IndRSq, IndVelocity, IndDepth;
+    double xmin, xmax, ymin, ymax;            // bounding box of the material
     int nxmin, nxmax, nymin, nymax;         // same, but nuber of grid cells
 
-    real ParticleVolume, ParticleMass, ParticleViewSize;
+    double ParticleVolume, ParticleMass, ParticleViewSize;
 
     int SimulationStep;
-    real SimulationTime;
+    double SimulationTime;
 
-    real indenter_x, indenter_x_initial, indenter_y, indenter_y_initial;
-    real Volume;
+    double indenter_x, indenter_x_initial, indenter_y, indenter_y_initial;
+    double Volume;  // total volume (area) of the object
     int SetupType;  // 0 - ice block horizontal indentation; 1 - cone uniaxial compression
 
     void Reset();
@@ -86,6 +81,8 @@ public:
     void ComputeHelperVariables();
     void ComputeIntegerBlockCoords();
     double PointsPerCell() {return nPts/(Volume/(cellsize*cellsize));}
+    int AnimationFrameNumber() { return SimulationStep / UpdateEveryNthStep;}
+    size_t IndenterArraySize() { return sizeof(double)*n_indenter_subdivisions*2; }
 };
 
 #endif
