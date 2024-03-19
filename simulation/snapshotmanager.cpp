@@ -9,15 +9,63 @@
 #include <iomanip>
 #include <fstream>
 
+void icy::SnapshotManager::SavePQ(std::string outputDirectory)
+{
+    std::filesystem::path odp(outputDirectory);
+    if(!std::filesystem::is_directory(odp) || !std::filesystem::exists(odp)) std::filesystem::create_directory(odp);
+    std::filesystem::path odp2(outputDirectory+"/"+directory_pq);
+    if(!std::filesystem::is_directory(odp2) || !std::filesystem::exists(odp2)) std::filesystem::create_directory(odp2);
+
+    const int current_frame_number = model->prms.AnimationFrameNumber();
+    char fileName[20];
+    snprintf(fileName, sizeof(fileName), "pq%05d.h5", current_frame_number);
+    std::string filePath = outputDirectory + "/" + directory_pq + "/" + fileName;
+    spdlog::info("saving NC frame {} to file {}", current_frame_number, filePath);
+
+
+    const int &n = model->prms.nPts;
+    buffer1.clear();
+    buffer1.reserve(n*2);
+    buffer2.clear();
+    buffer2.reserve(n*2);
+
+    for(int i=0;i<n;i++)
+    {
+        auto [p,q] = icy::Point::getPQ(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch,i);
+        uint8_t crushed = icy::Point::getCrushedStatus(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch,i);
+        if(crushed) {buffer1.push_back(p);buffer1.push_back(q);}
+        else {buffer2.push_back(p);buffer2.push_back(q);}
+    }
+
+    H5::H5File file(filePath, H5F_ACC_TRUNC);
+
+    hsize_t dims_pq_intact[2] = {buffer2.size()/2, 2};
+    H5::DataSpace dataspace_pq_intact(2, dims_pq_intact);
+    H5::DataSet dataset_pq_intact = file.createDataSet("PQ_intact", H5::PredType::NATIVE_DOUBLE, dataspace_pq_intact);
+    dataset_pq_intact.write(buffer2.data(), H5::PredType::NATIVE_DOUBLE);
+    SaveParametersAsAttributes(dataset_pq_intact);
+
+    hsize_t dims_pq_crushed[2] = {buffer1.size()/2, 2};
+    H5::DataSpace dataspace_pq_crushed(2, dims_pq_crushed);
+    H5::DataSet dataset_pq_crushed = file.createDataSet("PQ_crushed", H5::PredType::NATIVE_DOUBLE, dataspace_pq_crushed);
+
+    dataset_pq_crushed.write(buffer1.data(), H5::PredType::NATIVE_DOUBLE);
+    file.close();
+}
+
+
+
 void icy::SnapshotManager::SaveSnapshot(std::string outputDirectory)
 {
     std::filesystem::path odp(outputDirectory);
     if(!std::filesystem::is_directory(odp) || !std::filesystem::exists(odp)) std::filesystem::create_directory(odp);
+    std::filesystem::path odp2(outputDirectory+"/"+directory_snapshots);
+    if(!std::filesystem::is_directory(odp2) || !std::filesystem::exists(odp2)) std::filesystem::create_directory(odp2);
 
     const int current_frame_number = model->prms.AnimationFrameNumber();
     char fileName[20];
     snprintf(fileName, sizeof(fileName), "d%05d.h5", current_frame_number);
-    std::string filePath = outputDirectory + "/" + fileName;
+    std::string filePath = outputDirectory + "/" + directory_snapshots + "/" + fileName;
     spdlog::info("saving NC frame {} to file {}", current_frame_number, filePath);
 
     H5::H5File file(filePath, H5F_ACC_TRUNC);
@@ -37,10 +85,10 @@ void icy::SnapshotManager::SaveSnapshot(std::string outputDirectory)
     hsize_t dims_points = model->prms.nPtsPitch*icy::SimParams::nPtsArrays;
     H5::DataSpace dataspace_points(1, &dims_points);
 
-    hsize_t chunk_dims = (hsize_t)std::min(1024*256, model->prms.nPts);
+//    hsize_t chunk_dims = (hsize_t)std::min(1024*256, model->prms.nPts);
     H5::DSetCreatPropList proplist;
-    proplist.setChunk(1, &chunk_dims);
-    proplist.setDeflate(6);
+//    proplist.setChunk(1, &chunk_dims);
+//    proplist.setDeflate(4);
     H5::DataSet dataset_points = file.createDataSet("Points", H5::PredType::NATIVE_DOUBLE, dataspace_points, proplist);
     dataset_points.write(model->gpu.tmp_transfer_buffer, H5::PredType::NATIVE_DOUBLE);
 

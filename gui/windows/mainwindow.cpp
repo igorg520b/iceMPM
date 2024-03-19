@@ -285,6 +285,7 @@ void MainWindow::simulation_data_ready()
 {
     updateGUI();
     snapshot.SaveSnapshot(outputDirectory);
+    snapshot.SavePQ(outputDirectory);
     model.UnlockCycleMutex();
 }
 

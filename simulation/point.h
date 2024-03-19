@@ -2,6 +2,7 @@
 #define PARTICLE_H
 
 #include <cmath>
+#include <utility>
 #include <Eigen/Core>
 
 #include "parameters_sim.h"
@@ -27,10 +28,13 @@ struct icy::Point
     void Reset();
     void TransferToBuffer(double *buffer, const int pitch, const int point_index) const;  // distribute to SOA
     static Eigen::Vector2d getPos(const double *buffer, const int pitch, const int point_index);
-    static char getCrushedStatus(const double *buffer, const int pitch, const int point_index);
+    static uint8_t getCrushedStatus(const double *buffer, const int pitch, const int point_index);
 
     static double getJp_inv(const double *buffer, const int pitch, const int point_index);
     static short getGrain(const double *buffer, const int pitch, const int point_index);
+
+    static std::pair<double,double> getPQ(const double *buffer, const int pitch, const int point_index);
+
 };
 
 

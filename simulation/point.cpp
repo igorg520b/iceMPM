@@ -43,9 +43,9 @@ Eigen::Vector2d icy::Point::getPos(const double *buffer, const int pitch, const 
     return result;
 }
 
-char icy::Point::getCrushedStatus(const double *buffer, const int pitch, const int point_index)
+uint8_t icy::Point::getCrushedStatus(const double *buffer, const int pitch, const int point_index)
 {
-    char* ptr_intact = (char*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
+    uint8_t* ptr_intact = (uint8_t*)(&buffer[pitch*icy::SimParams::idx_utility_data]);
     return ptr_intact[point_index];
 }
 
@@ -53,6 +53,12 @@ double icy::Point::getJp_inv(const double *buffer, const int pitch, const int po
 {
     return buffer[point_index + pitch*icy::SimParams::idx_Jp_inv];
 }
+
+std::pair<double,double> icy::Point::getPQ(const double *buffer, const int pitch, const int point_index)
+{
+    return {buffer[point_index + pitch*icy::SimParams::idx_P],buffer[point_index + pitch*icy::SimParams::idx_Q]};
+}
+
 
 short icy::Point::getGrain(const double *buffer, const int pitch, const int point_index)
 {
