@@ -52,6 +52,10 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     const double &tan_phi = gprms.DP_tan_phi;
     const double &DP_threshold_p = gprms.DP_threshold_p;
 
+    const double &pmin = -gprms.IceTensileStrength;
+    const double &pmax = gprms.IceCompressiveStrength;
+    const double &qmax = gprms.IceShearStrength;
+
     if(p.p_tr < -DP_threshold_p || p.Jp_inv < 1)
     {
         // tear in tension or compress until original state
@@ -63,8 +67,19 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
     }
     else
     {
-        double q_n_1 = (p.p_tr+DP_threshold_p)*tan_phi;
-        q_n_1 = min(gprms.IceShearStrength, q_n_1);
+        double q_n_1;
+
+        if(p.p_tr > pmax)
+        {
+            q_n_1 = 0;
+        }
+        else
+        {
+            double q_from_dp = (p.p_tr+DP_threshold_p)*tan_phi;
+            q_n_1 = min(q_from_dp,qmax);
+//            double q_from_failure_surface = 2*sqrt((pmax-p.p_tr)*(p.p_tr-pmin))*qmax/(pmax-pmin);
+//            q_n_1 = min(q_from_failure_surface, q_from_dp);
+        }
 
         if(p.q_tr >= q_n_1)
         {
@@ -79,18 +94,174 @@ __device__ void Wolper_Drucker_Prager(icy::Point &p)
 }
 
 
+__device__ void GetParametersForGrain(short grain, double &pmin, double &pmax, double &qmax, double &beta, double &mSq)
+{
+    double var1 = 1.0 + gprms.GrainVariability*0.05*(-10 + grain%21);
+    double var2 = 1.0 + gprms.GrainVariability*0.033*(-15 + (grain+3)%30);
+    double var3 = 1.0 + gprms.GrainVariability*0.1*(-10 + (grain+4)%11);
+
+    pmax = gprms.IceCompressiveStrength * var1;
+    pmin = -gprms.IceTensileStrength * var2;
+    qmax = gprms.IceShearStrength * var3;
+
+    beta = -pmin / pmax;
+//    double NACC_M = (2*qmax*sqrt(1+2*beta))/(pmax*(1+beta));
+    mSq = (4*qmax*qmax*(1+2*beta))/((pmax*(1+beta))*(pmax*(1+beta)));
+//    mSq = NACC_M*NACC_M;
+}
+
+
 __device__ void CheckIfPointIsInsideFailureSurface(icy::Point &p)
 {
+    /*
     const double &beta = gprms.NACC_beta;
-    const double &p0 = gprms.IceCompressiveStrength;
     const double &M_sq = gprms.NACC_Msq;
-    double y = (1.+2.*beta)*p.q_tr*p.q_tr + M_sq*(p.p_tr + beta*p0)*(p.p_tr - p0);
-    if(y > 0) p.crushed = 1;
+    const double &pmin = -gprms.IceTensileStrength;
+    const double &pmax = gprms.IceCompressiveStrength;;
+    const double &qmax = gprms.IceShearStrength;
+    */
+
+    double beta, M_sq, pmin, pmax, qmax;
+    GetParametersForGrain(p.grain, pmin, pmax, qmax, beta, M_sq);
+
+    const double pmin2 = -3e6;
+    if(p.p_tr<0)
+    {
+        if(p.p_tr<pmin2) {p.crushed = 1; return;}
+        double q0 = 2*sqrt(-pmax*pmin)*qmax/(pmax-pmin);
+        double k = -q0/pmin2;
+        double q_limit = k*(p.p_tr-pmin2);
+        if(p.q_tr > q_limit) {p.crushed = 1; return;}
+    }
+    else
+    {
+        double y = (1.+2.*beta)*p.q_tr*p.q_tr + M_sq*(p.p_tr + beta*pmax)*(p.p_tr - pmax);
+        if(y > 0) p.crushed = 1;
+    }
 }
 
 
 
 // ==============================  kernels  ====================================
+
+
+__global__ void v2_kernel_p2g_alt()
+{
+    int pt_idx = blockIdx.x * blockDim.x + threadIdx.x;
+    const int &nPoints = gprms.nPts;
+    if(pt_idx >= nPoints) return;
+    const int laneIdx = threadIdx.x%32;//warpSize;     // for warp-level reduction
+
+    const double &dt = gprms.InitialTimeStep;
+    const double &vol = gprms.ParticleVolume;
+    const double &h = gprms.cellsize;
+    const double &h_inv = gprms.cellsize_inv;
+    const double &Dinv = gprms.Dp_inv;
+    const int &gridX = gprms.GridX;
+    const int &gridY = gprms.GridY;
+    const double &particle_mass = gprms.ParticleMass;
+    const int &nGridPitch = gprms.nGridPitch;
+    const int &pitch = gprms.nPtsPitch;
+
+    // pull point data from SOA
+    const double *buffer = gprms.pts_array;
+
+    Vector2d pos, velocity;
+    Matrix2d Bp, Fe;
+
+    for(int i=0; i<icy::SimParams::dim; i++)
+    {
+        pos[i] = buffer[pt_idx + pitch*(icy::SimParams::posx+i)];
+        velocity[i] = buffer[pt_idx + pitch*(icy::SimParams::velx+i)];
+        for(int j=0; j<icy::SimParams::dim; j++)
+        {
+            Fe(i,j) = buffer[pt_idx + pitch*(icy::SimParams::Fe00 + i*icy::SimParams::dim + j)];
+            Bp(i,j) = buffer[pt_idx + pitch*(icy::SimParams::Bp00 + i*icy::SimParams::dim + j)];
+        }
+    }
+
+    Matrix2d PFt = KirchhoffStress_Wolper(Fe);
+    Matrix2d subterm2 = particle_mass*Bp - (dt*vol*Dinv)*PFt;
+
+    Eigen::Vector2i base_coord_i = (pos*h_inv - Vector2d::Constant(0.5)).cast<int>(); // coords of base grid node for point
+    Vector2d base_coord = base_coord_i.cast<double>();
+    Vector2d fx = pos*h_inv - base_coord;
+
+    // optimized method of computing the quadratic (!) weight function (no conditional operators)
+    Array2d arr_v0 = 1.5-fx.array();
+    Array2d arr_v1 = fx.array() - 1.0;
+    Array2d arr_v2 = fx.array() - 0.5;
+    Array2d ww[3] = {0.5*arr_v0*arr_v0, 0.75-arr_v1*arr_v1, 0.5*arr_v2*arr_v2};
+
+//    int idx_gridnode_base = base_coord_i[0] + base_coord_i[1]*gridX;
+//    unsigned int mask_rgroup = __match_any_sync(0xFFFFFFFF, idx_gridnode_base); // for warp-level reduction
+
+    __syncwarp();
+    for (int i = 0; i < 3; i++)
+        for (int j = 0; j < 3; j++)
+        {
+            double Wip = ww[i][0]*ww[j][1];
+            Vector2d dpos((i-fx[0])*h, (j-fx[1])*h);
+            Vector2d incV = Wip*(velocity*particle_mass + subterm2*dpos);
+            double incM = Wip*particle_mass;
+
+            int i2 = i+base_coord_i[0];
+            int j2 = j+base_coord_i[1];
+            int idx_gridnode = (i+base_coord_i[0]) + (j+base_coord_i[1])*gridX;
+            if(i2<0 || j2<0 || i2>=gridX || j2>=gridY) gpu_error_indicator = 1;
+
+            // distribute the results into grid_array
+
+            // perform warp-level reduction
+
+            int active = 1;
+            unsigned int mask_rgroup = __match_any_sync(0xFFFFFFFF, idx_gridnode);
+            unsigned active_group = mask_rgroup;
+            int g_total = __popc(active_group);
+
+            for(int k=0;k<5;k++)
+            {
+                // check which lanes still participate
+                active_group = __ballot_sync(mask_rgroup, active);
+                g_total = __popc(active_group);
+
+                if(!active || g_total<=1) continue;
+
+                int local_idx = __popc(~(0xffffffff << laneIdx) & active_group);
+                int n_source_lanes = g_total/2;
+                // Find the position of the n-th set to 1 bit in a 32-bit integer.
+                unsigned source_lane = __fns(active_group, 0, local_idx + n_source_lanes+1);
+                double received_incM = __shfl_sync(active_group, incM, source_lane);
+                double received_incV0 = __shfl_sync(active_group, incV[0], source_lane);
+                double received_incV1 = __shfl_sync(active_group, incV[1], source_lane);
+
+                if(local_idx < n_source_lanes)
+                {
+                    incM += received_incM;
+                    incV[0] += received_incV0;
+                    incV[1] += received_incV1;
+                }
+                else if(local_idx < n_source_lanes*2)
+                {
+                    active = 0;
+                }
+            }
+
+//            __syncwarp();
+            // Udpate mass, velocity and force
+            if(active)
+            {
+                atomicAdd(&gprms.grid_array[0*nGridPitch + idx_gridnode], incM);
+                atomicAdd(&gprms.grid_array[1*nGridPitch + idx_gridnode], incV[0]);
+                atomicAdd(&gprms.grid_array[2*nGridPitch + idx_gridnode], incV[1]);
+            }
+
+//            __syncwarp();
+        }
+}
+
+
+
 
 __global__ void v2_kernel_p2g()
 {
@@ -374,17 +545,9 @@ __global__ void kernel_hello()
 
 void GPU_Implementation5::test()
 {
-    cudaError_t err;
     kernel_hello<<<1,1,0,streamCompute>>>();
-    if(cudaGetLastError() != cudaSuccess)
-    {
-        std::cout << "cuda test error " << err << '\n';
-        throw std::runtime_error("cuda test");
-    }
-    else
-    {
-        std::cout << "hello kernel executed successfully\n";
-    }
+    if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda test");
+    else std::cout << "hello kernel executed successfully\n";
     cudaDeviceSynchronize();
 }
 

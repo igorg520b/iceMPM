@@ -154,6 +154,11 @@ MainWindow::MainWindow(QWidget *parent)
     }
 
 
+    windowToImageFilter->SetInput(renderWindow);
+    windowToImageFilter->SetScale(1); // image quality
+    windowToImageFilter->SetInputBufferTypeToRGBA(); //also record the alpha (transparency) channel
+    windowToImageFilter->ReadFrontBufferOn(); // read from the back buffer
+    writerPNG->SetInputConnection(windowToImageFilter->GetOutputPort());
 
     connect(ui->action_quit, &QAction::triggered, this, &MainWindow::quit_triggered);
     connect(ui->action_camera_reset, &QAction::triggered, this, &MainWindow::cameraReset_triggered);
@@ -284,8 +289,10 @@ void MainWindow::load_parameter_triggered()
 void MainWindow::simulation_data_ready()
 {
     updateGUI();
-    snapshot.SaveSnapshot(outputDirectory);
-    snapshot.SavePQ(outputDirectory);
+//    snapshot.SaveSnapshot(outputDirectory);
+//    snapshot.SavePQ(outputDirectory);
+//    if(ui->actionTake_Screenshots->isChecked())
+        screenshot();
     model.UnlockCycleMutex();
 }
 
@@ -328,3 +335,25 @@ void MainWindow::background_worker_paused()
     statusLabel->setText("simulation stopped");
 }
 
+void MainWindow::screenshot()
+{
+    if(model.prms.SimulationStep % model.prms.UpdateEveryNthStep) return;
+    QString outputPath = QDir::currentPath()+ "/" + screenshot_directory.c_str() + "/" +
+                         QString::number(model.prms.AnimationFrameNumber()).rightJustified(5, '0') + ".png";
+
+    QDir pngDir(QDir::currentPath()+ "/"+ screenshot_directory.c_str());
+    if(!pngDir.exists()) pngDir.mkdir(QDir::currentPath()+ "/"+ screenshot_directory.c_str());
+
+    renderWindow->DoubleBufferOff();
+    renderWindow->Render();
+    windowToImageFilter->SetInputBufferTypeToRGBA(); //also record the alpha (transparency) channel
+    renderWindow->WaitForCompletion();
+
+    windowToImageFilter->Update();
+    windowToImageFilter->Modified();
+
+    writerPNG->Modified();
+    writerPNG->SetFileName(outputPath.toUtf8().constData());
+    writerPNG->Write();
+    renderWindow->DoubleBufferOn();
+}

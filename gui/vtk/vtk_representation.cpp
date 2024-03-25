@@ -21,7 +21,7 @@ icy::VisualRepresentation::VisualRepresentation()
         hueLut_pastel->SetTableValue(i, lutArrayPastel[i][0],
                               lutArrayPastel[i][1],
                               lutArrayPastel[i][2], 1.0);
-    hueLut_pastel->SetTableRange(0,39);
+    hueLut_pastel->SetTableRange(0,40);
 
     nLut = sizeof lutArrayMPMColors / sizeof lutArrayMPMColors[0];
     lutMPM->SetNumberOfTableValues(nLut);
@@ -207,8 +207,12 @@ void icy::VisualRepresentation::SynchronizeValues()
 
         visualized_values->SetNumberOfValues(model->prms.nPts);
         for(int i=0;i<model->prms.nPts;i++)
-            visualized_values->SetValue((vtkIdType)i,
-                                        icy::Point::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40);
+        {
+            int value = 40;
+            uint8_t crushed = icy::Point::getCrushedStatus(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
+            if(!crushed) value = icy::Point::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40;
+            visualized_values->SetValue((vtkIdType)i, (float)value);
+        }
         visualized_values->Modified();
     }
     else

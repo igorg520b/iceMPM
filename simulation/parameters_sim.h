@@ -72,6 +72,7 @@ public:
     double indenter_x, indenter_x_initial, indenter_y, indenter_y_initial;
     double Volume;  // total volume (area) of the object
     int SetupType;  // 0 - ice block horizontal indentation; 1 - cone uniaxial compression
+    double GrainVariability;
 
     void Reset();
     std::string ParseFile(std::string fileName);

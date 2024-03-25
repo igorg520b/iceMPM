@@ -43,6 +43,7 @@ Eigen::Vector2d icy::Point::getPos(const double *buffer, const int pitch, const 
     return result;
 }
 
+
 uint8_t icy::Point::getCrushedStatus(const double *buffer, const int pitch, const int point_index)
 {
     uint8_t* ptr_intact = (uint8_t*)(&buffer[pitch*icy::SimParams::idx_utility_data]);

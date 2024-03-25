@@ -87,6 +87,7 @@ private:
     void updateGUI();   // when simulation is started/stopped or when a step is advanced
     void updateActorText();
     void save_binary_data();
+
     std::string LoadParameterFile(std::string fileName);    // return file name of the point cloud
     void OpenSnapshot(QString fileName);
 
@@ -115,5 +116,11 @@ private:
     QString qLastParameterFile;
     const std::string outputDirectory = "default_output";
     vtkNew<vtkInteractorStyleRubberBand2D> interactor;
+
+    // screenshots
+    const std::string screenshot_directory = "screenshots";
+    vtkNew<vtkWindowToImageFilter> windowToImageFilter;
+    vtkNew<vtkPNGWriter> writerPNG;
+    void screenshot();
 };
 #endif // MAINWINDOW_H

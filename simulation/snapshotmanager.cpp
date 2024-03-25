@@ -8,6 +8,8 @@
 #include <sstream>
 #include <iomanip>
 #include <fstream>
+#include <algorithm>
+#include <utility>
 
 void icy::SnapshotManager::SavePQ(std::string outputDirectory)
 {
@@ -205,6 +207,19 @@ void icy::SnapshotManager::LoadRawPoints(std::string fileName)
     H5::DataSet dataset_grains = file.openDataSet("GrainIDs");
     dataset_grains.read(grainIDs.data(), H5::PredType::NATIVE_INT16);
 
+    std::vector<std::tuple<float,float,short>> tmpBuffer(nPoints);
+    for(int i=0;i<nPoints;i++) {
+        std::tuple<float,float,short> t = std::make_tuple(buffer[i][0],buffer[i][1],grainIDs[i]);
+        tmpBuffer[i] = t;
+    }
+    SortPoints(tmpBuffer);
+    for(int i=0;i<nPoints;i++) {
+        buffer[i][0] = std::get<0>(tmpBuffer[i]);
+        buffer[i][1] = std::get<1>(tmpBuffer[i]);
+        grainIDs[i] = std::get<2>(tmpBuffer[i]);
+    }
+
+
     H5::Attribute att_volume = dataset_grains.openAttribute("volume");
     float volume;
     att_volume.read(H5::PredType::NATIVE_FLOAT, &volume);
@@ -266,4 +281,22 @@ void icy::SnapshotManager::LoadRawPoints(std::string fileName)
     model->gpu.transfer_ponts_to_device();
     model->Reset();
     model->Prepare();
+}
+
+void icy::SnapshotManager::SortPoints(std::vector<std::tuple<float,float,short>> &buffer)
+{
+    const double hinv = model->prms.cellsize_inv;
+    const int gx = model->prms.GridX;
+//    const int nPoints = model->prms.nPts;
+
+    spdlog::info("sort start");
+    std::sort(buffer.begin(),buffer.end(),[hinv, gx](const std::tuple<float,float,short> &a, std::tuple<float,float,short> &b){
+        float ax = std::get<0>(a);
+        float ay = std::get<1>(a);
+        float bx = std::get<0>(b);
+        float by = std::get<1>(b);
+        int aidx = (int)(ax*hinv-0.5) + ((int)(ay*hinv-0.5))*gx;
+        int bidx = (int)(bx*hinv-0.5) + ((int)(by*hinv-0.5))*gx;
+        return aidx<bidx;});
+    spdlog::info("sorting done");
 }

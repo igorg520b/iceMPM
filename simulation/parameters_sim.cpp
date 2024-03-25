@@ -44,6 +44,7 @@ void icy::SimParams::Reset()
 
     indenter_x = indenter_x_initial = indenter_y = indenter_y_initial = 0;
     SetupType = 0;
+    GrainVariability = 0.50;
 
     ComputeLame();
     ComputeCamClayParams2();
@@ -86,6 +87,7 @@ std::string icy::SimParams::ParseFile(std::string fileName)
 
     if(doc.HasMember("DP_phi")) DP_tan_phi = std::tan(doc["DP_phi"].GetDouble()*pi/180);
     if(doc.HasMember("DP_threshold_p")) DP_threshold_p = doc["DP_threshold_p"].GetDouble();
+    if(doc.HasMember("GrainVariability")) GrainVariability = doc["GrainVariability"].GetDouble();
 
     ComputeCamClayParams2();
     spdlog::info("ComputeCamClayParams2() done");

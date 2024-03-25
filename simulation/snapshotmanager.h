@@ -4,6 +4,7 @@
 #include <array>
 #include <vector>
 #include <string>
+
 #include <H5Cpp.h>
 
 namespace icy {class SnapshotManager; class Model;}
@@ -18,7 +19,7 @@ public:
     void ReadSnapshot(std::string fileName); // return file number
     void LoadRawPoints(std::string fileName);
     void SaveParametersAsAttributes(H5::DataSet &dataset);
-
+    void SortPoints(std::vector<std::tuple<float,float,short>> &buffer);
     void SavePQ(std::string directory);
 
     const std::string directory_snapshots = "snapshots";
