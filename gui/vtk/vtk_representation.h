@@ -47,7 +47,7 @@ public:
 
     icy::Model *model;
 
-    enum VisOpt { none, NACC_case, Jp_inv, grains };
+    enum VisOpt { none, NACC_case, Jp_inv, grains, special_count };
     Q_ENUM(VisOpt)
     VisOpt VisualizingVariable = VisOpt::none;
     double ranges[20] = {};

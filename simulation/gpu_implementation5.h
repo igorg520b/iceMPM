@@ -16,10 +16,8 @@
 
 
 __global__ void v2_kernel_p2g();
-__global__ void v2_kernel_p2g_alt();
 __global__ void v2_kernel_g2p(bool recordPQ);
 __global__ void v2_kernel_update_nodes(double indenter_x, double indenter_y);
-
 
 __device__ Eigen::Matrix2d polar_decomp_R(const Eigen::Matrix2d &val);
 __device__ void svd(const double a[4], double u[4], double sigma[2], double v[4]);
@@ -33,6 +31,8 @@ __device__ void ComputePQ(icy::Point &p, const double &kappa, const double &mu);
 __device__ void GetParametersForGrain(short grain, double &pmin, double &pmax, double &qmax, double &beta, double &mSq);
 
 __device__ Eigen::Vector2d dev_d(Eigen::Vector2d Adiag);
+__device__ Eigen::Matrix2d dev(Eigen::Matrix2d A);
+
 
 // Naive GPU Implementation with memory coalescing
 namespace icy { class Model; }

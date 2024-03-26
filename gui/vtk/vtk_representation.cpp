@@ -203,7 +203,6 @@ void icy::VisualRepresentation::SynchronizeValues()
         points_mapper->UseLookupTableScalarRangeOn();
         points_mapper->SetLookupTable(hueLut_pastel);
         scalarBar->SetLookupTable(hueLut_pastel);
-        lutMPM->SetTableRange(0,39);
 
         visualized_values->SetNumberOfValues(model->prms.nPts);
         for(int i=0;i<model->prms.nPts;i++)
@@ -211,6 +210,27 @@ void icy::VisualRepresentation::SynchronizeValues()
             int value = 40;
             uint8_t crushed = icy::Point::getCrushedStatus(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i);
             if(!crushed) value = icy::Point::getGrain(model->gpu.tmp_transfer_buffer, model->prms.nPtsPitch, i)%40;
+            visualized_values->SetValue((vtkIdType)i, (float)value);
+        }
+        visualized_values->Modified();
+    }
+    else if(VisualizingVariable == VisOpt::special_count)
+    {
+        scalarBar->VisibilityOn();
+        points_mapper->ScalarVisibilityOn();
+        points_mapper->SetColorModeToMapScalars();
+        points_mapper->UseLookupTableScalarRangeOn();
+        points_mapper->SetLookupTable(hueLut);
+        scalarBar->SetLookupTable(hueLut);
+        hueLut->SetTableRange(0,8);
+
+        visualized_values->SetNumberOfValues(model->prms.nPts);
+        for(int i=0;i<model->prms.nPts;i++)
+        {
+            int value = 40;
+            char* ptr_intact = (char*)(&model->gpu.tmp_transfer_buffer[model->prms.nPtsPitch*icy::SimParams::idx_utility_data]);
+            uint8_t* ptr_special_count = (uint8_t*)(&ptr_intact[model->prms.nPtsPitch*3]);
+            value = ptr_special_count[i];
             visualized_values->SetValue((vtkIdType)i, (float)value);
         }
         visualized_values->Modified();
