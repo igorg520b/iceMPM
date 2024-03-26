@@ -27,7 +27,7 @@ else()
 endif()
 
 
-#[[
+
 
 # CLI version
 add_executable(cm
@@ -39,16 +39,14 @@ add_executable(cm
     simulation/model.h
     simulation/point.h
     simulation/point.cpp
-#    simulation/gridnode.h
-#    simulation/gridnode.cpp
 
     simulation/givens.cuh
     simulation/helper_math.cuh
     simulation/gpu_implementation5.h
     simulation/gpu_implementation5.cu
 
-    simulation/snapshotwriter.h
-    simulation/snapshotwriter.cpp
+    simulation/snapshotmanager.h
+    simulation/snapshotmanager.cpp
 )
 
 set_target_properties(cm PROPERTIES CUDA_ARCHITECTURES "80")
@@ -75,8 +73,6 @@ else()
     target_include_directories(cm PRIVATE ${HDF5_INCLUDE_DIRS})
 endif()
 
-
-#]]
 
 
 

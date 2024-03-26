@@ -46,6 +46,9 @@ void icy::SimParams::Reset()
     SetupType = 0;
     GrainVariability = 0.50;
 
+    UseWarpLevelReduction = 0;
+    SortPointsByGridCell = 1;
+
     ComputeLame();
     ComputeCamClayParams2();
     ComputeHelperVariables();
@@ -88,6 +91,13 @@ std::string icy::SimParams::ParseFile(std::string fileName)
     if(doc.HasMember("DP_phi")) DP_tan_phi = std::tan(doc["DP_phi"].GetDouble()*pi/180);
     if(doc.HasMember("DP_threshold_p")) DP_threshold_p = doc["DP_threshold_p"].GetDouble();
     if(doc.HasMember("GrainVariability")) GrainVariability = doc["GrainVariability"].GetDouble();
+
+    if(doc.HasMember("UseWarpLevelReduction")) UseWarpLevelReduction = doc["UseWarpLevelReduction"].GetInt();
+    if(doc.HasMember("tpb_P2G")) tpb_P2G = doc["tpb_P2G"].GetInt();
+    if(doc.HasMember("tpb_Upd")) tpb_Upd = doc["tpb_Upd"].GetInt();
+    if(doc.HasMember("tpb_G2P")) tpb_G2P = doc["tpb_G2P"].GetInt();
+    if(doc.HasMember("SortPointsByGridCell")) SortPointsByGridCell = doc["SortPointsByGridCell"].GetInt();
+
 
     ComputeCamClayParams2();
     spdlog::info("ComputeCamClayParams2() done");

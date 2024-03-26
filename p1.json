@@ -1,5 +1,5 @@
 {
-"InputRawPoints":"/home/s2/Documents/geometries_2d/2d_70k.h5",
+"InputRawPoints":"geometries_2d/2d_70k.h5",
 
 "ParticleViewSize":4.1,
 "InitialTimeStep":1.0e-5,
@@ -21,8 +21,12 @@
 "IndDiameter":0.324,
 "IndVelocity":0.2,
 "IndDepth":0.101,
-"BlockHeight":1.0,
-"BlockLength":2.5
+
+"SortPointsByGridCell":1,
+"tpb_P2G":256,
+"tpb_Upd":512,
+"tpb_G2P":128,
+"UseWarpLevelReduction":0
 }
 
 

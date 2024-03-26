@@ -207,18 +207,20 @@ void icy::SnapshotManager::LoadRawPoints(std::string fileName)
     H5::DataSet dataset_grains = file.openDataSet("GrainIDs");
     dataset_grains.read(grainIDs.data(), H5::PredType::NATIVE_INT16);
 
-    std::vector<std::tuple<float,float,short>> tmpBuffer(nPoints);
-    for(int i=0;i<nPoints;i++) {
-        std::tuple<float,float,short> t = std::make_tuple(buffer[i][0],buffer[i][1],grainIDs[i]);
-        tmpBuffer[i] = t;
+    if(model->prms.SortPointsByGridCell)
+    {
+        std::vector<std::tuple<float,float,short>> tmpBuffer(nPoints);
+        for(int i=0;i<nPoints;i++) {
+            std::tuple<float,float,short> t = std::make_tuple(buffer[i][0],buffer[i][1],grainIDs[i]);
+            tmpBuffer[i] = t;
+        }
+        SortPoints(tmpBuffer);
+        for(int i=0;i<nPoints;i++) {
+            buffer[i][0] = std::get<0>(tmpBuffer[i]);
+            buffer[i][1] = std::get<1>(tmpBuffer[i]);
+            grainIDs[i] = std::get<2>(tmpBuffer[i]);
+        }
     }
-    SortPoints(tmpBuffer);
-    for(int i=0;i<nPoints;i++) {
-        buffer[i][0] = std::get<0>(tmpBuffer[i]);
-        buffer[i][1] = std::get<1>(tmpBuffer[i]);
-        grainIDs[i] = std::get<2>(tmpBuffer[i]);
-    }
-
 
     H5::Attribute att_volume = dataset_grains.openAttribute("volume");
     float volume;

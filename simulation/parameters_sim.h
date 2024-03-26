@@ -74,6 +74,9 @@ public:
     int SetupType;  // 0 - ice block horizontal indentation; 1 - cone uniaxial compression
     double GrainVariability;
 
+    int UseWarpLevelReduction; // may be used for development/testing
+    int SortPointsByGridCell;
+
     void Reset();
     std::string ParseFile(std::string fileName);
 

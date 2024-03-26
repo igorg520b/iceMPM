@@ -639,7 +639,6 @@ void GPU_Implementation5::transfer_ponts_to_device()
 
 void GPU_Implementation5::cuda_transfer_from_device()
 {
-    spdlog::info("cuda_transfer_from_device()");
     cudaError_t err = cudaMemcpyAsync(tmp_transfer_buffer, model->prms.pts_array,
                                       model->prms.nPtsPitch*sizeof(double)*icy::SimParams::nPtsArrays,
                                       cudaMemcpyDeviceToHost, streamCompute);
@@ -683,7 +682,10 @@ void GPU_Implementation5::cuda_p2g()
     const int nPoints = model->prms.nPts;
     int tpb = model->prms.tpb_P2G;
     int blocksPerGrid = (nPoints + tpb - 1) / tpb;
-    v2_kernel_p2g<<<blocksPerGrid, tpb, 0, streamCompute>>>();
+    if(model->prms.UseWarpLevelReduction)
+        v2_kernel_p2g_alt<<<blocksPerGrid, tpb, 0, streamCompute>>>();
+    else
+        v2_kernel_p2g<<<blocksPerGrid, tpb, 0, streamCompute>>>();
     if(cudaGetLastError() != cudaSuccess) throw std::runtime_error("cuda_p2g");
 }
 
